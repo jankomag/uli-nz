@@ -9,38 +9,54 @@ library(rgeos)
 library(geosphere)
 
 #### Data imports ####
-sa1 <- st_read("data/geographic/auckland_urban_centroid_sa1.gpkg")
-households <- read.csv("data/geographic/SA1 Census 2018-WellingtonRegion_updated_4-11-21/households_in_sa1s.csv")
-dampness <- read.csv("data/geographic/SA1 Census 2018-WellingtonRegion_updated_4-11-21/dampness.csv")
-stations <- st_read("data/transport/public_transport/trains_auckland.gpkg")
+# geographic data
+sa1 <- st_read("data/geographic/wellington_urban_sa1s.gpkg")
+#sa1_cent <- st_read("data/geographic/wellington_urban_polygons_sa1s.gpkg")
+stations <- st_read("data/transport/public_transport/Wellington_Public_Transport.geojson")
+# census variables
+households <- read.csv("data/geographic/SA1 CensusWellingtonRegion/households_in_sa1s.csv")
+dampness <- read.csv("data/geographic/SA1 CensusWellingtonRegion/dampness.csv")
+population <- read.csv("data/geographic/SA1 CensusWellingtonRegion/population_welly.csv")
+
 
 #transforming to the same coordinate system
 stations <- st_transform(stations, 27291)
 sa1 = st_transform(sa1, 27291)
 
-tmap_mode("plot")
+tmap_mode("view")
 tm_shape(sa1) +
-  tm_dots(col="black") +
+  tm_borders(col="black") +
   tm_shape(stations) +
   tm_dots(col="red")
 
 #### Adding Census vars ####
 sa1_nons <- sa1 %>% st_drop_geometry()
-head(sa1)
+head(sa1_nons)
 
 dampness <- dampness %>%
   mutate(code = as.character(code)) %>%
-  mutate(dampness = as.numeric(dampness))
-household <- household %>%  
-  mutate(code = as.character(code))
+  mutate(dampness_rate = as.numeric(as.factor(Total_damp))/as.numeric(as.factor(Total.stated)))
 
-sa1_h <- left_join(sa1, household, by = c("SA12018_V1"="code"))
+households <- households %>%  
+  mutate(code = as.character(code)) %>%
+  mutate(no_households = as.numeric(no_households))
+
+population <- population %>%  
+  mutate(code = as.character(code)) %>%
+  mutate(population_usual = as.numeric(as.factor(population_usual))) %>%
+  mutate(maori_descent = as.numeric(as.factor(maori_descent))) %>%
+  mutate(median_income = as.numeric(as.factor(median_income))) %>%
+  mutate(maori_pr = maori_descent/population_usual)
+
+sa1_h <- left_join(sa1, households, by = c("SA12018_V1"="code"))
 sa1_h_d <- left_join(sa1_h, dampness, by = c("SA12018_V1"="code"))
+sa1_all <- left_join(sa1_h_d, population, by = c("SA12018_V1"="code"))
 
-head(sa1_h_d)
 
-tm_shape(sa1_h_d) +
-  tm_fill(col="dampness",
+head(sa1_all)
+
+tm_shape(sa1_all) +
+  tm_fill(col="maori_pr",
           style = "kmeans", palette = "Reds") +
   tm_borders("transparent")
 #tm_shape(pt) +
