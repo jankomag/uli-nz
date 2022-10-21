@@ -60,11 +60,17 @@ tm_shape(sa1_all) +
 #tm_shape(pt) +
 #tm_dots(col="Mode")
 #### Spatial Interpolation ####
-grid = st_sample(sa1_all, 5000, type = "regular")
+grid <- st_sample(sa1_all, 5000, type = "regular")
+grid <- st_transform(grid, 27291)
+grid <- st_as_sf(grid)
+
 tmap_mode("view")
 tm_shape(grid) +
-  tm_dots(col="black")
+  tm_dots(col="grey") +
+  tm_shape(stations) +
+  tm_dots("black")
 
+# IDW for census variables
 idw_income <- idw(formula = median_income~1, locations = sa1_all, 
                newdata = grid, idp = 1, nmax=1000)
 idw_hs <- idw(formula = no_households~1, locations = sa1_all, 
@@ -78,14 +84,26 @@ tm_shape(idw_income) +
   tm_dots(col="var1.pred", style="kmeans") +
   tm_basemap("OpenStreetMap")
 
+idw_joined <- cbind(idw_income, idw_hs, idw_damp, idw_maori)
+colnames(idw_joined) <- c("income", "no_households", "dmapness", "maori_pr")
+idw_joined
 #### Distances to transport ####
-sa1_all$nearest_station <- st_nearest_feature(sa1, stations)
+train_stations <- stations %>% filter(Mode == "Railway Station")
+bus_stops <- subset(stations, Mode == "Bus Stop")
+grid <- st_as_sf(grid)
+bus_stops <- st_as_sf(bus_stops)
 
-grid$dist_nearest_station <- st_distance(grid, stations, by_element = FALSE)
+sa1_all$nearest_station <- st_nearest_feature(sa1, stations)
+g1 = st_geometry(grid)
+g2 = st_geometry(stations) 
+
+dlist = mapply(st_distance, g1, g2)
+
+grid$dist_nearest_station <- st_distance(grid, stations, by_element = TRUE)
 
 tm_shape(grid) +
   tm_dots() +
-  tm_shape(stations) +
+  tm_shape(bus_stops) +
   tm_dots(col="grey")
 
 # bind results with original points
