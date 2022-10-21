@@ -18,7 +18,6 @@ households <- read.csv("data/geographic/SA1 CensusWellingtonRegion/households_in
 dampness <- read.csv("data/geographic/SA1 CensusWellingtonRegion/dampness.csv")
 population <- read.csv("data/geographic/SA1 CensusWellingtonRegion/population_welly.csv")
 
-
 #transforming to the same coordinate system
 stations <- st_transform(stations, 27291)
 sa1 = st_transform(sa1, 27291)
@@ -52,7 +51,6 @@ sa1_h <- left_join(sa1, households, by = c("SA12018_V1"="code"))
 sa1_h_d <- left_join(sa1_h, dampness, by = c("SA12018_V1"="code"))
 sa1_all <- left_join(sa1_h_d, population, by = c("SA12018_V1"="code"))
 
-
 head(sa1_all)
 
 tm_shape(sa1_all) +
@@ -61,21 +59,38 @@ tm_shape(sa1_all) +
   tm_borders("transparent")
 #tm_shape(pt) +
 #tm_dots(col="Mode")
-#### Station distances ####
-sa1$nearest_station <- st_nearest_feature(sa1, stations)
-sa1$dist_nearest_station <- st_distance(sa1, stations, by_element = TRUE)
-summary(sa1)
-
-tm_shape(sa1) +
-  tm_dots(col="dist_nearest_station", style="kmeans") +
-  tm_shape(stations) +
+#### Spatial Interpolation ####
+grid = st_sample(sa1_all, 5000, type = "regular")
+tmap_mode("view")
+tm_shape(grid) +
   tm_dots(col="black")
 
+idw_income <- idw(formula = median_income~1, locations = sa1_all, 
+               newdata = grid, idp = 1, nmax=1000)
+idw_hs <- idw(formula = no_households~1, locations = sa1_all, 
+                  newdata = grid, idp = 1)
+idw_damp <- idw(formula = dampness_rate~1, locations = sa1_all, 
+                      newdata = grid, idp = 2)
+idw_maori <- idw(formula = maori_pr~1, locations = sa1_all, 
+                newdata = grid, idp = 2)
+
+tm_shape(idw_income) +
+  tm_dots(col="var1.pred", style="kmeans") +
+  tm_basemap("OpenStreetMap")
+
+#### Distances to transport ####
+sa1_all$nearest_station <- st_nearest_feature(sa1, stations)
+
+grid$dist_nearest_station <- st_distance(grid, stations, by_element = FALSE)
+
+tm_shape(grid) +
+  tm_dots() +
+  tm_shape(stations) +
+  tm_dots(col="grey")
 
 # bind results with original points
 pts.wit.dist <- cbind(pts, dist.mat)
 pts.wit.dist[1:3,]
-
 
 
 ##### Buffers ####
