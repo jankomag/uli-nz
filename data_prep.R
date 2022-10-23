@@ -7,6 +7,8 @@ library(ggplot2)
 library(RColorBrewer)
 library(rgeos)
 library(geosphere)
+library(gstat)
+library(spdep)
 
 #### Data imports ####
 # geographic data
@@ -20,7 +22,7 @@ population <- read.csv("data/geographic/SA1 CensusWellingtonRegion/population_we
 
 #transforming to the same coordinate system
 stations <- st_transform(stations, 27291)
-sa1 = st_transform(sa1, 27291)
+sa1 <- st_transform(sa1, 27291)
 
 tmap_mode("view")
 tm_shape(sa1) +
@@ -29,12 +31,10 @@ tm_shape(sa1) +
   tm_dots(col="red")
 
 #### Adding Census vars ####
-sa1_nons <- sa1 %>% st_drop_geometry()
-head(sa1_nons)
-
+dampness[is.na(dampness)] <- 0
 dampness <- dampness %>%
   mutate(code = as.character(code)) %>%
-  mutate(dampness_rate = as.numeric(as.factor(Total_damp))/as.numeric(as.factor(Total.stated)))
+  mutate(dampness = as.numeric(as.character(dampness)))
 
 households <- households %>%  
   mutate(code = as.character(code)) %>%
@@ -51,14 +51,26 @@ sa1_h <- left_join(sa1, households, by = c("SA12018_V1"="code"))
 sa1_h_d <- left_join(sa1_h, dampness, by = c("SA12018_V1"="code"))
 sa1_all <- left_join(sa1_h_d, population, by = c("SA12018_V1"="code"))
 
+sa1_all = subset(sa1_all, select = -c(X,Total_damp,Not_damp, Total.stated, maori_descent))
+
 head(sa1_all)
 
 tm_shape(sa1_all) +
-  tm_fill(col="maori_pr",
+  tm_fill(col="dampness",
           style = "kmeans", palette = "Reds") +
   tm_borders("transparent")
 #tm_shape(pt) +
 #tm_dots(col="Mode")
+
+##### Impute missing values #####
+sa1_all <- mutate(sa1_all, dampness = as.numeric(as.character(dampness)))
+sa1 <- SpatialPoints(sa1)
+knn5 <- knn2nb(knearneigh(sa1, k = 5))
+
+sapply(1:length(knn5), function(N){mean(dampness[N])})
+
+sa1s_na_damp <- sa1_all[which(is.na(sa1_all$dampness)),]
+sa1s_na_damp$dampness
 #### Spatial Interpolation ####
 grid <- st_sample(sa1_all, 5000, type = "regular")
 grid <- st_transform(grid, 27291)
@@ -72,13 +84,13 @@ tm_shape(grid) +
 
 # IDW for census variables
 idw_income <- idw(formula = median_income~1, locations = sa1_all, 
-               newdata = grid, idp = 1, nmax=1000)
+               newdata = grid, idp = 1, nmax=10)
 idw_hs <- idw(formula = no_households~1, locations = sa1_all, 
-                  newdata = grid, idp = 1)
-idw_damp <- idw(formula = dampness_rate~1, locations = sa1_all, 
-                      newdata = grid, idp = 2)
+                  newdata = grid, idp = 1, nmax=10)
+idw_damp <- idw(formula = dampness~1, locations = sa1_all, 
+                      newdata = grid, idp = 1, nmax=10)
 idw_maori <- idw(formula = maori_pr~1, locations = sa1_all, 
-                newdata = grid, idp = 2)
+                newdata = grid, idp = 1, nmax=10)
 
 tm_shape(idw_income) +
   tm_dots(col="var1.pred", style="kmeans") +
@@ -111,7 +123,7 @@ pts.wit.dist <- cbind(pts, dist.mat)
 pts.wit.dist[1:3,]
 
 
-##### Buffers ####
+#### Buffers ####
 # union the stations to a single point file
 pt_merge <- st_sf(st_union(pt))
 
