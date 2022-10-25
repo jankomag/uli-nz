@@ -72,7 +72,7 @@ sapply(1:length(knn5), function(N){mean(dampness[N])})
 sa1s_na_damp <- sa1_all[which(is.na(sa1_all$dampness)),]
 sa1s_na_damp$dampness
 #### Spatial Interpolation ####
-grid <- st_sample(sa1_all, 5000, type = "regular")
+grid <- st_sample(sa1_all, 10000, type = "regular")
 grid <- st_transform(grid, 27291)
 grid <- st_as_sf(grid)
 
