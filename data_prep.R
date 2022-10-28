@@ -10,59 +10,50 @@ library(geosphere)
 library(gstat)
 library(spdep)
 
-#### Data imports ####
+ #### Data imports ####
 # geographic data
-sa1 <- st_read("data/geographic/wellington_urban_sa1s.gpkg")
+sa1 <- st_read("data/geographic/auckland_urban_sa1s.gpkg")
 #sa1_cent <- st_read("data/geographic/wellington_urban_polygons_sa1s.gpkg")
-stations <- st_read("data/transport/public_transport/Wellington_Public_Transport.geojson")
+stations <- st_read("data/transport/public_transport/trains_auckland.gpkg")
+stops <- st_read("data/transport/public_transport/bus_stops_auckland.geojson")
 # census variables
-households <- read.csv("data/geographic/SA1 CensusWellingtonRegion/households_in_sa1s.csv")
-dampness <- read.csv("data/geographic/SA1 CensusWellingtonRegion/dampness.csv")
-population <- read.csv("data/geographic/SA1 CensusWellingtonRegion/population_welly.csv")
+census <- read.csv("data/geographic/SA1 CensusAucklandRegion/auckland_census.csv")
+households <- read.csv("data/geographic/SA1 CensusAucklandRegion/households_in_sa1s.csv")
+dampness <- read.csv("data/geographic/SA1 CensusAucklandRegion/dampness.csv")
+population <- read.csv("data/geographic/SA1 CensusAucklandRegion/population_welly.csv")
 
 #transforming to the same coordinate system
 stations <- st_transform(stations, 27291)
+stops <- st_transform(stops, 27291)
 sa1 <- st_transform(sa1, 27291)
 
 tmap_mode("view")
-tm_shape(sa1) +
-  tm_borders(col="black")# +
+tm_shape(grid) +
+  tm_dots(col="black")# +
   tm_shape(stations) +
   tm_dots(col="red")
 
+head(census)
 #### Adding Census vars ####
-dampness[is.na(dampness)] <- 0
-dampness <- dampness %>%
+census <- census %>%
   mutate(code = as.character(code)) %>%
-  mutate(dampness = as.numeric(as.character(dampness)))
+  mutate(no_households = as.numeric(no_households)) %>%
+  mutate(median_income = as.numeric(median_income)) %>%
+  mutate(maori_desc = as.numeric(maori_desc)) %>%
+  mutate(pop_usual = as.numeric(pop_usual)) %>%
+  mutate(maori_pr = maori_desc/pop_usual)
 
-households <- households %>%  
-  mutate(code = as.character(code)) %>%
-  mutate(no_households = as.numeric(no_households))
-
-population <- population %>%  
-  mutate(code = as.character(code)) %>%
-  mutate(population_usual = as.numeric(as.factor(population_usual))) %>%
-  mutate(maori_descent = as.numeric(as.factor(maori_descent))) %>%
-  mutate(median_income = as.numeric(as.factor(median_income))) %>%
-  mutate(maori_pr = maori_descent/population_usual)
-
-sa1_h <- left_join(sa1, households, by = c("SA12018_V1"="code"))
-sa1_h_d <- left_join(sa1_h, dampness, by = c("SA12018_V1"="code"))
-sa1_all <- left_join(sa1_h_d, population, by = c("SA12018_V1"="code"))
-
-sa1_all = subset(sa1_all, select = -c(X,Total_damp,Not_damp, Total.stated, maori_descent))
-
+sa1_all <- left_join(sa1, census, by = c("SA12018_V1"="code"))
+#sa1_all = subset(sa1_all, select = -c(maori_desc))
 head(sa1_all)
 
 tm_shape(sa1_all) +
-  tm_fill(col="dampness",
-          style = "kmeans", palette = "Reds") +
-  tm_borders("transparent")
-#tm_shape(pt) +
-#tm_dots(col="Mode")
-
+  tm_fill(col="maori_pr",
+          style = "kmeans", palette = "Reds") #+
+  #tm_borders("transparent")
 ##### Impute missing values #####
+length(sa1_all[is.na(sa1_all),])
+
 sa1_all <- mutate(sa1_all, dampness = as.numeric(as.character(dampness)))
 sa1 <- SpatialPoints(sa1)
 knn5 <- knn2nb(knearneigh(sa1, k = 5))
@@ -73,11 +64,10 @@ sa1s_na_damp <- sa1_all[which(is.na(sa1_all$dampness)),]
 sa1s_na_damp$dampness
 
 #### Spatial Interpolation ####
-grid <- st_sample(sa1, 100000, type = "regular")
+grid <- st_sample(sa1, 10000, type = "regular")
 grid <- st_transform(grid, 27291)
 grid <- st_as_sf(grid)
-
-st_write(grid, "grid_10000.gpkg")
+#st_write(grid, "grid_10000.gpkg")
 
 tmap_mode("view")
 tm_shape(grid) +
