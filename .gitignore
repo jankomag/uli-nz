@@ -1,5 +1,6 @@
 data/
 cache/
+.ipynb_checkpoints/
 reading/
 .RData
 .Rhistory
