@@ -57,6 +57,8 @@ tm_shape(sa1_all) +
 ##### Impute missing values #####
 summary(aggr(census))
 sa1_all$maori_pr[is.na(sa1_all$maori_pr)] <- 0
+sa1_all$median_income[is.na(sa1_all$median_income)] <- 0
+
 
 #imputation by neighbouring values - not working yet
 #sa1_all <- mutate(sa1_all, dampness = as.numeric(as.character(dampness)))
@@ -97,7 +99,7 @@ idw_joined = subset(idw_joined, select = -c(var1.var, var1.var.1, var1.var.2,
                                             var1.var.3, geometry.1, geometry.2,geometry.3))
 
 colnames(idw_joined) <- c("income", "no_households", "maori_pr", "dampness", "geometry")
-st_write(idw_joined,"data/grid_auckaldn_census.gpkg")
+st_write(idw_joined,"data/grid_auckland_census_10000.gpkg")
 
 #### Distances to transport ####
 train_stations <- stations %>% filter(Mode == "Railway Station")
