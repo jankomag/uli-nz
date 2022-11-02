@@ -67,7 +67,7 @@ sa1_all$maori_pr[is.na(sa1_all$maori_pr)] <- 0
 #sa1s_na_damp$dampness
 
 #### Spatial Interpolation ####
-grid <- st_sample(sa1, 50000, type = "regular")
+grid <- st_sample(sa1, 10000, type = "regular")
 grid <- st_transform(grid, 27291)
 grid <- st_as_sf(grid)
 #st_write(grid, "grid_10000.gpkg")
