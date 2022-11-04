@@ -50,9 +50,13 @@ sa1_all <- left_join(sa1, census, by = c("SA12018_V1"="code"))
 #sa1_all = subset(sa1_all, select = -c(maori_desc))
 head(sa1_all)
 
-tm_shape(sa1_all) +
-  tm_fill(col="maori_pr",
+
+grid <- st_read("data/geographic/grids/grid_all-v-04.11.22_19.52.gpkg")
+
+tm_shape(grid) +
+  tm_dots(col="kuli",
           style = "kmeans", palette = "Reds")
+
 
 ##### Impute missing values #####
 summary(aggr(census))
@@ -102,12 +106,11 @@ colnames(idw_joined) <- c("income", "no_households", "maori_pr", "dampness", "ge
 st_write(idw_joined,"data/grid_auckland_census_10000.gpkg")
 
 #### Distances to transport ####
-train_stations <- stations %>% filter(Mode == "Railway Station")
-bus_stops <- subset(stations, Mode == "Bus Stop")
 grid <- st_as_sf(grid)
-bus_stops <- st_as_sf(bus_stops)
+st_crs(grid)
+stations <- st_as_sf(stations)
 
-sa1_all$nearest_station <- st_nearest_feature(sa1, stations)
+grid$nearest_station <- st_nearest_feature(grid, stations)
 g1 = st_geometry(grid)
 g2 = st_geometry(stations) 
 
@@ -124,11 +127,9 @@ tm_shape(grid) +
 pts.wit.dist <- cbind(pts, dist.mat)
 pts.wit.dist[1:3,]
 
-
 #### Buffers ####
 # union the stations to a single point file
 pt_merge <- st_sf(st_union(pt))
-
 # buffer this
 buf_pt <- st_buffer(pt_merge, 800)
 # and map
