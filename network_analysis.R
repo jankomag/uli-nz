@@ -1,4 +1,3 @@
-#library(stplanr)
 library(sf)
 library(sp)
 library(tmap)
@@ -8,14 +7,14 @@ library(dplyr)
 library(tidygraph)
 
 #### Data Imports ####
-gpkgnet <- st_read("data/network_analysis/auckland_network_walk_consolidatedTRUE_gpkg.gpkg")
+gpkgnet <- st_read("data/network_analysis/sample_network.gpkg")
 net <- as_sfnetwork(gpkgnet, crs = 27291)
 net <- st_transform(net, 27291)
 
-grid <- st_read("data/geographic/grids/grid_50000_auckland_allDist.gpkg")
+grid <- st_read("data/geographic/grids/sample_grid_all.gpkg")
 grid <- st_transform(grid, 27291)
 
-stations <- st_read("data/transport/public_transport/trains_auckland_with_distances_on_network.gpkg")
+stations <- st_read("data/transport/public_transport/sample_stations.gpkg")
 stations <- st_transform(stations, 27291)
 
 # test plotting
@@ -26,7 +25,23 @@ tm_shape(net) +
   tm_shape(grid) +
   tm_dots(col="grey")
 
-# network distances
+#### Distance analysis ####
+new_net = net %>%
+  activate(nodes) %>%
+  filter(group_components() == 1) %>%
+  st_network_blend(grid) %>%
+  st_network_blend(stations)
+
+# Calculate the cost matrix.
+cost_matrix = st_network_cost(new_net, from = sites, to = facilities, weights = "weight")
+
+# Find for each site which facility is closest.
+closest = stations[apply(cost_matrix, 1, function(x) which(x == min(x))[1])]
+
+distm (c(40.777250, -73.872610), c(40.6895, -74.1745), fun = distHaversine)
+
+
+# test network distances
 p1 = st_geometry(net, "nodes")[495] + st_sfc(st_point(c(50, -50)))
 st_crs(p1) = st_crs(net)
 p2 = st_geometry(net, "nodes")[121] + st_sfc(st_point(c(-10, 100)))
@@ -47,17 +62,4 @@ plot(slice(activate(net, "nodes"), node_path), col = "red", add = TRUE)
 
 ## Distance matrix
 dist_matrix <- st_network_cost(net, from = grid, to = stations)
-
-#### Following analysis ####
-new_net = net %>%
-  activate("nodes") %>%
-  filter(group_components() == 1) %>%
-  st_network_blend(grid) %>%
-  st_network_blend(stations)
-
-# Calculate the cost matrix.
-cost_matrix = st_network_cost(new_net, from = sites, to = facilities, weights = "weight")
-
-# Find for each site which facility is closest.
-closest = stations[apply(cost_matrix, 1, function(x) which(x == min(x))[1])]
 
