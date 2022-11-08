@@ -101,9 +101,9 @@ TNORM<- function(x){
 }
 
 # normalise against target value
-targetnorm<- function(x){
-  return min(1, 1 - (800 - x) / (max(x) - min(x)))
-}
+#targetnorm<- function(x){
+ # return min(1, 1 - (800 - x) / (max(x) - min(x)))
+#}
 
 grid_df %>% 
   mutate(station_meas = TNORM(station_dist)) %>%
