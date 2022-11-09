@@ -34,10 +34,7 @@ summary(grid)
 grid_df <- grid %>% st_drop_geometry()
 
 ##### distributions #####
-head(testdf)
-
-df_to_see_dist = grid_modified # define parameter
-
+df_to_see_dist = grid_df # define parameter
 my_plots <- lapply(names(df_to_see_dist), function(var_x){
   p <- ggplot(df_to_see_dist) +
     aes_string(var_x)
@@ -96,38 +93,40 @@ robust_scalar<- function(x){
 }
 
 # distance to threshold normalisation
-TNORM<- function(x){
+distTNORM<- function(x){
   return ((1- (800-x)) / (max(x) - min(x)))
 }
 
-# normalise against target value
-#targetnorm<- function(x){
- # return min(1, 1 - (800 - x) / (max(x) - min(x)))
-#}
+# threshold normalisation
+targetnorm <- function(x, threshold, lim){
+  trans_x <- ifelse(x<=threshold,
+                   x, #normal linear
+                   min(x*1.1,lim)) # penalty for not meeting the target
+  return (trans_x)
+}
 
-grid_df %>% 
-  mutate(station_meas = TNORM(station_dist)) %>%
-  ggplot() +
-  geom_density(aes(station_meas))
+# other normalisation
+targetnormlog <- function(x, threshold){
+  trans_x = if_else(x<threshold,
+                   x,1) #normal linear
+                   #-log(1/x)) # penalty for not meeting the target
+  return (trans_x)
+}
 
-grid_df %>% 
-  mutate(station_meas = ifelse(station_dist<=800,
-                               minmax_normalise(station_dist),
-                               minmax_normalise(station_dist))) %>%
+#vis different standarisation methods
+grid_df |>
   ggplot() +
-  geom_density(aes(station_meas))
+  geom_density(aes(bus_dist))
 
-grid_df %>% 
-  mutate(station_meas = ifelse(station_dist<=800,
-                               minmax_normalise(station_dist)*(0-1)+1,
-                               minmax_normalise(station_dist)*(0-1)+1)) %>%
+grid_df |>
+  mutate(bus_meas = sapply(bus_dist, targetnorm, 400, 5000)) |> 
   ggplot() +
-  geom_density(aes(station_meas))
-#title("station_meas")
+  geom_density(aes(bus_meas))
 
 # define parameters for index construction
 reward=1.1 
 normalise = robust_scalar
+
 # indicator
 grid_modified <- grid_df %>% 
   mutate(station_meas = ifelse(station_dist<=800,
