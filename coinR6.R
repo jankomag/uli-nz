@@ -119,20 +119,41 @@ KULI_treated$Analysis$Treated$TreatSummary |>
 iplotIndDist2(KULI_treated, dsets = c("Raw", "Treated"), icodes = "bigpark_dist", ptype = "Histogram") # Scatter
 
 # Normalisation
-# define nonlinear normalisation function
-targetnorm <- function(x, threshold, lim){
-  x = ifelse(x<=threshold,
-                    x, #normal linear
-                    min(x*1.1,lim)) # penalty for not meeting the target capped at a limit
+# define nonlinear normalisation functions
+busnorm <- function(x){
+  x = ifelse(x<=400,
+             x, #normal linear
+             min(x*1.1,5000)) # penalty for not meeting the target capped at a limit
+  minmaxed = ((x - min(x)) / (max(x) - min(x)))*(0-10)+10 #then scaling 0-10
+  return (minmaxed)
+}
+stationnorm <- function(x){
+  x = ifelse(x<=800,
+             x, #normal linear
+             min(x*1.1,10000)) # penalty for not meeting the target capped at a limit
+  minmaxed = ((x - min(x)) / (max(x) - min(x)))*(0-10)+10 #then scaling 0-10
+  return (minmaxed)
+}
+bigparknorm <- function(x){
+  x = ifelse(x<=1000,
+             x, #normal linear
+             min(x*1.1,10000)) # penalty for not meeting the target capped at a limit
+  minmaxed = ((x - min(x)) / (max(x) - min(x)))*(0-10)+10 #then scaling 0-10
+  return (minmaxed)
+}
+smallparknorm <- function(x){
+  x = ifelse(x<=600,
+             x, #normal linear
+             min(x*1.1,5000)) # penalty for not meeting the target capped at a limit
   minmaxed = ((x - min(x)) / (max(x) - min(x)))*(0-10)+10 #then scaling 0-10
   return (minmaxed)
 }
 
 indiv = list(
-  bigpark_dist = list(ntype = "custom", npara = targetnorm(x, 5000, 20000)),
-  smallpark_dist = list(ntype = "custom", npara = targetnorm(x, 3000, 20000)),
-  station_dist = list(ntype = "custom", npara = targetnorm(x, 800, 20000)),
-  bus_dist = list(ntype = "custom", npara = targetnorm(x, 400, 20000)))
+  bigpark_dist = list(ntype = "custom", npara = bigparknorm),
+  smallpark_dist = list(ntype = "custom", npara = smallparknorm),
+  station_dist = list(ntype = "custom", npara = stationnorm),
+  bus_dist = list(ntype = "custom", npara = busnorm))
 
 # Minmax in [0,10] for all indicators, except custom individual normalisation
 KULI <- normalise(KULI, dset = "Raw", ntype = "minmax", npara = list(minmax = c(0,10)),
