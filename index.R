@@ -14,11 +14,11 @@ library(gclus)
 library(corrr)
 library(tidyr)
 library(cowplot)
-library(COINr6)
+library(stringr)
 
 #### Data imports ####
 # geographic data
-grid <- st_read("data/geographic/grids/grid_all-v-07.11.22_20.02.gpkg")
+grid <- st_read("data/geographic/grids/grid_all-v-11.11.22-19.22.gpkg")
 #transforming to the same coordinate system
 grid <- st_transform(grid, 27291)
 grid$id <- 1:nrow(grid)
@@ -107,10 +107,21 @@ targetnormlog <- function(x, threshold){
   return (trans_x)
 }
 
+#test function
+testfunc <- function(x){
+  trans_x = if_else(x<3,
+                    x,
+                    -log(1/x)+1.3) #normal linear
+  return (trans_x)
+}
+
+curve(testfunc, from=1, to=10, xlab="x", ylab="y")
+
 #vis different standarisation methods
 grid_df |>
   ggplot() +
   geom_density(aes(smallpark_dist))
+
 
 grid_df |>
   mutate(bus_meas = minmaxNORM(-smallpark_dist)) |> 
@@ -124,7 +135,6 @@ grid_df |>
 
 # indicator
 penalty = 1.5
-
 grid_modified <- grid_df |> 
   mutate(bus_meas = minmaxNORM(-sapply(bus_dist, targetnorm, 400, penalty, 2000))) |> # penalty for being beyond threshold distance
   mutate(station_meas = minmaxNORM(-sapply(station_dist, targetnorm, 800, penalty, 10000))) |>  # penalty for being beyond threshold distance
@@ -146,17 +156,20 @@ grid_modified <- grid_df |>
   mutate(chemists_mea = minmaxNORM(-chemists_dist)) |> 
   mutate(dentist_mea = minmaxNORM(-dentist_dist)) |> 
   mutate(supermarket_mea = minmaxNORM(-supermarket_dist)) |> 
+  mutate(crimes_mea = minmaxNORM(-crimes)) |> 
+  mutate(dwellings_mea = minmaxNORM(no_households)) |> 
   mutate(kuli = station_meas + bus_meas + intersections_mea + conv_st_mea +
            ev_mea + petrol_mea + second_mea + primary_mea + childcare_mea +
-           cinema_mea + gallery_mea + library_mea + museum_mea + theatre_mea + biking_mea +
-           bigpark_mea + smallpark_mea + chemists_mea + dentist_mea + supermarket_mea) |> 
+           cinema_mea + gallery_mea + library_mea + museum_mea + theatre_mea +
+           biking_mea +  bigpark_mea + smallpark_mea + chemists_mea +
+           dentist_mea + supermarket_mea + crimes_mea + dwellings_mea) |> 
   mutate(kuli_norm = minmaxNORM(kuli))
   
 # rejoin with geometry
 grid_geom = subset(grid, select = c(id, geom))
 grid_normed <- left_join(grid_geom, grid_modified, by = c("id"="id"))
 
-summary(grid_normed)
+summary(grid_df)
 
 #tmap_mode("plot")
 tm_shape(grid_normed) +
