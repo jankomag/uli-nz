@@ -15,6 +15,7 @@ library(corrr)
 library(tidyr)
 library(cowplot)
 library(stringr)
+library(DescTools)
 
 #### Data imports ####
 # geographic data
@@ -27,19 +28,8 @@ grid$id <- 1:nrow(grid)
 summary(grid)
 # strip from geography for EDA
 grid_df <- grid |> st_drop_geometry()
-
-##### distributions #####
-df_to_see_dist = grid_df # define parameter
-my_plots <- lapply(names(df_to_see_dist), function(var_x){
-  p <- ggplot(df_to_see_dist) +
-    aes_string(var_x)
-  if(is.numeric(df_to_see_dist[[var_x]])) {
-    p <- p + geom_density()
-  } else {
-    p <- p + geom_bar()
-  } 
-})
-plot_grid(plotlist = my_plots)
+# save geometry only for later
+grid_geom = subset(grid, select = c(id, geom))
 
 ##### correlations #####
 cor <- cor(x = grid_df[1:21], y = grid_df[1:21], use="complete.obs")
@@ -72,109 +62,99 @@ grid_df |>
   theme_bw() +
   geom_smooth(method="lm")
 
-#### Index Construcion ####
-summary(grid_df)
+##### distributions #####
+df_to_see_dist = grid_logged # define parameter
+my_plots <- lapply(names(df_to_see_dist), function(var_x){
+  p <- ggplot(df_to_see_dist) +
+    aes_string(var_x)
+  if(is.numeric(df_to_see_dist[[var_x]])) {
+    p <- p + geom_density()
+  } else {
+    p <- p + geom_bar()
+  } 
+})
+plot_grid(plotlist = my_plots)
 
-###### Different Normalisation methods ####
+#### Index Construcion ####
+##### Different Normalisation methods ####
 # min-max normalise columns function
 minmaxNORM <- function(x) {
   return (((x - min(x))) / (max(x) - min(x))*(10-0)+0)
 }
 
-# robust scalar normalisation
-robust_scalar<- function(x){
-  return (x- median(x)) /(quantile(x,probs = .75)-quantile(x,probs = .25))
-}
-
-# distance to threshold normalisation
-distTNORM<- function(x){
-  return ((1- (800-x)) / (max(x) - min(x)))
-}
-
 # threshold normalisation
 targetnorm <- function(x, threshold, penalty, lim){
   x <- ifelse(x<=threshold,
-                   x, #normal linear
-                   min(x*penalty,lim)) # penalty for not meeting the target
+                   min(x,lim), #normal linear
+                   min(
+                     x+penalty*(-log(x/threshold)),
+                     lim)) # penalty for not meeting the target
   return (x)
 }
 
-# other normalisation
-targetnormlog <- function(x, threshold){
-  trans_x = if_else(x<threshold,
-                   x,1) #normal linear
-                   #-log(1/x)) # penalty for not meeting the target
-  return (trans_x)
-}
-
 #test function
-testfunc <- function(x){
-  trans_x = if_else(x<3,
+testfunc <- function(x, threshold, penalty, lim){
+  trans_x = if_else(x<=10,
                     x,
-                    -log(1/x)+1.3) #normal linear
+                    x+12*(-log(x/10))) #
   return (trans_x)
 }
-
-curve(testfunc, from=1, to=10, xlab="x", ylab="y")
+curve(testfunc, from=1, to=50, xlab="x", ylab="y")
 
 #vis different standarisation methods
 grid_df |>
   ggplot() +
-  geom_density(aes(smallpark_dist))
-
+  geom_density(aes(minmaxNORM(-log(smallpark_dist))))
 
 grid_df |>
-  mutate(bus_meas = minmaxNORM(-smallpark_dist)) |> 
+  mutate(bus_meas = Winsorize((no_households),minval=0,maxval=100)) |> 
   ggplot() +
   geom_density(aes(bus_meas))
 
 grid_df |>
-  mutate(smallpark_dist = minmaxNORM(-sapply(smallpark_dist, targetnorm, 600, 2000))) |> 
+  mutate(smallpark_dist = minmaxNORM(-log(sapply(smallpark_dist, targetnorm, 600, penalty, 2000)))) |> 
   ggplot() +
   geom_density(aes(smallpark_dist))
 
+##### Normalaise variables #####
 # indicator
-penalty = 1.5
+penalty = 1
+
 grid_modified <- grid_df |> 
-  mutate(bus_meas = minmaxNORM(-sapply(bus_dist, targetnorm, 400, penalty, 2000))) |> # penalty for being beyond threshold distance
-  mutate(station_meas = minmaxNORM(-sapply(station_dist, targetnorm, 800, penalty, 10000))) |>  # penalty for being beyond threshold distance
-  mutate(intersections_mea = minmaxNORM(no_intersections_in_100m)) |>
-  mutate(conv_st_mea = minmaxNORM(-conv_st_dist)) |> 
-  mutate(ev_mea = minmaxNORM(-ev_dist)) |> 
-  mutate(petrol_mea = minmaxNORM(-petrol_st_dist)) |> 
-  mutate(second_mea = minmaxNORM(-second_dist)) |> 
-  mutate(primary_mea = minmaxNORM(-primary_dist)) |> 
-  mutate(childcare_mea = minmaxNORM(-childcare_dist)) |> 
-  mutate(cinema_mea = minmaxNORM(-cinemas_dist)) |> 
-  mutate(gallery_mea = minmaxNORM(-galleries_dist)) |> 
-  mutate(library_mea = minmaxNORM(-libraries_dist)) |> 
+  mutate(bus_meas = minmaxNORM(-log(sapply(bus_dist, targetnorm, 400, penalty, 10000)))) |>
+  mutate(station_mea = minmaxNORM(-log(station_dist))) |>
+  mutate(intersections_mea = minmaxNORM(Winsorize(no_intersections_in_100m, maxval=10))) |>
+  mutate(conv_st_mea = minmaxNORM(-log(conv_st_dist))) |> 
+  mutate(second_mea = minmaxNORM(-log(second_dist))) |> 
+  mutate(primary_mea = minmaxNORM(-log(primary_dist))) |> 
+  mutate(childcare_mea = minmaxNORM(-log(childcare_dist))) |> 
+  mutate(cinema_mea = minmaxNORM(-log(cinemas_dist))) |> 
+  mutate(gallery_mea = minmaxNORM(-log(galleries_dist))) |> 
+  mutate(library_mea = minmaxNORM(-log(libraries_dist))) |> 
   mutate(museum_mea = minmaxNORM(-museum_dist)) |> 
-  mutate(theatre_mea = minmaxNORM(-theatre_dist)) |> 
-  mutate(biking_mea = minmaxNORM(biking_len_100m)) |> 
-  mutate(bigpark_mea = minmaxNORM(-sapply(bigpark_dist, targetnorm, 1500, penalty, 3000))) |> 
-  mutate(smallpark_mea = minmaxNORM(-sapply(smallpark_dist, targetnorm, 600, penalty, 2000))) |> 
-  mutate(chemists_mea = minmaxNORM(-chemists_dist)) |> 
-  mutate(dentist_mea = minmaxNORM(-dentist_dist)) |> 
-  mutate(supermarket_mea = minmaxNORM(-supermarket_dist)) |> 
-  mutate(crimes_mea = minmaxNORM(-crimes)) |> 
-  mutate(dwellings_mea = minmaxNORM(no_households)) |> 
-  mutate(kuli = station_meas + bus_meas + intersections_mea + conv_st_mea +
-           ev_mea + petrol_mea + second_mea + primary_mea + childcare_mea +
+  mutate(theatre_mea = minmaxNORM(-log(theatre_dist))) |> 
+  mutate(biking_mea = minmaxNORM(Winsorize(biking_len_100m,minval=0.0001,maxval=10000))) |> 
+  mutate(bigpark_mea = minmaxNORM(-log(bigpark_dist))) |> 
+  mutate(smallpark_mea = minmaxNORM(-log(smallpark_dist))) |> 
+  mutate(chemists_mea = minmaxNORM(-log(chemists_dist))) |> 
+  mutate(dentist_mea = minmaxNORM(-log(dentist_dist))) |> 
+  mutate(supermarket_mea = minmaxNORM(-log(supermarket_dist))) |> 
+  mutate(crimes_mea = minmaxNORM(-log(crimes))) |> 
+  mutate(dwellings_mea = minmaxNORM(Winsorize(no_households,minval=0,maxval=10000))) |>
+  mutate(kuli = station_mea + bus_meas + intersections_mea + conv_st_mea +
+           second_mea + primary_mea + childcare_mea +
            cinema_mea + gallery_mea + library_mea + museum_mea + theatre_mea +
            biking_mea +  bigpark_mea + smallpark_mea + chemists_mea +
            dentist_mea + supermarket_mea + crimes_mea + dwellings_mea) |> 
   mutate(kuli_norm = minmaxNORM(kuli))
-  
-# rejoin with geometry
-grid_geom = subset(grid, select = c(id, geom))
-grid_normed <- left_join(grid_geom, grid_modified, by = c("id"="id"))
 
-summary(grid_df)
+# rejoin with geometry
+grid_normed <- left_join(grid_geom, grid_modified, by = c("id"="id"))
 
 #tmap_mode("plot")
 tm_shape(grid_normed) +
-  tm_dots(col = "kuli_norm", #style = "equal",
-          breaks = c(0,1,3,5,6.5,7.5,8,8.5,9,9.5,9.9,10),
+  tm_dots(col = "kuli_norm",# style = "equal",
+          breaks = c(0,1,2,3,4,5,5.7,6,7.5,8,9.5,10),
           palette = "Reds", title = str_glue('Penalty= {penalty}'))
 #st_write(grid_normed, "data/geographic/grids/grid_with_kuli.gpkg")
 
