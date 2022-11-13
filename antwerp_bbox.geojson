@@ -1,0 +1,7 @@
+{
+"type": "FeatureCollection",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
+"features": [
+{ "type": "Feature", "properties": { "description": "bbox around Antwerp" }, "geometry": { "type": "Polygon", "coordinates": [ [ [ 4.243429293744231, 51.143323454505257 ], [ 4.497967360159926, 51.143323454505257 ], [ 4.497967360159926, 51.377639400334083 ], [ 4.243429293744231, 51.377639400334083 ], [ 4.243429293744231, 51.143323454505257 ] ] ] } }
+]
+}

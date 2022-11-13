@@ -5,6 +5,11 @@ library(igraph)
 library(sfnetworks)
 library(dplyr)
 library(tidygraph)
+library(here)
+library(magrittr)
+library(osmdata)
+library(dodgr)
+library(expss)
 
 #### Data Imports ####
 gpkgnet <- st_read("data/network_analysis/sample_network.gpkg")
@@ -17,15 +22,7 @@ grid <- st_transform(grid, 27291)
 stations <- st_read("data/transport/public_transport/sample_stations.gpkg")
 stations <- st_transform(stations, 27291)
 
-# test plotting
-tm_shape(net) +
-  tm_lines(col="black") +
-  tm_shape(stations) +
-  tm_dots(col="red") +
-  tm_shape(grid) +
-  tm_dots(col="grey")
-
-#### Distance analysis ####
+#### Distance analysis old ####
 new_net = net %>%
   activate(nodes) %>%
   filter(group_components() == 1) %>%
@@ -63,3 +60,30 @@ plot(slice(activate(net, "nodes"), node_path), col = "red", add = TRUE)
 ## Distance matrix
 dist_matrix <- st_network_cost(net, from = grid, to = stations)
 
+#### Distance analysis new ####
+
+# Define our bbox coordinates, here our coordinates relate to Portsmouth
+p_bbox <- c(-1.113197, 50.775781, -1.026508, 50.859941)
+
+# Pass our bounding box coordinates into the OverPassQuery (opq) function
+osmdata <- opq(bbox = p_bbox) |> 
+  add_osm_feature(key = "highway", value = c("primary", "secondary", "tertiary", "residential", 
+                                             "path", "footway", "unclassified", "living_street", "pedestrian")) |> 
+  osmdata_sf()
+
+# Create network graph using are edge data, with the foot weighting profile
+bb <- osmdata::getbb("Auckland, NZ")
+npts <- 1000
+xy <- apply (bb, 1, function (i) min (i) + runif (npts) * diff (i))
+bb; head (xy)
+
+net <- dodgr_streetnet (bb)
+net <- weight_streetnet (net, wt_profile = "foot")
+system.time (
+  d <- dodgr_dists (net, from = xy, to = xy)
+)
+
+
+# Calculate distances between schools to fast-food stores
+sch_to_ff_calc <- dodgr_distances(graph, from = st_coordinates(ports_schools), to = st_coordinates(ports_ff), 
+                                  shortest = TRUE, pairwise = FALSE, quiet = FALSE)

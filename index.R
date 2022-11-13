@@ -118,7 +118,7 @@ grid_df |>
 
 ##### Normalaise variables #####
 # indicator
-penalty = 1
+penalty = 5
 
 grid_modified <- grid_df |> 
   mutate(bus_meas = minmaxNORM(-log(sapply(bus_dist, targetnorm, 400, penalty, 10000)))) |>
@@ -139,7 +139,7 @@ grid_modified <- grid_df |>
   mutate(chemists_mea = minmaxNORM(-log(chemists_dist))) |> 
   mutate(dentist_mea = minmaxNORM(-log(dentist_dist))) |> 
   mutate(supermarket_mea = minmaxNORM(-log(supermarket_dist))) |> 
-  mutate(crimes_mea = minmaxNORM(-log(crimes))) |> 
+  mutate(crimes_mea = minmaxNORM(minmaxNORM(-log(crimes)+1))) |> 
   mutate(dwellings_mea = minmaxNORM(Winsorize(no_households,minval=0,maxval=10000))) |>
   mutate(kuli = station_mea + bus_meas + intersections_mea + conv_st_mea +
            second_mea + primary_mea + childcare_mea +
