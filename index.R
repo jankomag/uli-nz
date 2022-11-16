@@ -96,7 +96,7 @@ targetnorm <- function(x, threshold, penalty, lim){
 testfunc <- function(x, threshold, penalty, lim){
   trans_x = if_else(x<=10,
                     x,
-                    x+12*(-log(x/10))) #
+                    x+2*log(x/10)) #
   return (trans_x)
 }
 curve(testfunc, from=1, to=50, xlab="x", ylab="y")
