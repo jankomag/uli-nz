@@ -63,13 +63,23 @@ dist_matrix <- st_network_cost(net, from = grid, to = stations)
 #### Distance analysis new ####
 
 # Define our bbox coordinates, here our coordinates relate to Portsmouth
-p_bbox <- c(-1.113197, 50.775781, -1.026508, 50.859941)
+p_bbox <- c(174.207,-37.3268,175.3151,-36.0623)
 
 # Pass our bounding box coordinates into the OverPassQuery (opq) function
 osmdata <- opq(bbox = p_bbox) |> 
   add_osm_feature(key = "highway", value = c("primary", "secondary", "tertiary", "residential", 
                                              "path", "footway", "unclassified", "living_street", "pedestrian")) |> 
   osmdata_sf()
+# Extract our spatial data into variables of their own
+
+# Extract the points, with their osm_id.
+ports_roads_nodes <- osmdata$osm_points[, "osm_id"]
+
+# Extract the lines, with their osm_id, name, type of highway, max speed and
+# oneway attributes
+ports_roads_edges <- osmdata$osm_lines[, c("osm_id", "name", "highway", "maxspeed", 
+                                           "oneway")]
+
 
 # Create network graph using are edge data, with the foot weighting profile
 bb <- osmdata::getbb("Auckland, NZ")
