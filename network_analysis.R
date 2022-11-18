@@ -22,12 +22,12 @@ sa1 <- st_read("data/geographic/sa1_centorids_clean.gpkg") |>
   st_transform(4326)
 
 #get network
-net <- as_sfnetwork(sample_edges, directed = FALSE) |> 
+network <- as_sfnetwork(edges, directed = FALSE) |> 
   st_transform(4326) |> 
   activate("edges")
 
 get_distance <- function(supply) {
-  dist_matrix <- data.frame(st_network_cost(net, from = sa1, to = supply, weights = "length"))
+  dist_matrix <- data.frame(st_network_cost(network, from = sa1, to = supply, weights = "length"))
   dist_matrix$new_dist <- do.call(pmin, dist_matrix)
   dist_matrix <- colnames(dist_matrix)[-1] <- toString(c("dist",supply)) #rename the column to the thing being measured
   dist_matrix <- dist_matrix[ , ncol(dist_matrix), drop = FALSE] #keep only the last column
@@ -38,7 +38,7 @@ get_distance <- function(supply) {
 stations <- st_read("data/transport/public_transport/trains_auckland.gpkg") |>
   st_transform(4326)# 27291
 
-dist_matrix = data.frame(st_network_cost(net, from = sa1, to = stations, weights = "length"))
+dist_matrix = data.frame(st_network_cost(network, from = sa1, to = stations, weights = "length"))
 dist_matrix$station_dist <- do.call(pmin, dist_matrix)
 dist_matrix <- dist_matrix |> 
   subset(select = c(min_dist_station))
@@ -56,11 +56,6 @@ dist_matrix <- dist_matrix |>
 
 sa1_dist <- cbind(sa1, dist_matrix)
 
-
-sa1c <- sa1
-
-last_data <- sa1c[ , ncol(sa1c), drop = FALSE]    # Apply ncol & drop
-last_data                   
 #calulate distances to marae
 marae <- st_read("data/kiwi/marae.gpkg") |>
   st_transform(4326)# 27291
