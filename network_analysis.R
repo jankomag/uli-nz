@@ -13,12 +13,15 @@ library(expss)
 library(stringr)
 library(DescTools)
 
+## RERUN WITH WAIHEKE ISLAND NETWORK - IT WAS EXCLUDED
 #### Data Imports ####
 edges <- st_read("data/network_analysis/full_auckland_network.gpkg", layer='edges') |> 
   st_transform(4326) |> 
   subset(select = -c(u,v,key,osmid, lanes, name, highway, oneway, reversed, from, to,ref, service, access, bridge,
                      width, junction, tunnel, area))
 sa1 <- st_read("data/geographic/sa1_centorids_clean.gpkg") |> 
+  st_transform(4326)
+grid_sample <- st_read("data/geographic/grids/sample_grid_all.gpkg") |> 
   st_transform(4326)
 
 #get network
@@ -27,17 +30,92 @@ network <- as_sfnetwork(edges, directed = FALSE) |>
   activate("edges")
 
 get_distance <- function(supply) {
-  dist_matrix <- data.frame(st_network_cost(network, from = sa1, to = supply, weights = "length"))
-  dist_matrix$new_dist <- do.call(pmin, dist_matrix)
-  dist_matrix <- colnames(dist_matrix)[-1] <- toString(c("dist",supply)) #rename the column to the thing being measured
-  dist_matrix <- dist_matrix[ , ncol(dist_matrix), drop = FALSE] #keep only the last column
-  sa1 <- cbind(sa1, dist_matrix)
+  supplyname <- deparse(substitute(supply))
+  supplydist <- str_glue("dist_{supplyname}")
+  
+  distances <- data.frame(st_network_cost(network, from = sa1, to = supply, weights = "length"))
+  distances[toString(supplydist)] <- do.call(pmin, distances)
+
+  last_data <- distances[ , ncol(distances), drop = FALSE]
+  cbind(sa1, last_data)
 }
 
 #calulate distances to train stations
 stations <- st_read("data/transport/public_transport/trains_auckland.gpkg") |>
   st_transform(4326)# 27291
+sa1 <- get_distance(stations)
 
+#calulate distances to bus stops
+busstops <- st_read("data/transport/public_transport/bus_stops_auckland.geojson") |>
+  st_transform(4326)# 27291
+sa1 <- get_distance(busstops)
+
+#calulate distances to marae
+marae <- st_read("data/kiwi/marae.gpkg") |>
+  st_transform(4326)# 27291
+sa1 <- get_distance(marae)
+
+cinema <- st_read("data/social infrastructure/culture&leisure/cinemas_all.gpkg") |>
+  st_transform(4326)# 27291
+sa1 <- get_distance(cinema)
+
+galleries <- st_read("data/social infrastructure/culture&leisure/galleries_all.gpkg") |>
+  st_transform(4326)# 27291
+sa1 <- get_distance(galleries)
+
+libraries <- st_read("data/social infrastructure/culture&leisure/libraries_all.gpkg") |>
+  st_transform(4326)# 27291
+sa1 <- get_distance(libraries)
+
+museums <- st_read("data/social infrastructure/culture&leisure/museums_all.gpkg") |>
+  st_transform(4326)# 27291
+sa1 <- get_distance(museums)
+
+theatre <- st_read("data/social infrastructure/culture&leisure/theatres_all.gpkg") |>
+  st_transform(4326)# 27291
+sa1 <- get_distance(theatre)
+
+chemist <- st_read("data/social infrastructure/medical/chemist_all.gpkg") |>
+  st_transform(4326)# 27291
+sa1 <- get_distance(chemist)
+
+dentist <- st_read("data/social infrastructure/medical/dentists_all.gpkg") |>
+  st_transform(4326)# 27291
+sa1 <- get_distance(dentist)
+
+healthcentre <- st_read("data/social infrastructure/medical/healthcentres_all.gpkg") |>
+  st_transform(4326)# 27291
+sa1 <- get_distance(healthcentre)
+
+hospital <- st_read("data/social infrastructure/medical/newhospitals_all.gpkg") |>
+  st_transform(4326)# 27291
+sa1 <- get_distance(hospital)
+
+childcare <- st_read("data/social infrastructure/schools/childcare_all.gpkg") |>
+  st_transform(4326)# 27291
+sa1 <- get_distance(childcare)
+
+primary <- st_read("data/social infrastructure/schools/primary_schools.gpkg") |>
+  st_transform(4326)# 27291
+sa1 <- get_distance(childcare)
+
+sport <- st_read("data/social infrastructure/sport/sport_facilities.gpkg") |>
+  st_transform(4326)# 27291
+sa1 <- get_distance(sport)
+
+conveniencestore <- st_read("data/walkability/convst_all.gpkg") |>
+  st_transform(4326)# 27291
+sa1 <- get_distance(conveniencestore)
+
+supermarket <- st_read("data/walkability/supermarket_all.gpkg") |>
+  st_transform(4326)# 27291
+sa1 <- get_distance(supermarket)
+
+#save final
+st_write(sa1, "data/allsa1_dist.gpkg")
+head(sa1)
+
+# old way pre-function
 dist_matrix = data.frame(st_network_cost(network, from = sa1, to = stations, weights = "length"))
 dist_matrix$station_dist <- do.call(pmin, dist_matrix)
 dist_matrix <- dist_matrix |> 
@@ -45,29 +123,8 @@ dist_matrix <- dist_matrix |>
 
 sa1_dist <- cbind(sa1, dist_matrix)
 
-#calulate distances to bus stops
-busstops <- st_read("data/transport/public_transport/bus_stops_auckland.geojson") |>
-  st_transform(4326)# 27291
-
-dist_matrix = data.frame(st_network_cost(net, from = sa1, to = busstops, weights = "length"))
-dist_matrix$bus_dist <- do.call(pmin, dist_matrix)
-dist_matrix <- dist_matrix |> 
-  subset(select = c(bus_dist))
-
-sa1_dist <- cbind(sa1, dist_matrix)
-
-#calulate distances to marae
-marae <- st_read("data/kiwi/marae.gpkg") |>
-  st_transform(4326)# 27291
-
-get_distance(marae)
-sa1
-#save final
-st_write(sa1, "allsa1_dist_marae.gpkg")
-
 
 #### Distance analysis old ####
-
 # Define our bbox coordinates, here our coordinates relate to Portsmouth
 p_bbox <- c(174.207,-37.3268,175.3151,-36.0623)
 # Pass our bounding box coordinates into the OverPassQuery (opq) function
