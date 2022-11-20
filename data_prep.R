@@ -5,23 +5,23 @@ library(tmap)
 library(dplyr)
 library(ggplot2)
 library(RColorBrewer)
-#library(rgeos)
 library(geosphere)
-#library(gstat)
 library(spdep)
+#library(gstat)
 #library(VIM)
- 
+#library(rgeos)
+
 #### Data imports ####
 # geographic data
-sa1_dist <- st_read("data/geographic/sa1_allNetDist.gpkg")
+#sa1_dist <- st_read("data/geographic/sa1_allNetDist.gpkg")
 sa1_base <- st_read("data/geographic/sa1_centroids_base.gpkg")
 #transforming to the same coordinate system
 sa1_dist <- st_transform(sa1_dist, 27291)
-sa1_rest <- st_transform(sa1_rest, 27291)
+sa1_base <- st_transform(sa1_base, 27291)
 
-sa1_rest <- sa1_rest %>%
-  subset(select = c(SA12018_V1, LAND_AREA_, geom))
-summary(sa1_rest)
+sa1_base <- sa1_base %>%
+  subset(select = c(SA12018_V1, LAND_AREA_, AREA_SQ_KM, geom))
+summary(sa1_base)
 
 # census variables
 census <- read.csv("data/geographic/Census/auckland_census.csv")
@@ -30,15 +30,24 @@ census <- read.csv("data/geographic/Census/auckland_census.csv")
 census <- census %>%
   mutate(code = as.character(code)) %>%
   mutate(no_households = as.numeric(no_households)) %>%
+  mutate(born_overseas = as.numeric(born_overseas)) %>%
+  mutate(European = as.numeric(European)) %>%
+  mutate(Māori = as.numeric(Māori)) %>%
+  mutate(Pacific = as.numeric(Pacific)) %>%
+  mutate(Asian = as.numeric(Asian)) %>%
+  mutate(MiddleEasternLatinAmericanAfrican = as.numeric(MiddleEasternLatinAmericanAfrican)) %>%
+  mutate(OtherEthnicity = as.numeric(OtherEthnicity)) %>%
   mutate(median_income = as.numeric(median_income)) %>%
   mutate(maori_desc = as.numeric(maori_desc)) %>%
   mutate(pop_usual = as.numeric(pop_usual)) %>%
   mutate(maori_pr = maori_desc/pop_usual) %>%
-  mutate(household_density = no_households/pop_usual) %>%
   mutate(dampness = as.numeric(as.factor(dampness)))
 
-head(census)
-sa1_all <- left_join(sa1, census, by = c("SA12018_V1"="code"))
+
+sa1_all <- left_join(sa1_base, census, by = c("SA12018_V1"="code"))
+# Compute crime measure
+
+# Compute diversity measure
 
 ##### Impute missing values #####
 summary(aggr(census))
