@@ -122,26 +122,3 @@ dist_matrix <- dist_matrix |>
   subset(select = c(min_dist_station))
 
 sa1_dist <- cbind(sa1, dist_matrix)
-
-
-#### Distance analysis old ####
-# Define our bbox coordinates, here our coordinates relate to Portsmouth
-p_bbox <- c(174.207,-37.3268,175.3151,-36.0623)
-# Pass our bounding box coordinates into the OverPassQuery (opq) function
-osmdata <- opq(bbox = p_bbox, timeout = 100) |> 
-  add_osm_feature(key = "highway", value = c("primary", "secondary", "tertiary", "residential", 
-                                             "path", "footway", "unclassified", "living_street", "pedestrian")) |> 
-  osmdata_sf()
-# Extract our spatial data into variables of their own
-# Extract the points, with their osm_id.
-nodes <- osmdata$osm_points[, "osm_id"]
-
-# Extract the lines, with their osm_id, name, type of highway, max speed
-edges <- osmdata$osm_lines[, c("osm_id", "name", "highway", "maxspeed", 
-                                           "oneway")]
-# Create network graph using edge data, with the foot weighting profile
-graph <- weight_streetnet(edges, wt_profile = "foot")
-
-# Calculate distances between grid to stations
-sch_to_ff_calc <- dodgr_distances(graph, from = st_coordinates(grid), to = st_coordinates(stations), 
-                                  shortest = TRUE, pairwise = FALSE, quiet = FALSE)

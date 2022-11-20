@@ -19,7 +19,7 @@ library(DescTools)
 
 #### Data imports ####
 # geographic data
-grid <- st_read("data/geographic/grids/grid_all-v-11.11.22-19.22.gpkg")
+sa1 <- st_read("data/geographic/grids/grid_all-v-11.11.22-19.22.gpkg")
 #transforming to the same coordinate system
 grid <- st_transform(grid, 27291)
 grid$id <- 1:nrow(grid)

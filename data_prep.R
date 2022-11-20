@@ -7,32 +7,24 @@ library(ggplot2)
 library(RColorBrewer)
 #library(rgeos)
 library(geosphere)
-library(gstat)
+#library(gstat)
 library(spdep)
-library(VIM)
+#library(VIM)
  
 #### Data imports ####
 # geographic data
-sa1 <- st_read("data/geographic/auckland_urban_sa1s.gpkg")
-#sa1_cent <- st_read("data/geographic/wellington_urban_polygons_sa1s.gpkg")
-stations <- st_read("data/transport/public_transport/trains_auckland.gpkg")
-stops <- st_read("data/transport/public_transport/bus_stops_auckland.geojson")
-# census variables
-census <- read.csv("data/geographic/SA1 CensusAucklandRegion/auckland_census.csv")
-households <- read.csv("data/geographic/SA1 CensusAucklandRegion/households_in_sa1s.csv")
-dampness <- read.csv("data/geographic/SA1 CensusAucklandRegion/dampness.csv")
-population <- read.csv("data/geographic/SA1 CensusAucklandRegion/population_welly.csv")
-
+sa1_dist <- st_read("data/geographic/sa1_allNetDist.gpkg")
+sa1_base <- st_read("data/geographic/sa1_centroids_base.gpkg")
 #transforming to the same coordinate system
-stations <- st_transform(stations, 27291)
-stops <- st_transform(stops, 27291)
-sa1 <- st_transform(sa1, 27291)
+sa1_dist <- st_transform(sa1_dist, 27291)
+sa1_rest <- st_transform(sa1_rest, 27291)
 
-tmap_mode("view")
-tm_shape(grid) +
-  tm_dots(col="black")# +
-  tm_shape(stations) +
-  tm_dots(col="red")
+sa1_rest <- sa1_rest %>%
+  subset(select = c(SA12018_V1, LAND_AREA_, geom))
+summary(sa1_rest)
+
+# census variables
+census <- read.csv("data/geographic/Census/auckland_census.csv")
 
 #### Adding Census vars ####
 census <- census %>%
@@ -42,21 +34,11 @@ census <- census %>%
   mutate(maori_desc = as.numeric(maori_desc)) %>%
   mutate(pop_usual = as.numeric(pop_usual)) %>%
   mutate(maori_pr = maori_desc/pop_usual) %>%
+  mutate(household_density = no_households/pop_usual) %>%
   mutate(dampness = as.numeric(as.factor(dampness)))
 
 head(census)
 sa1_all <- left_join(sa1, census, by = c("SA12018_V1"="code"))
-
-#sa1_all = subset(sa1_all, select = -c(maori_desc))
-head(sa1_all)
-
-
-grid <- st_read("data/geographic/grids/grid_all-v-04.11.22_19.52.gpkg")
-
-tm_shape(grid) +
-  tm_dots(col="kuli",
-          style = "kmeans", palette = "Reds")
-
 
 ##### Impute missing values #####
 summary(aggr(census))
@@ -105,36 +87,6 @@ idw_joined = subset(idw_joined, select = -c(var1.var, var1.var.1, var1.var.2,
 colnames(idw_joined) <- c("income", "no_households", "maori_pr", "dampness", "geometry")
 st_write(idw_joined,"data/grid_auckland_census_10000.gpkg")
 
-#### Distances to transport ####
-grid <- st_as_sf(grid)
-st_crs(grid)
-stations <- st_as_sf(stations)
-
-grid$nearest_station <- st_nearest_feature(grid, stations)
-g1 = st_geometry(grid)
-g2 = st_geometry(stations) 
-
-dlist = mapply(st_distance, g1, g2)
-
-grid$dist_nearest_station <- st_distance(grid, stations, by_element = TRUE)
-
-tm_shape(grid) +
-  tm_dots() +
-  tm_shape(bus_stops) +
-  tm_dots(col="grey")
-
 # bind results with original points
 pts.wit.dist <- cbind(pts, dist.mat)
 pts.wit.dist[1:3,]
-
-#### Buffers ####
-# union the stations to a single point file
-pt_merge <- st_sf(st_union(pt))
-# buffer this
-buf_pt <- st_buffer(pt_merge, 800)
-# and map
-tmap_mode("plot")
-tm_shape(buf_pt) + 
-  tm_borders() +
-  tm_shape(pt_merge) +
-  tm_dots()
