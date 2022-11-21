@@ -19,28 +19,58 @@ sa1_base <- st_read("data/geographic/sa1_centroids_base.gpkg")
 sa1_dist <- st_transform(sa1_dist, 27291)
 sa1_base <- st_transform(sa1_base, 27291)
 
-sa1_base <- sa1_base %>%
+sa1_base <- sa1_base |>
   subset(select = c(SA12018_V1, LAND_AREA_, AREA_SQ_KM, geom))
 summary(sa1_base)
 
 # census variables
 census <- read.csv("data/geographic/Census/auckland_census.csv")
+census <- census |>
+  mutate(code = as.character(code))
+sa1_all <- left_join(sa1_base, census, by = c("SA12018_V1"="code"))
+
+sa1_all <- sa1_all |>
+  mutate(European = as.numeric(European), na.rm=T) |> 
+  mutate(Māori = as.numeric(Māori), na.rm=T) |>
+  mutate(Pacific = as.numeric(Pacific), na.rm=T) |>
+  mutate(Asian = as.numeric(Asian), na.rm=T) |>
+  mutate(MiddleEasternLatinAmericanAfrican = as.numeric(MiddleEasternLatinAmericanAfrican), na.rm=T) |>
+  mutate(OtherEthnicity = as.numeric(OtherEthnicity), na.rm=T) |>
+  mutate(pop_usual = as.numeric(pop_usual), na.rm=T) |> 
+  mutate(pcEuropean = European/pop_usual, na.rm=T) |> 
+  mutate(pcMāori = Māori/pop_usual, na.rm=T) |> 
+  mutate(pcPacific = Pacific/pop_usual, na.rm=T) |> 
+  mutate(pcMiddleEasternLatinAmericanAfrican = MiddleEasternLatinAmericanAfrican/pop_usual, na.rm=T) |> 
+  mutate(pcOtherEthnicity = OtherEthnicity/pop_usual, na.rm=T)
+  
+
+ggplot(sa1_all) +
+  geom_line(aes(x=lat, y=lon), col="Māori")
+  
+#test function
+shannons <- function(x){
+  x = -sum(0.5*log(0.5))
+  return (x)
+}
+curve(shannons(1), from=1, to=50, xlab="x", ylab="y")
+
+
 
 #### Adding Census vars ####
 census <- census %>%
-  mutate(code = as.character(code)) %>%
-  mutate(no_households = as.numeric(no_households)) %>%
-  mutate(born_overseas = as.numeric(born_overseas)) %>%
-  mutate(European = as.numeric(European)) %>%
-  mutate(Māori = as.numeric(Māori)) %>%
-  mutate(Pacific = as.numeric(Pacific)) %>%
-  mutate(Asian = as.numeric(Asian)) %>%
-  mutate(MiddleEasternLatinAmericanAfrican = as.numeric(MiddleEasternLatinAmericanAfrican)) %>%
-  mutate(OtherEthnicity = as.numeric(OtherEthnicity)) %>%
-  mutate(median_income = as.numeric(median_income)) %>%
-  mutate(maori_desc = as.numeric(maori_desc)) %>%
-  mutate(pop_usual = as.numeric(pop_usual)) %>%
-  mutate(maori_pr = maori_desc/pop_usual) %>%
+  mutate(code = as.character(code)) |> 
+  mutate(no_households = as.numeric(no_households)) |>
+  mutate(born_overseas = as.numeric(born_overseas)) |>
+  mutate(European = as.numeric(European)) |>
+  mutate(Māori = as.numeric(Māori)) |>
+  mutate(Pacific = as.numeric(Pacific)) |>
+  mutate(Asian = as.numeric(Asian)) |>
+  mutate(MiddleEasternLatinAmericanAfrican = as.numeric(MiddleEasternLatinAmericanAfrican)) |>
+  mutate(OtherEthnicity = as.numeric(OtherEthnicity)) |>
+  mutate(median_income = as.numeric(median_income)) |>
+  mutate(maori_desc = as.numeric(maori_desc)) |>
+  mutate(pop_usual = as.numeric(pop_usual)) |>
+  mutate(maori_pr = maori_desc/pop_usual) |> 
   mutate(dampness = as.numeric(as.factor(dampness)))
 
 
