@@ -7,82 +7,100 @@ library(ggplot2)
 library(RColorBrewer)
 library(geosphere)
 library(spdep)
+library(tidyr)
+library(mice)
+library(VIM)
 #library(gstat)
-#library(VIM)
 #library(rgeos)
 
 #### Data imports ####
 # geographic data
 #sa1_dist <- st_read("data/geographic/sa1_allNetDist.gpkg")
-sa1_base <- st_read("data/geographic/sa1_centroids_base.gpkg")
+sa1_base <- st_read("data/geographic/sa1_centroid_base.gpkg")
 #transforming to the same coordinate system
 sa1_dist <- st_transform(sa1_dist, 27291)
 sa1_base <- st_transform(sa1_base, 27291)
 
 sa1_base <- sa1_base |>
   subset(select = c(SA12018_V1, LAND_AREA_, AREA_SQ_KM, geom))
-summary(sa1_base)
 
 # census variables
-census <- read.csv("data/geographic/Census/auckland_census.csv")
+census <- as.data.frame(read.csv("data/geographic/Census/auckland_census.csv"))
 census <- census |>
-  mutate(code = as.character(code))
-sa1_all <- left_join(sa1_base, census, by = c("SA12018_V1"="code"))
-
-sa1_all <- sa1_all |>
+  select(subset = -c(maori_desc, median_income, born_overseas, PacificNum)) |> 
+  mutate(code = as.character(code)) |> 
+  mutate(dampness = as.numeric(dampness), na.rm=T) |> 
   mutate(European = as.numeric(European), na.rm=T) |> 
-  mutate(Māori = as.numeric(Māori), na.rm=T) |>
+  mutate(Maori = as.numeric(Maori), na.rm=T) |>
   mutate(Pacific = as.numeric(Pacific), na.rm=T) |>
   mutate(Asian = as.numeric(Asian), na.rm=T) |>
   mutate(MiddleEasternLatinAmericanAfrican = as.numeric(MiddleEasternLatinAmericanAfrican), na.rm=T) |>
   mutate(OtherEthnicity = as.numeric(OtherEthnicity), na.rm=T) |>
-  mutate(pop_usual = as.numeric(pop_usual), na.rm=T) |> 
+  mutate(pop_usual = as.numeric(pop_usual))
+
+# Dealing with missing values #
+#observe NAs
+md.pattern(census)
+aggr_plot <- aggr(census, col=c('navyblue','red'), numbers=TRUE, sortVars=TRUE, labels=names(census), cex.axis=.7, gap=3, ylab=c("Histogram of missing data","Pattern"))
+# replace with 0s
+census[which(census$pop_usual == 0,),5:10] <- 0 # assign ethnicity values to 0 in rows where no population is registered
+census[which(is.na(census$European),), "European"] <- 0
+census[which(is.na(census$Maori),), "Maori"] <- 0
+census[which(is.na(census$Pacific),), "Pacific"] <- 0
+census[which(is.na(census$Asian),), "Asian"] <- 0
+census[which(is.na(census$MiddleEasternLatinAmericanAfrican),), "MiddleEasternLatinAmericanAfrican"] <- 0
+census[which(is.na(census$OtherEthnicity),), "OtherEthnicity"] <- 0
+
+#calculate percentages ethnicity
+census <- census |>
   mutate(pcEuropean = European/pop_usual, na.rm=T) |> 
-  mutate(pcMāori = Māori/pop_usual, na.rm=T) |> 
+  mutate(pcMaori = Maori/pop_usual, na.rm=T) |> 
   mutate(pcPacific = Pacific/pop_usual, na.rm=T) |> 
+  mutate(pcAsian = Asian/pop_usual, na.rm=T) |> 
   mutate(pcMiddleEasternLatinAmericanAfrican = MiddleEasternLatinAmericanAfrican/pop_usual, na.rm=T) |> 
   mutate(pcOtherEthnicity = OtherEthnicity/pop_usual, na.rm=T)
-  
 
-ggplot(sa1_all) +
-  geom_line(aes(x=lat, y=lon), col="Māori")
-  
-#test function
-shannons <- function(x){
-  x = -sum(0.5*log(0.5))
-  return (x)
+#cleaning missing values for ethnicity
+census[which(is.na(census$pcEuropean),), "pcEuropean"] <- 0
+census[which(is.na(census$pcMaori),), "pcMaori"] <- 0
+census[which(is.na(census$pcPacific),), "pcPacific"] <- 0
+census[which(is.na(census$pcAsian),), "pcAsian"] <- 0
+census[which(is.na(census$pcMiddleEasternLatinAmericanAfrican),), "pcMiddleEasternLatinAmericanAfrican"] <- 0
+census[which(is.na(census$pcOtherEthnicity),), "pcOtherEthnicity"] <- 0
+
+sa1_cen_spatial <- left_join(sa1_base, census, by = c("SA12018_V1"="code"))
+tm_shape(sa1_cen_spatial) +
+  tm_dots(col="pcEuropean", breaks="equal")
+
+ggplot(census) +
+  geom_density(aes(x=pcMaori))
+
+# Compute Diversity Index #
+p <- census[3022,12:17]
+p <- as.vector(t(p))
+
+shannon(p)
+df1 <- census |> 
+  mutate(diversityIndex = sapply(as.vector(t(census[,12:17])), shannon))
+
+#shannon function working
+shannon <- function(p){
+  if (0 %in% p) {
+    p = replace(p,p==0,0.0001)
+  } else {
+      p
+    }
+  H = -sum(p*log(p))
+  return (H)
 }
-curve(shannons(1), from=1, to=50, xlab="x", ylab="y")
+shannon(p)
 
 
 
-#### Adding Census vars ####
-census <- census %>%
-  mutate(code = as.character(code)) |> 
-  mutate(no_households = as.numeric(no_households)) |>
-  mutate(born_overseas = as.numeric(born_overseas)) |>
-  mutate(European = as.numeric(European)) |>
-  mutate(Māori = as.numeric(Māori)) |>
-  mutate(Pacific = as.numeric(Pacific)) |>
-  mutate(Asian = as.numeric(Asian)) |>
-  mutate(MiddleEasternLatinAmericanAfrican = as.numeric(MiddleEasternLatinAmericanAfrican)) |>
-  mutate(OtherEthnicity = as.numeric(OtherEthnicity)) |>
-  mutate(median_income = as.numeric(median_income)) |>
-  mutate(maori_desc = as.numeric(maori_desc)) |>
-  mutate(pop_usual = as.numeric(pop_usual)) |>
-  mutate(maori_pr = maori_desc/pop_usual) |> 
-  mutate(dampness = as.numeric(as.factor(dampness)))
-
-
-sa1_all <- left_join(sa1_base, census, by = c("SA12018_V1"="code"))
 # Compute crime measure
 
-# Compute diversity measure
 
-##### Impute missing values #####
-summary(aggr(census))
-sa1_all$maori_pr[is.na(sa1_all$maori_pr)] <- 0
-sa1_all$median_income[is.na(sa1_all$median_income)] <- 0
+
 
 
 #imputation by neighbouring values - not working yet
