@@ -18,7 +18,7 @@ library(VIM)
 #sa1_dist <- st_read("data/geographic/sa1_allNetDist.gpkg")
 sa1_base <- st_read("data/geographic/sa1_centroid_base.gpkg")
 #transforming to the same coordinate system
-sa1_dist <- st_transform(sa1_dist, 27291)
+#sa1_dist <- st_transform(sa1_dist, 27291)
 sa1_base <- st_transform(sa1_base, 27291)
 
 sa1_base <- sa1_base |>
@@ -76,12 +76,26 @@ ggplot(census) +
   geom_density(aes(x=pcMaori))
 
 # Compute Diversity Index #
-p <- census[3022,12:17]
+p <- census[,12:17]
 p <- as.vector(t(p))
 
 shannon(p)
 df1 <- census |> 
   mutate(diversityIndex = sapply(as.vector(t(census[,12:17])), shannon))
+
+
+#shannon function testing
+shannon <- function(p){
+  if (0 %in% p) {
+    p = replace(p,p==0,0.0001)
+  } else {
+    p
+  }
+  H = -sum(p*log(p))
+  df1 <- mutate(df1, shIdx = H)
+  return (df1)
+}
+shannon(p)
 
 #shannon function working
 shannon <- function(p){
@@ -96,10 +110,13 @@ shannon <- function(p){
 shannon(p)
 
 
-
 # Compute crime measure
+crime <- as.data.frame(read.csv("data/safety/crime/crime_agged_mesh.gpkg"))
 
-
+# sum all cases by area
+cases_agg <- aggregate(crime["newCasesBySpecimenDateRollingSum"], by=df["areaCode"], sum)
+head(cases_agg)
+#write.csv(cases_agg, "data/cases.csv")
 
 
 
