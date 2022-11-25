@@ -111,13 +111,21 @@ shannon(p)
 
 
 # Compute crime measure
-crime <- as.data.frame(read.csv("data/safety/crime/crime_agged_mesh.gpkg"))
+crime <- as.data.frame(read.csv("data/safety/crime/crimes_originaldata.csv"))
+crime <- crime |> 
+  mutate(terrau = as.factor(Territorial.Authority)) |> 
+  mutate(Meshblock = as.factor(Meshblock))
+crime <- crime[crime$terrau == 'Auckland.',]
 
 # sum all cases by area
-cases_agg <- aggregate(crime["newCasesBySpecimenDateRollingSum"], by=df["areaCode"], sum)
-head(cases_agg)
-#write.csv(cases_agg, "data/cases.csv")
+crime_agg <- aggregate(crime["Victimisations"], by=crime["Meshblock"], sum)
+summary(crime_agg)
 
+meshb <- st_read("data/geographic/Meshblocks/meshblocks.gpkg")
+meshb <- st_transform(meshb, 27291)
+
+meshb_crimes <- left_join(meshb, crime_agg, by = c("code"="Meshblock")) # codes don't match!!
+st_write(meshb_crimes, "data/safety/crime/crimes_aggregated.gpkg")
 
 
 #imputation by neighbouring values - not working yet
