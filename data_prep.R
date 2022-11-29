@@ -76,14 +76,14 @@ ggplot(census) +
   geom_density(aes(x=pcMaori))
 
 # Compute Diversity Index #
-p <- census[,12:17]
+p <- census[3000,12:17]
 p <- as.vector(t(p))
 
 shannon(p)
 df1 <- census |> 
-  mutate(diversityIndex = sapply(as.vector(t(census[,12:17])), shannon))
+  mutate(diversityIndex = aggregate(as.vector(t(census[,12:17])), by=list("code"), FUN=shannon))
 
-
+nrow(census)
 #shannon function testing
 shannon <- function(p){
   if (0 %in% p) {
@@ -92,8 +92,7 @@ shannon <- function(p){
     p
   }
   H = -sum(p*log(p))
-  df1 <- mutate(df1, shIdx = H)
-  return (df1)
+  return (H)
 }
 shannon(p)
 
