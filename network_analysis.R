@@ -32,10 +32,8 @@ network <- as_sfnetwork(edges, directed = FALSE) |>
 get_distance <- function(supply) {
   supplyname <- deparse(substitute(supply))
   supplydist <- str_glue("dist_{supplyname}")
-  
   distances <- data.frame(st_network_cost(network, from = sa1, to = supply, weights = "length"))
   distances[toString(supplydist)] <- do.call(pmin, distances)
-
   last_data <- distances[ , ncol(distances), drop = FALSE]
   cbind(sa1, last_data)
 }

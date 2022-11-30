@@ -93,12 +93,10 @@ targetnorm <- function(x, threshold, penalty, lim){
 }
 
 #test function
-testfunc <- function(x, threshold, penalty, lim){
-  trans_x = if_else(x<=10,
-                    x,
-                    x+2*log(x/10)) #
-  return (trans_x)
+testfunc <- function(x, vdist=1, bw=4){
+  wgt = exp(-.5*(vdist/bw)^2)
 }
+
 curve(testfunc, from=1, to=50, xlab="x", ylab="y")
 
 #vis different standarisation methods
