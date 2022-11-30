@@ -23,6 +23,8 @@ sa1_base <- st_transform(sa1_base, 27291)
 
 sa1_base <- sa1_base |>
   subset(select = c(SA12018_V1, LAND_AREA_, AREA_SQ_KM, geom))
+tm_shape(sa1_base)+
+  tm_dots()
 
 # census variables
 census <- as.data.frame(read.csv("data/geographic/Census/auckland_census.csv"))
@@ -68,35 +70,7 @@ census[which(is.na(census$pcAsian),), "pcAsian"] <- 0
 census[which(is.na(census$pcMiddleEasternLatinAmericanAfrican),), "pcMiddleEasternLatinAmericanAfrican"] <- 0
 census[which(is.na(census$pcOtherEthnicity),), "pcOtherEthnicity"] <- 0
 
-sa1_cen_spatial <- left_join(sa1_base, census, by = c("SA12018_V1"="code"))
-tm_shape(sa1_cen_spatial) +
-  tm_dots(col="pcEuropean", breaks="equal")
-
-ggplot(census) +
-  geom_density(aes(x=pcMaori))
-
 # Compute Diversity Index #
-p <- census[3000,12:17]
-p <- as.vector(t(p))
-
-shannon(p)
-df1 <- census |> 
-  mutate(diversityIndex = aggregate(as.vector(t(census[,12:17])), by=list("code"), FUN=shannon))
-
-nrow(census)
-#shannon function testing
-shannon <- function(p){
-  if (0 %in% p) {
-    p = replace(p,p==0,0.0001)
-  } else {
-    p
-  }
-  H = -sum(p*log(p))
-  return (H)
-}
-shannon(p)
-
-#shannon function working
 shannon <- function(p){
   if (0 %in% p) {
     p = replace(p,p==0,0.0001)
@@ -106,8 +80,7 @@ shannon <- function(p){
   H = -sum(p*log(p))
   return (H)
 }
-shannon(p)
-
+census$shannon <- apply(census[,12:17], 1, shannon)
 
 # Compute crime measure
 crime <- as.data.frame(read.csv("data/safety/crime/crimes_originaldata.csv"))
@@ -125,6 +98,14 @@ meshb <- st_transform(meshb, 27291)
 
 meshb_crimes <- left_join(meshb, crime_agg, by = c("code"="Meshblock")) # codes don't match!!
 st_write(meshb_crimes, "data/safety/crime/crimes_aggregated.gpkg")
+
+# plot
+sa1_cen_spatial <- left_join(sa1_base, census, by = c("SA12018_V1"="code"))
+tm_shape(sa1_cen_spatial) +
+  tm_dots(col="shannon")
+
+ggplot(census) +
+  geom_density(aes(x=pcEuropean))
 
 
 #imputation by neighbouring values - not working yet
