@@ -10,6 +10,7 @@ library(spdep)
 library(tidyr)
 library(mice)
 library(VIM)
+library(stringr)
 #library(gstat)
 #library(rgeos)
 
@@ -26,7 +27,7 @@ sa1_base <- sa1_base |>
 tm_shape(sa1_base)+
   tm_dots()
 
-# census variables
+##### Census####
 census <- as.data.frame(read.csv("data/geographic/Census/auckland_census.csv"))
 census <- census |>
   select(subset = -c(maori_desc, median_income, born_overseas, PacificNum)) |> 
@@ -62,13 +63,14 @@ census <- census |>
   mutate(pcMiddleEasternLatinAmericanAfrican = MiddleEasternLatinAmericanAfrican/pop_usual, na.rm=T) |> 
   mutate(pcOtherEthnicity = OtherEthnicity/pop_usual, na.rm=T)
 
-#cleaning missing values for ethnicity
+# again clean rows where population is zero
 census[which(is.na(census$pcEuropean),), "pcEuropean"] <- 0
 census[which(is.na(census$pcMaori),), "pcMaori"] <- 0
 census[which(is.na(census$pcPacific),), "pcPacific"] <- 0
 census[which(is.na(census$pcAsian),), "pcAsian"] <- 0
 census[which(is.na(census$pcMiddleEasternLatinAmericanAfrican),), "pcMiddleEasternLatinAmericanAfrican"] <- 0
 census[which(is.na(census$pcOtherEthnicity),), "pcOtherEthnicity"] <- 0
+census[which(census$pcEuropean>1), "pcEuropean"] <- 1 # 3 rows where white pop is larger than total pop
 
 # Compute Diversity Index #
 shannon <- function(p){
@@ -82,23 +84,53 @@ shannon <- function(p){
 }
 census$shannon <- apply(census[,12:17], 1, shannon)
 
+sa1_all <- left_join(sa1_base, census, by = c("SA12018_V1"="code"))
+##### Crimes ####
 # Compute crime measure
 crime <- as.data.frame(read.csv("data/safety/crime/crimes_originaldata.csv"))
+crime$Area.Unit = substr(crime$Area.Unit,1,nchar(crime$Area.Unit)-1)
 crime <- crime |> 
   mutate(terrau = as.factor(Territorial.Authority)) |> 
-  mutate(Meshblock = as.factor(Meshblock))
+  mutate(Meshblock = as.factor(Meshblock)) |> 
+  mutate(Area.Unit = as.factor(Area.Unit))
 crime <- crime[crime$terrau == 'Auckland.',]
 
-# sum all cases by area
-crime_agg <- aggregate(crime["Victimisations"], by=crime["Meshblock"], sum)
-summary(crime_agg)
+# sum all cases by Area Units
+crime_agg <- aggregate(crime["Victimisations"], by=crime["Area.Unit"], sum)
+areaunits <- st_read("data/geographic/areaunit/area-units.gpkg")
+areaunits <- st_transform(areaunits, 27291)
+areaunits_crimes <- left_join(areaunits, crime_agg, by = c("name"="Area.Unit"))
+#st_write(areaunits_crimes, "data/safety/crime/crimes_aggregated_areaunit.gpkg")
+tm_shape(areaunits_crimes)+
+  tm_polygons("Victimisations")
+# aggregation to SA1 level was done in QGIS
+sa1_crime <- st_read("data/safety/crime/sa1_cent_crimes.gpkg")
+sa1_crime <- st_transform(sa1_crime, 27291)
+summary(sa1_crime)
 
-meshb <- st_read("data/geographic/Meshblocks/meshblocks.gpkg")
-meshb <- st_transform(meshb, 27291)
+sa1_all <- st_join(sa1_all, sa1_crime, by = c("SA12018_V1"="SA12018_V1"))
 
-meshb_crimes <- left_join(meshb, crime_agg, by = c("code"="Meshblock")) # codes don't match!!
-st_write(meshb_crimes, "data/safety/crime/crimes_aggregated.gpkg")
+##### Road Safety ####
+crashes_sa1 <- st_read("data/safety/crash/sa1_cents_crashes.gpkg")
+crashes_sa1 <- st_transform(crashes_sa1, 27291)
+names(crashes_sa1)[names(crashes_sa1) == "Count_fatal_crashes_per_area"] <- "fatalcrashes_per"
+sa1_all <- st_join(sa1_all, crashes_sa1, by = c("SA12018_V1"="SA12018_V1"))
 
+##### Floods ####
+floods_sa1 <- st_read("data/safety/floods/sa1_cents_floods.gpkg")
+floods_sa1 <- st_transform(floods_sa1, 27291)
+names(floods_sa1)[names(floods_sa1) == "sa1s_floodproneareas...auckland_urba_sa1s_pr_flood"] <- "floodprone_prc"
+floods_sa1[which(is.na(floods_sa1$floodprone_prc),), "floodprone_prc"] <- 0
+sa1_all <- st_join(sa1_all, floods_sa1, by = c("SA12018_V1"="SA12018_V1"))
+
+##### Alcohol Environments ####
+alco_sa1 <- st_read("data/safety/alcoholenvs/sa1_cents_alcoenvs.gpkg")
+alco_sa1 <- st_transform(alco_sa1, 27291)
+alco_sa1[which(is.na(alco_sa1$alcoprohibited),), "alcoprohibited"] <- 0
+sa1_all <- st_join(sa1_all, alco_sa1, by = c("SA12018_V1"="SA12018_V1"))
+
+#### Rest ####
+summary(sa1_all)
 # plot
 sa1_cen_spatial <- left_join(sa1_base, census, by = c("SA12018_V1"="code"))
 tm_shape(sa1_cen_spatial) +
@@ -115,6 +147,9 @@ ggplot(census) +
 #sapply(1:length(knn5), function(N){mean(dampness[N])})
 #sa1s_na_damp <- sa1_all[which(is.na(sa1_all$dampness)),]
 #sa1s_na_damp$dampness
+
+
+
 
 #### Spatial Interpolation ####
 grid <- st_sample(sa1, 10000, type = "regular")
