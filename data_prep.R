@@ -17,15 +17,16 @@ library(stringr)
 #### Data imports ####
 # geographic data
 #sa1_dist <- st_read("data/geographic/sa1_allNetDist.gpkg")
-sa1_base <- st_read("data/geographic/sa1_centroid_base.gpkg")
+sa1_base <- st_read("data/geographic/urban_sa1_landvalid.gpkg")
 #transforming to the same coordinate system
 #sa1_dist <- st_transform(sa1_dist, 27291)
 sa1_base <- st_transform(sa1_base, 27291)
 
 sa1_base <- sa1_base |>
-  subset(select = c(SA12018_V1, LAND_AREA_, AREA_SQ_KM, geom))
+  subset(select = c(SA12018_V1_00, area, geom))
+
 tm_shape(sa1_base)+
-  tm_dots()
+  tm_polygons(lwd=0, style="kmeans")
 
 ##### Census####
 census <- as.data.frame(read.csv("data/geographic/Census/auckland_census.csv"))
@@ -84,7 +85,7 @@ shannon <- function(p){
 }
 census$shannon <- apply(census[,12:17], 1, shannon)
 
-sa1_all <- left_join(sa1_base, census, by = c("SA12018_V1"="code"))
+sa1_all <- left_join(sa1_base, census, by = c("SA12018_V1_00"="code"))
 ##### Crimes ####
 # Compute crime measure
 crime <- as.data.frame(read.csv("data/safety/crime/crimes_originaldata.csv"))
@@ -104,40 +105,46 @@ areaunits_crimes <- left_join(areaunits, crime_agg, by = c("name"="Area.Unit"))
 tm_shape(areaunits_crimes)+
   tm_polygons("Victimisations")
 # aggregation to SA1 level was done in QGIS
-sa1_crime <- st_read("data/safety/crime/sa1_cent_crimes.gpkg")
+sa1_crime <- st_read("data/safety/crime/sa1_crimes_final.gpkg")
 sa1_crime <- st_transform(sa1_crime, 27291)
-summary(sa1_crime)
+sa1_crime <- sa1_crime |>
+  subset(select = c(SA12018_V1_00, crime_perarea))
+sa1_crime[which(is.na(sa1_crime$crime_perarea),), "crime_perarea"] <- 0
 
-sa1_all <- st_join(sa1_all, sa1_crime, by = c("SA12018_V1"="SA12018_V1"))
+sa1_all <- st_join(sa1_all, sa1_crime, by = c("SA12018_V1_00"="SA12018_V1_00"))
 
 ##### Road Safety ####
 crashes_sa1 <- st_read("data/safety/crash/sa1_cents_crashes.gpkg")
 crashes_sa1 <- st_transform(crashes_sa1, 27291)
+crashes_sa1 <- crashes_sa1 |>
+  subset(select = c(SA12018_V1_00, Count_fatal_crashes_per_area))
 names(crashes_sa1)[names(crashes_sa1) == "Count_fatal_crashes_per_area"] <- "fatalcrashes_per"
-sa1_all <- st_join(sa1_all, crashes_sa1, by = c("SA12018_V1"="SA12018_V1"))
+crashes_sa1[which(is.na(crashes_sa1$crime_perarea),), "Count_fatal_crashes_per_area"] <- 0
+
+sa1_all <- st_join(sa1_all, crashes_sa1, by = c("SA12018_V1_00"="SA12018_V1_00"))
 
 ##### Floods ####
 floods_sa1 <- st_read("data/safety/floods/sa1_cents_floods.gpkg")
 floods_sa1 <- st_transform(floods_sa1, 27291)
+floods_sa1 <- floods_sa1 |>
+  subset(select = c(SA12018_V1, sa1s_floodproneareas...auckland_urba_sa1s_pr_flood))
 names(floods_sa1)[names(floods_sa1) == "sa1s_floodproneareas...auckland_urba_sa1s_pr_flood"] <- "floodprone_prc"
 floods_sa1[which(is.na(floods_sa1$floodprone_prc),), "floodprone_prc"] <- 0
-sa1_all <- st_join(sa1_all, floods_sa1, by = c("SA12018_V1"="SA12018_V1"))
+sa1_all <- st_join(sa1_all, floods_sa1, by = c("SA12018_V1_00"="SA12018_V1"))
 
 ##### Alcohol Environments ####
 alco_sa1 <- st_read("data/safety/alcoholenvs/sa1_cents_alcoenvs.gpkg")
 alco_sa1 <- st_transform(alco_sa1, 27291)
+alco_sa1 <- alco_sa1 |>
+  subset(select = c(SA12018_V1, alcoprohibited))
 alco_sa1[which(is.na(alco_sa1$alcoprohibited),), "alcoprohibited"] <- 0
-sa1_all <- st_join(sa1_all, alco_sa1, by = c("SA12018_V1"="SA12018_V1"))
+sa1_all <- st_join(sa1_all, alco_sa1, by = c("SA12018_V1_00"="SA12018_V1"))
 
 #### Rest ####
 summary(sa1_all)
 # plot
-sa1_cen_spatial <- left_join(sa1_base, census, by = c("SA12018_V1"="code"))
-tm_shape(sa1_cen_spatial) +
-  tm_dots(col="shannon")
-
-ggplot(census) +
-  geom_density(aes(x=pcEuropean))
+tm_shape(sa1_all) +
+  tm_polygons(col="crime_perarea", lwd=0)
 
 
 #imputation by neighbouring values - not working yet
