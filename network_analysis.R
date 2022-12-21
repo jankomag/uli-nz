@@ -15,11 +15,11 @@ library(DescTools)
 
 ## RERUN WITH WAIHEKE ISLAND NETWORK - IT WAS EXCLUDED
 #### Data Imports ####
-edges <- st_read("data/network_analysis/full_auckland_network.gpkg", layer='edges') |> 
+edges <- st_read("data/network_analysis/auckland_waiheke_network_walk.gpkg", layer='edges') |> 
   st_transform(4326) |> 
   subset(select = -c(u,v,key,osmid, lanes, name, highway, oneway, reversed, from, to,ref, service, access, bridge,
                      width, junction, tunnel, area))
-sa1 <- st_read("data/geographic/sa1_centorids_clean.gpkg") |> 
+sa1 <- st_read("data/geographic/urban_sa1_landvalid.gpkg") |> 
   st_transform(4326)
 grid_sample <- st_read("data/geographic/grids/sample_grid_all.gpkg") |> 
   st_transform(4326)
@@ -112,6 +112,9 @@ sa1 <- get_distance(supermarket)
 #save final
 st_write(sa1, "data/allsa1_dist.gpkg")
 head(sa1)
+
+
+
 
 # old way pre-function
 dist_matrix = data.frame(st_network_cost(network, from = sa1, to = stations, weights = "length"))

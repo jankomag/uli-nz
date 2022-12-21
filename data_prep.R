@@ -117,20 +117,20 @@ sa1_all <- st_join(sa1_all, sa1_crime, by = c("SA12018_V1_00"="SA12018_V1_00"))
 crashes_sa1 <- st_read("data/safety/crash/sa1_cents_crashes.gpkg")
 crashes_sa1 <- st_transform(crashes_sa1, 27291)
 crashes_sa1 <- crashes_sa1 |>
-  subset(select = c(SA12018_V1_00, Count_fatal_crashes_per_area))
+  subset(select = c(SA12018_V1, Count_fatal_crashes_per_area))
 names(crashes_sa1)[names(crashes_sa1) == "Count_fatal_crashes_per_area"] <- "fatalcrashes_per"
 crashes_sa1[which(is.na(crashes_sa1$crime_perarea),), "Count_fatal_crashes_per_area"] <- 0
 
 sa1_all <- st_join(sa1_all, crashes_sa1, by = c("SA12018_V1_00"="SA12018_V1_00"))
 
 ##### Floods ####
-floods_sa1 <- st_read("data/safety/floods/sa1_cents_floods.gpkg")
+floods_sa1 <- st_read("data/safety/floods/sa1_floods_final.gpkg")
 floods_sa1 <- st_transform(floods_sa1, 27291)
 floods_sa1 <- floods_sa1 |>
-  subset(select = c(SA12018_V1, sa1s_floodproneareas...auckland_urba_sa1s_pr_flood))
-names(floods_sa1)[names(floods_sa1) == "sa1s_floodproneareas...auckland_urba_sa1s_pr_flood"] <- "floodprone_prc"
+  subset(select = c(SA12018_V1_00, flood_pc))
+names(floods_sa1)[names(floods_sa1) == "flood_pc"] <- "floodprone_prc"
 floods_sa1[which(is.na(floods_sa1$floodprone_prc),), "floodprone_prc"] <- 0
-sa1_all <- st_join(sa1_all, floods_sa1, by = c("SA12018_V1_00"="SA12018_V1"))
+sa1_all <- st_join(sa1_all, floods_sa1, by = c("SA12018_V1_00"="SA12018_V1_00"))
 
 ##### Alcohol Environments ####
 alco_sa1 <- st_read("data/safety/alcoholenvs/sa1_cents_alcoenvs.gpkg")
