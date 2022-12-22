@@ -95,7 +95,11 @@ sa1 <- get_distance(childcare)
 
 primary <- st_read("data/social infrastructure/schools/primary_schools.gpkg") |>
   st_transform(4326)# 27291
-sa1 <- get_distance(childcare)
+sa1 <- get_distance(primary)
+
+secondary <- st_read("data/social infrastructure/schools/secondary_schools.gpkg") |>
+  st_transform(4326)# 27291
+sa1 <- get_distance(secondary)
 
 sport <- st_read("data/social infrastructure/sport/sport_facilities.gpkg") |>
   st_transform(4326)# 27291
@@ -110,9 +114,8 @@ supermarket <- st_read("data/walkability/supermarket_all.gpkg") |>
 sa1 <- get_distance(supermarket)
 
 #save final
-st_write(sa1, "data/allsa1_dist.gpkg")
+st_write(sa1, "data/geographic/allsa1_dist.gpkg")
 head(sa1)
-
 
 
 
