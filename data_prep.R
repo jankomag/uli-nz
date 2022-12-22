@@ -11,22 +11,17 @@ library(tidyr)
 library(mice)
 library(VIM)
 library(stringr)
-#library(gstat)
-#library(rgeos)
+library(rgoes)
 
 #### Data imports ####
 # geographic data
-#sa1_dist <- st_read("data/geographic/sa1_allNetDist.gpkg")
-sa1_base <- st_read("data/geographic/urban_sa1_landvalid.gpkg")
+sa1_polys <- st_read("data/geographic/urban_sa1_landvalid.gpkg")
 #transforming to the same coordinate system
 #sa1_dist <- st_transform(sa1_dist, 27291)
-sa1_base <- st_transform(sa1_base, 27291)
+sa1_base <- st_transform(sa1_polys, 27291) |> st_drop_geometry()
 
 sa1_base <- sa1_base |>
-  subset(select = c(SA12018_V1_00, area, geom))
-
-tm_shape(sa1_base)+
-  tm_polygons(lwd=0, style="kmeans")
+  subset(select = c(SA12018_V1_00, area))
 
 ##### Census####
 census <- as.data.frame(read.csv("data/geographic/Census/auckland_census.csv"))
@@ -104,48 +99,53 @@ areaunits_crimes <- left_join(areaunits, crime_agg, by = c("name"="Area.Unit"))
 #st_write(areaunits_crimes, "data/safety/crime/crimes_aggregated_areaunit.gpkg")
 tm_shape(areaunits_crimes)+
   tm_polygons("Victimisations")
+
 # aggregation to SA1 level was done in QGIS
-sa1_crime <- st_read("data/safety/crime/sa1_crimes_final.gpkg")
-sa1_crime <- st_transform(sa1_crime, 27291)
+sa1_crime <- st_read("data/safety/crime/sa1_crimes_final.gpkg") |> st_drop_geometry()
 sa1_crime <- sa1_crime |>
   subset(select = c(SA12018_V1_00, crime_perarea))
-sa1_crime[which(is.na(sa1_crime$crime_perarea),), "crime_perarea"] <- 0
 
-sa1_all <- st_join(sa1_all, sa1_crime, by = c("SA12018_V1_00"="SA12018_V1_00"))
+sa1_all <- left_join(sa1_all, sa1_crime, by = c("SA12018_V1_00"="SA12018_V1_00"))
+sa1_all[which(is.na(sa1_all$crime_perarea),), "crime_perarea"] <- 0
 
 ##### Road Safety ####
-crashes_sa1 <- st_read("data/safety/crash/sa1_cents_crashes.gpkg")
-crashes_sa1 <- st_transform(crashes_sa1, 27291)
+crashes_sa1 <- st_read("data/safety/crash/sa1_cents_crashes.gpkg") |> st_drop_geometry()
 crashes_sa1 <- crashes_sa1 |>
   subset(select = c(SA12018_V1, Count_fatal_crashes_per_area))
 names(crashes_sa1)[names(crashes_sa1) == "Count_fatal_crashes_per_area"] <- "fatalcrashes_per"
-crashes_sa1[which(is.na(crashes_sa1$crime_perarea),), "Count_fatal_crashes_per_area"] <- 0
 
-sa1_all <- st_join(sa1_all, crashes_sa1, by = c("SA12018_V1_00"="SA12018_V1_00"))
+sa1_all <- left_join(sa1_all, crashes_sa1, by = c("SA12018_V1_00"="SA12018_V1"))
+sa1_all[which(is.na(sa1_all$fatalcrashes_per),), "fatalcrashes_per"] <- 0
 
 ##### Floods ####
-floods_sa1 <- st_read("data/safety/floods/sa1_floods_final.gpkg")
-floods_sa1 <- st_transform(floods_sa1, 27291)
+floods_sa1 <- st_read("data/safety/floods/sa1_floods_final.gpkg") |> st_drop_geometry()
 floods_sa1 <- floods_sa1 |>
   subset(select = c(SA12018_V1_00, flood_pc))
 names(floods_sa1)[names(floods_sa1) == "flood_pc"] <- "floodprone_prc"
-floods_sa1[which(is.na(floods_sa1$floodprone_prc),), "floodprone_prc"] <- 0
-sa1_all <- st_join(sa1_all, floods_sa1, by = c("SA12018_V1_00"="SA12018_V1_00"))
+
+sa1_all <- left_join(sa1_all, floods_sa1, by = c("SA12018_V1_00"="SA12018_V1_00"))
+sa1_all[which(is.na(sa1_all$floodprone_prc),), "floodprone_prc"] <- 0
 
 ##### Alcohol Environments ####
-alco_sa1 <- st_read("data/safety/alcoholenvs/sa1_cents_alcoenvs.gpkg")
-alco_sa1 <- st_transform(alco_sa1, 27291)
+alco_sa1 <- st_read("data/safety/alcoholenvs/sa1_cents_alcoenvs.gpkg") |> st_drop_geometry()
 alco_sa1 <- alco_sa1 |>
   subset(select = c(SA12018_V1, alcoprohibited))
-alco_sa1[which(is.na(alco_sa1$alcoprohibited),), "alcoprohibited"] <- 0
-sa1_all <- st_join(sa1_all, alco_sa1, by = c("SA12018_V1_00"="SA12018_V1"))
+sa1_all <- left_join(sa1_all, alco_sa1, by = c("SA12018_V1_00"="SA12018_V1"))
+sa1_all[which(is.na(sa1_all$alcoprohibited),), "alcoprohibited"] <- 0
 
 #### Rest ####
-summary(sa1_all)
-# plot
-tm_shape(sa1_all) +
-  tm_polygons(col="crime_perarea", lwd=0)
+sa1_dists <- st_read("data/geographic/allsa1_dist.gpkg")|> st_drop_geometry()
+sa1_all <- left_join(sa1_all, sa1_dists, by = c("SA12018_V1_00"="SA12018_V1_00"))
 
+sa1_allg <- left_join(sa1_polys, sa1_all, by=c("SA12018_V1_00"="SA12018_V1_00"))
+sa1_allg <- sa1_allg |> 
+  subset(select = -c(LANDWATER, LANDWATER_NAME, LAND_AREA_SQ_KM, AREA_SQ_KM, Shape_Length, fid_2, TA2018_V1_, TA2018_V_1, LAND_AREA_, AREA_SQ_KM_2, Shape_Leng, area.y, na.rm))
+
+# plot
+tm_shape(sa1_allg) +
+  tm_polygons(col="dist_secondary", lwd=0)
+
+st_write(sa1_allg, "data/geographic/sa1_allvars.gpkg")
 
 #imputation by neighbouring values - not working yet
 #sa1_all <- mutate(sa1_all, dampness = as.numeric(as.character(dampness)))

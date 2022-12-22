@@ -115,6 +115,9 @@ sa1 <- get_distance(supermarket)
 
 #save final
 st_write(sa1, "data/geographic/allsa1_dist.gpkg")
+sa1 <- st_read("data/geographic/allsa1_dist.gpkg") |> 
+  subset(select = -c(LANDWATER, LANDWATER_NAME, LAND_AREA_SQ_KM, AREA_SQ_KM, Shape_Length, fid_2, TA2018_V1_, TA2018_V_1, LAND_AREA_, AREA_SQ_KM_2, Shape_Leng, dist_childcare.1))
+  
 head(sa1)
 
 

@@ -19,22 +19,23 @@ library(DescTools)
 
 #### Data imports ####
 # geographic data
-grid <- st_read("data/geographic/grids/grid_all-v-11.11.22-19.22.gpkg")
-#transforming to the same coordinate system
-grid <- st_transform(grid, 27291)
-grid$id <- 1:nrow(grid)
+sa1_allg <- st_read("data/geographic/sa1_allvars.gpkg") |> st_transform(27291) #transforming to the same coordinate system
+#sa1_allg$id <- 1:nrow(sa1_allg)
 
 #### EDA ####
-summary(grid)
-# strip from geography for EDA
-grid_df <- grid |> st_drop_geometry()
-# save geometry only for later
-grid_geom = subset(grid, select = c(id, geom))
+sa1_allg[which(is.infinite(sa1_allg$dist_stations),), "dist_stations"] <- 1000000
+sa1_allg[which(is.infinite(sa1_allg$dist_childcare),), "dist_childcare"] <- 1000000
+sa1_allg[which(is.infinite(sa1_allg$dist_hospital),), "dist_hospital"] <- 1000000
+sa1_allg[which(is.infinite(sa1_allg$dist_chemist),), "dist_chemist"] <- 1000000
 
+
+summary(sa1_allg)
+# strip from geography for EDA
+sa1_all <- sa1_allg |> st_drop_geometry()
 ##### correlations #####
-cor <- cor(x = grid_df[1:21], y = grid_df[1:21], use="complete.obs")
+cor <- cor(x = sa1_all[2:43], y = sa1_all[2:43], use="complete.obs")
 corrplot(cor, tl.srt = 25)
-corr <- rcorr(as.matrix(grid_df))
+corr <- rcorr(as.matrix(sa1_all))
 
 # function to make correlation matrix
 flattenCorrMatrix <- function(cormat, pmat) {
@@ -54,16 +55,16 @@ corrmatrix <- corrmatrix |>
   filter(row == 'income')
   
 # plot correlations
-grid_df |>
-  gather(-no_intersections_in_100m, key = "var", value = "value") |> 
-  ggplot(aes(x = no_intersections_in_100m, y = value)) +
+sa1_all |>
+  gather(key = "var", value = "value") |> 
+  ggplot(aes(x = "shannon", y = value)) +
   facet_wrap(~ var, scales = "free") +
   geom_point(alpha=0.2) +
   theme_bw() +
   geom_smooth(method="lm")
 
-##### distributions #####
-df_to_see_dist = grid_logged # define parameter
+##### Distributions #####
+df_to_see_dist = sa1_all # define parameter
 my_plots <- lapply(names(df_to_see_dist), function(var_x){
   p <- ggplot(df_to_see_dist) +
     aes_string(var_x)
@@ -79,47 +80,49 @@ plot_grid(plotlist = my_plots)
 ##### Different Normalisation methods ####
 # min-max normalise columns function
 minmaxNORM <- function(x) {
-  return (((x - min(x))) / (max(x) - min(x))*(10-0)+0)
+  return (((x - min(x))) / (max(x) - min(x))*(1-0)+0)
 }
-
-# threshold normalisation
-targetnorm <- function(x, threshold, penalty, lim){
+if (threshold != 0) {
   x <- ifelse(x<=threshold,
-                   min(x,lim), #normal linear
-                   min(
-                     x+penalty*(-log(x/threshold)),
-                     lim)) # penalty for not meeting the target
-  return (x)
+              Winsorize(x,maxval=lim), #normal linear
+              Winsorize(x,maxval=lim)) # penalty for not meeting the target
+} else {
+  x <- Winsorize(x, maxval=lim)
 }
 
-#test function
-testfunc <- function(x, vdist=1, bw=4){
-  wgt = exp(-.5*(vdist/bw)^2)
+# normalisation func
+targetnorm <- function(x, threshold, penalty, lim, direction, log = FALSE){
+  x <- if (lim != 0) {
+    Winsorize(x, maxval=lim)
+  } else if (log=T) {
+    
+  }
+  else if (direction == 1) {
+    return (minmaxNORM(x))
+  } else {
+    return (minmaxNORM(-x))
+    }
 }
-
-curve(testfunc, from=1, to=50, xlab="x", ylab="y")
-
 #vis different standarisation methods
-grid_df |>
+sa1_all |>
   ggplot() +
-  geom_density(aes(minmaxNORM(-log(smallpark_dist))))
+  geom_density(aes(popdens.x))
 
-grid_df |>
-  mutate(bus_meas = Winsorize((no_households),minval=0,maxval=100)) |> 
-  ggplot() +
-  geom_density(aes(bus_meas))
-
-grid_df |>
-  mutate(smallpark_dist = minmaxNORM(-log(sapply(smallpark_dist, targetnorm, 600, penalty, 2000)))) |> 
-  ggplot() +
-  geom_density(aes(smallpark_dist))
+sa1_all_test <- sa1_all |> 
+  mutate(meas_popdens = Winsorize(log10(popdens.x), maxval = -2, minval = -2.7))
+summary(sa1_all_test)
+ggplot(sa1_all_test) +
+  geom_density(aes(meas_popdens))
 
 ##### Normalaise variables #####
-# indicator
-penalty = 5
+sa1_all_index <- sa1_all |> 
+  mutate(dist_stations = targetnorm(dist_stations, threshold=0, penalty=0, lim=20000, direction=0)) |>
+  mutate()
 
-grid_modified <- grid_df |> 
-  mutate(bus_meas = minmaxNORM(-log(sapply(bus_dist, targetnorm, 400, penalty, 10000)))) |>
+
+
+sa1_all_index <- sa1_all |> 
+  mutate(dist_stations = targetnorm(dist_stations, threshold=0, penalty=0, lim=20000, direction=0))
   mutate(station_mea = minmaxNORM(-log(station_dist))) |>
   mutate(intersections_mea = minmaxNORM(Winsorize(no_intersections_in_100m, maxval=10))) |>
   mutate(conv_st_mea = minmaxNORM(-log(conv_st_dist))) |> 
