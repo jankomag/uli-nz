@@ -38,7 +38,7 @@ census <- census |>
   mutate(pop_usual = as.numeric(pop_usual))
 
 # Dealing with missing values #
-#observe NAs
+# find NAs
 md.pattern(census)
 aggr_plot <- aggr(census, col=c('navyblue','red'), numbers=TRUE, sortVars=TRUE, labels=names(census), cex.axis=.7, gap=3, ylab=c("Histogram of missing data","Pattern"))
 # replace with 0s
@@ -67,6 +67,36 @@ census[which(is.na(census$pcAsian),), "pcAsian"] <- 0
 census[which(is.na(census$pcMiddleEasternLatinAmericanAfrican),), "pcMiddleEasternLatinAmericanAfrican"] <- 0
 census[which(is.na(census$pcOtherEthnicity),), "pcOtherEthnicity"] <- 0
 census[which(census$pcEuropean>1), "pcEuropean"] <- 1 # 3 rows where white pop is larger than total pop
+
+# NAs bade on neighbours
+sa1_geo_impute <- left_join(sa1_polys, census, by = c("SA12018_V1_00"="code"))
+tm_shape(sa1_geo_impute) + tm_polygons(col="dampness", lwd=0)
+
+sa1.nb <- poly2nb(sa1_geo_impute)
+
+idx <- which(is.na(sa1_geo_impute$dampness))
+nongeosa1_imp <- st_drop_geometry(sa1_geo_impute)
+
+#impute neigbouring values
+for (i in idx) {
+  neigidx <- sa1.nb[[idx[i]]]
+  nongeosa1_imp[i, "dampness"] <- mean(nongeosa1_imp[neigidx, "dampness"])
+}
+geosa1_imputed <- left_join(sa1_polys, nongeosa1_imp, by = c("SA12018_V1_00"="SA12018_V1_00"))
+tm_shape(geosa1_imputed) + tm_polygons(col="dampness", lwd=0)
+summary(census)
+
+
+## edit the islands
+g.nb[[101]] = as.integer(100)
+g.nb[[125]] = as.integer(c(247, 124, 123))
+g.nb[[126]] = as.integer(127)
+g.nb[[171]] = as.integer(c(165, 174))
+g.nb[[174]] = as.integer(171)
+g.nb[[179]] = as.integer(165)
+
+g.lw = nb2listw(g.nb)
+
 
 # Compute Diversity Index #
 shannon <- function(p){
