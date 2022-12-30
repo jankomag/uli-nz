@@ -11,15 +11,13 @@ library(tidyr)
 library(mice)
 library(VIM)
 library(stringr)
-library(rgoes)
+library(nngeo)
 
 #### Data imports ####
 # geographic data
 sa1_polys <- st_read("data/geographic/urban_sa1_landvalid.gpkg")
 #transforming to the same coordinate system
-#sa1_dist <- st_transform(sa1_dist, 27291)
 sa1_base <- st_transform(sa1_polys, 27291) |> st_drop_geometry()
-
 sa1_base <- sa1_base |>
   subset(select = c(SA12018_V1_00, area))
 
@@ -67,37 +65,28 @@ census[which(is.na(census$pcAsian),), "pcAsian"] <- 0
 census[which(is.na(census$pcMiddleEasternLatinAmericanAfrican),), "pcMiddleEasternLatinAmericanAfrican"] <- 0
 census[which(is.na(census$pcOtherEthnicity),), "pcOtherEthnicity"] <- 0
 census[which(census$pcEuropean>1), "pcEuropean"] <- 1 # 3 rows where white pop is larger than total pop
+census[which(is.na(census$dampness),), "dampness"] <- mean(census$dampness, na.rm=T)
 
-# NAs bade on neighbours
-sa1_geo_impute <- left_join(sa1_polys, census, by = c("SA12018_V1_00"="code"))
-tm_shape(sa1_geo_impute) + tm_polygons(col="dampness", lwd=0)
+##### NN impute  #####
+#impute NAs based on neighbouring values
+sa1_geo_imp <- left_join(sa1_polys, census, by = c("SA12018_V1_00"="code"))
+tmap_mode("view")
+tm_shape(sa1_geo_imp) + tm_polygons(col="dampness", lwd=0)
 
-sa1.nb <- poly2nb(sa1_geo_impute)
-
-idx <- which(is.na(sa1_geo_impute$dampness))
-nongeosa1_imp <- st_drop_geometry(sa1_geo_impute)
-
+sa1.nb <- poly2nb(sa1_geo_imp)
+idx <- as.vector(which(is.na(sa1_geo_imp$dampness)))
+sa1_nongeo_imp <- st_drop_geometry(sa1_geo_imp)
 #impute neigbouring values
 for (i in idx) {
-  neigidx <- sa1.nb[[idx[i]]]
-  nongeosa1_imp[i, "dampness"] <- mean(nongeosa1_imp[neigidx, "dampness"])
+  neigs_idx <- sa1.nb[[idx[i]]]
+  sa1_nongeo_imp[i, "dampness"] <- mean(sa1_nongeo_imp[neigs_idx, "dampness"])
 }
-geosa1_imputed <- left_join(sa1_polys, nongeosa1_imp, by = c("SA12018_V1_00"="SA12018_V1_00"))
-tm_shape(geosa1_imputed) + tm_polygons(col="dampness", lwd=0)
+geosa1_imputed <- left_join(sa1_polys, sa1_nongeo_imp, by = c("SA12018_V1_00"="SA12018_V1_00"))
+tm_shape(geosa1_imputed) + tm_polygons(col="dampness", lwd=0.1)
 summary(census)
 
 
-## edit the islands
-g.nb[[101]] = as.integer(100)
-g.nb[[125]] = as.integer(c(247, 124, 123))
-g.nb[[126]] = as.integer(127)
-g.nb[[171]] = as.integer(c(165, 174))
-g.nb[[174]] = as.integer(171)
-g.nb[[179]] = as.integer(165)
-
-g.lw = nb2listw(g.nb)
-
-
+##### Diversity ####
 # Compute Diversity Index #
 shannon <- function(p){
   if (0 %in% p) {
@@ -163,13 +152,18 @@ alco_sa1 <- alco_sa1 |>
 sa1_all <- left_join(sa1_all, alco_sa1, by = c("SA12018_V1_00"="SA12018_V1"))
 sa1_all[which(is.na(sa1_all$alcoprohibited),), "alcoprohibited"] <- 0
 
-#### Rest ####
+#### Distances ####
 sa1_dists <- st_read("data/geographic/allsa1_dist.gpkg")|> st_drop_geometry()
 sa1_all <- left_join(sa1_all, sa1_dists, by = c("SA12018_V1_00"="SA12018_V1_00"))
 
 sa1_allg <- left_join(sa1_polys, sa1_all, by=c("SA12018_V1_00"="SA12018_V1_00"))
 sa1_allg <- sa1_allg |> 
-  subset(select = -c(LANDWATER, LANDWATER_NAME, LAND_AREA_SQ_KM, AREA_SQ_KM, Shape_Length, fid_2, TA2018_V1_, TA2018_V_1, LAND_AREA_, AREA_SQ_KM_2, Shape_Leng, area.y, na.rm))
+  subset(select = -c(LANDWATER, LANDWATER_NAME, LAND_AREA_SQ_KM, AREA_SQ_KM, Shape_Length, fid_2, TA2018_V1_, TA2018_V_1, LAND_AREA_, AREA_SQ_KM_2, Shape_Leng, area.x, area.y, na.rm, popdens.y))
+
+sa1_allg[which(is.infinite(sa1_allg$dist_stations),), "dist_stations"] <- 86000
+sa1_allg[which(is.infinite(sa1_allg$dist_childcare),), "dist_childcare"] <- 70000
+sa1_allg[which(is.infinite(sa1_allg$dist_hospital),), "dist_hospital"] <- 28000
+sa1_allg[which(is.infinite(sa1_allg$dist_chemist),), "dist_chemist"] <- 72000
 
 # plot
 tm_shape(sa1_allg) +

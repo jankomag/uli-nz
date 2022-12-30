@@ -23,12 +23,6 @@ sa1_allg <- st_read("data/geographic/sa1_allvars.gpkg") |> st_transform(27291) #
 #sa1_allg$id <- 1:nrow(sa1_allg)
 
 #### EDA ####
-sa1_allg[which(is.infinite(sa1_allg$dist_stations),), "dist_stations"] <- 1000000
-sa1_allg[which(is.infinite(sa1_allg$dist_childcare),), "dist_childcare"] <- 1000000
-sa1_allg[which(is.infinite(sa1_allg$dist_hospital),), "dist_hospital"] <- 1000000
-sa1_allg[which(is.infinite(sa1_allg$dist_chemist),), "dist_chemist"] <- 1000000
-
-
 summary(sa1_allg)
 # strip from geography for EDA
 sa1_all <- sa1_allg |> st_drop_geometry()
@@ -94,7 +88,7 @@ if (threshold != 0) {
 targetnorm <- function(x, threshold, penalty, lim, direction, log = FALSE){
   x <- if (lim != 0) {
     Winsorize(x, maxval=lim)
-  } else if (log=T) {
+  } else if (log==T) {
     
   }
   else if (direction == 1) {
@@ -106,21 +100,30 @@ targetnorm <- function(x, threshold, penalty, lim, direction, log = FALSE){
 #vis different standarisation methods
 sa1_all |>
   ggplot() +
-  geom_density(aes(popdens.x))
+  geom_density(aes((fatalcrashes_per)))
+
+sa1_all |>
+  ggplot() +
+  geom_density(aes(Winsorize((fatalcrashes_per), minval=-0, maxval = 0.00005)))
 
 sa1_all_test <- sa1_all |> 
-  mutate(meas_popdens = Winsorize(log10(popdens.x), maxval = -2, minval = -2.7))
-summary(sa1_all_test)
+  mutate(fatalcrashes_permeas = minmaxNORM(Winsorize(log10(fatalcrashes_per), maxval = -4, minval = -6)))
 ggplot(sa1_all_test) +
-  geom_density(aes(meas_popdens))
+  geom_density(aes(fatalcrashes_permeas))
 
 ##### Normalaise variables #####
 sa1_all_index <- sa1_all |> 
-  mutate(dist_stations = targetnorm(dist_stations, threshold=0, penalty=0, lim=20000, direction=0)) |>
+  mutate(popdens1 = minmaxNORM(Winsorize(log10(popdens), maxval = -2, minval = -2.7))) |>
+  mutate(housedens1 = minmaxNORM(Winsorize(log10(no_households/area.x), maxval = -2, minval = -4))) |> 
+  mutate(damp1 = minmaxNORM(-dampness)) |>
+  mutate(diversity1 = minmaxNORM(shannon)) |>
+  mutate(crime1 = minmaxNORM(-Winsorize((crime_perarea), maxval = 0.0030, minval = 0)))
   mutate()
-
-
-
+  
+  
+  
+  
+  
 sa1_all_index <- sa1_all |> 
   mutate(dist_stations = targetnorm(dist_stations, threshold=0, penalty=0, lim=20000, direction=0))
   mutate(station_mea = minmaxNORM(-log(station_dist))) |>
