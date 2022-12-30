@@ -76,14 +76,6 @@ plot_grid(plotlist = my_plots)
 minmaxNORM <- function(x) {
   return (((x - min(x))) / (max(x) - min(x))*(1-0)+0)
 }
-if (threshold != 0) {
-  x <- ifelse(x<=threshold,
-              Winsorize(x,maxval=lim), #normal linear
-              Winsorize(x,maxval=lim)) # penalty for not meeting the target
-} else {
-  x <- Winsorize(x, maxval=lim)
-}
-
 # normalisation func
 targetnorm <- function(x, threshold, penalty, lim, direction, log = FALSE){
   x <- if (lim != 0) {
@@ -100,11 +92,10 @@ targetnorm <- function(x, threshold, penalty, lim, direction, log = FALSE){
 #vis different standarisation methods
 sa1_all |>
   ggplot() +
-  geom_density(aes((fatalcrashes_per)))
-
+  geom_density(aes(dist_petrol))
 sa1_all |>
   ggplot() +
-  geom_density(aes(Winsorize((fatalcrashes_per), minval=-0, maxval = 0.00005)))
+  geom_density(aes(minmaxNORM(-Winsorize(dist_evs, maxval = 5000))))
 
 sa1_all_test <- sa1_all |> 
   mutate(fatalcrashes_permeas = minmaxNORM(Winsorize(log10(fatalcrashes_per), maxval = -4, minval = -6)))
@@ -113,52 +104,52 @@ ggplot(sa1_all_test) +
 
 ##### Normalaise variables #####
 sa1_all_index <- sa1_all |> 
-  mutate(popdens1 = minmaxNORM(Winsorize(log10(popdens), maxval = -2, minval = -2.7))) |>
-  mutate(housedens1 = minmaxNORM(Winsorize(log10(no_households/area.x), maxval = -2, minval = -4))) |> 
+  mutate(popdens1 = minmaxNORM(Winsorize(log10(popdens.x), maxval = -2, minval = -2.7))) |>
+  mutate(housedens1 = minmaxNORM(Winsorize(log10(no_households/area), maxval = -2, minval = -4))) |> 
   mutate(damp1 = minmaxNORM(-dampness)) |>
   mutate(diversity1 = minmaxNORM(shannon)) |>
-  mutate(crime1 = minmaxNORM(-Winsorize((crime_perarea), maxval = 0.0030, minval = 0)))
-  mutate()
+  mutate(crime1 = minmaxNORM(-Winsorize((crime_perarea), maxval = 0.0030, minval = 0))) |> 
+  mutate(crashes1 = minmaxNORM(-Winsorize(crashesperarea.x, minval=0, maxval = 0.001))) |> 
+  mutate(flood1 = minmaxNORM(-Winsorize(floodprone_prc, minval=0, maxval = 0.5))) |> 
+  mutate(alcohol1 = alcoprohibited) |> 
+  mutate(trstation1 = minmaxNORM(-Winsorize(dist_stations, maxval = 50000))) |> 
+  mutate(bustop1 = minmaxNORM(-Winsorize(dist_stations, maxval = 5000))) |> 
+  mutate(marae1 = minmaxNORM(-dist_marae)) |> 
+  mutate(cinema1 = minmaxNORM(-Winsorize(dist_cinema, maxval = 20000))) |> 
+  mutate(galler1 = minmaxNORM(-Winsorize(dist_galleries, maxval = 30000))) |> 
+  mutate(library1 = minmaxNORM(-Winsorize(dist_libraries, maxval = 7000))) |> 
+  mutate(museum1 = minmaxNORM(-Winsorize(dist_museums, maxval = 25000))) |> 
+  mutate(theatre1 = minmaxNORM(-Winsorize(dist_theatre, maxval = 20000))) |> 
+  mutate(chemist1 = minmaxNORM(-Winsorize(dist_chemist, maxval = 20000))) |> 
+  mutate(dentist1 = minmaxNORM(-Winsorize(dist_dentist, maxval = 5000))) |> 
+  mutate(healthcr1 = minmaxNORM(-Winsorize(dist_healthcentre, maxval = 6000))) |> 
+  mutate(hospital1 = minmaxNORM(-Winsorize(dist_hospital, maxval = 15000))) |>
+  mutate(childcare1 = minmaxNORM(-Winsorize(dist_childcare, maxval = 10000))) |> 
+  mutate(sport1 = minmaxNORM(-Winsorize(dist_sport, maxval = 5000))) |>
+  mutate(convstor1 = minmaxNORM(-Winsorize(dist_conveniencestore, maxval = 2000))) |>
+  mutate(supermarket1 = minmaxNORM(-Winsorize(dist_supermarket, maxval = 5000))) |>
+  mutate(secondary1 = minmaxNORM(-Winsorize(dist_secondary, maxval = 7000))) |>
+  mutate(primary1 = minmaxNORM(-Winsorize(dist_primary, maxval = 3000))) |>
+  mutate(petrol1 = minmaxNORM(-Winsorize(dist_petrol, maxval = 5000))) |>
+  mutate(evch1 = minmaxNORM(-Winsorize(dist_evs, maxval = 5000)))
   
-  
-  
-  
-  
-sa1_all_index <- sa1_all |> 
-  mutate(dist_stations = targetnorm(dist_stations, threshold=0, penalty=0, lim=20000, direction=0))
-  mutate(station_mea = minmaxNORM(-log(station_dist))) |>
-  mutate(intersections_mea = minmaxNORM(Winsorize(no_intersections_in_100m, maxval=10))) |>
-  mutate(conv_st_mea = minmaxNORM(-log(conv_st_dist))) |> 
-  mutate(second_mea = minmaxNORM(-log(second_dist))) |> 
-  mutate(primary_mea = minmaxNORM(-log(primary_dist))) |> 
-  mutate(childcare_mea = minmaxNORM(-log(childcare_dist))) |> 
-  mutate(cinema_mea = minmaxNORM(-log(cinemas_dist))) |> 
-  mutate(gallery_mea = minmaxNORM(-log(galleries_dist))) |> 
-  mutate(library_mea = minmaxNORM(-log(libraries_dist))) |> 
-  mutate(museum_mea = minmaxNORM(-museum_dist)) |> 
-  mutate(theatre_mea = minmaxNORM(-log(theatre_dist))) |> 
-  mutate(biking_mea = minmaxNORM(Winsorize(biking_len_100m,minval=0.0001,maxval=10000))) |> 
-  mutate(bigpark_mea = minmaxNORM(-log(bigpark_dist))) |> 
-  mutate(smallpark_mea = minmaxNORM(-log(smallpark_dist))) |> 
-  mutate(chemists_mea = minmaxNORM(-log(chemists_dist))) |> 
-  mutate(dentist_mea = minmaxNORM(-log(dentist_dist))) |> 
-  mutate(supermarket_mea = minmaxNORM(-log(supermarket_dist))) |> 
-  mutate(crimes_mea = minmaxNORM(minmaxNORM(-log(crimes)+1))) |> 
-  mutate(dwellings_mea = minmaxNORM(Winsorize(no_households,minval=0,maxval=10000))) |>
-  mutate(kuli = station_mea + bus_meas + intersections_mea + conv_st_mea +
-           second_mea + primary_mea + childcare_mea +
-           cinema_mea + gallery_mea + library_mea + museum_mea + theatre_mea +
-           biking_mea +  bigpark_mea + smallpark_mea + chemists_mea +
-           dentist_mea + supermarket_mea + crimes_mea + dwellings_mea) |> 
+sa1_all_index <- sa1_all_index |> 
+  mutate(kuli = popdens1 + housedens1 + damp1 + diversity1 +
+           crime1 + crashes1 + flood1 +
+           alcohol1 + trstation1 + bustop1 + marae1 + cinema1 +
+           galler1 +  library1 + museum1 + theatre1 +
+           chemist1 + dentist1 + healthcr1 + hospital1 + childcare1 +
+           sport1 + convstor1 + supermarket1 + secondary1 + primary1 +
+           petrol1 + evch1) |> 
   mutate(kuli_norm = minmaxNORM(kuli))
 
 # rejoin with geometry
-grid_normed <- left_join(grid_geom, grid_modified, by = c("id"="id"))
+index_sa1g <- left_join(sa1_allg, sa1_all_index, by = c("SA12018_V1_00"="SA12018_V1_00"))
 
-#tmap_mode("plot")
-tm_shape(grid_normed) +
-  tm_dots(col = "kuli_norm",# style = "equal",
-          breaks = c(0,1,2,3,4,5,5.7,6,7.5,8,9.5,10),
-          palette = "Reds", title = str_glue('Penalty= {penalty}'))
+tmap_mode("view")
+tm_shape(index_sa1g) +
+  tm_polygons(col = "kuli_norm", style = "fixed", lwd=0.1,
+          breaks = c(0,.2,.3,.5,.7,.8,.9,.95,.99,1))
+          #palette = "Reds", title = str_glue('Penalty= {penalty}'))
 #st_write(grid_normed, "data/geographic/grids/grid_with_kuli.gpkg")
 

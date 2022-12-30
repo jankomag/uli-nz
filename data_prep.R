@@ -128,13 +128,11 @@ sa1_all <- left_join(sa1_all, sa1_crime, by = c("SA12018_V1_00"="SA12018_V1_00")
 sa1_all[which(is.na(sa1_all$crime_perarea),), "crime_perarea"] <- 0
 
 ##### Road Safety ####
-crashes_sa1 <- st_read("data/safety/crash/sa1_cents_crashes.gpkg") |> st_drop_geometry()
+crashes_sa1 <- st_read("data/safety/crash/crashes-perarea.gpkg") |> st_drop_geometry()
 crashes_sa1 <- crashes_sa1 |>
-  subset(select = c(SA12018_V1, Count_fatal_crashes_per_area))
-names(crashes_sa1)[names(crashes_sa1) == "Count_fatal_crashes_per_area"] <- "fatalcrashes_per"
+  subset(select = c(SA12018_V1_00, crashesperarea))
 
-sa1_all <- left_join(sa1_all, crashes_sa1, by = c("SA12018_V1_00"="SA12018_V1"))
-sa1_all[which(is.na(sa1_all$fatalcrashes_per),), "fatalcrashes_per"] <- 0
+sa1_all <- left_join(sa1_all, crashes_sa1, by = c("SA12018_V1_00"="SA12018_V1_00"))
 
 ##### Floods ####
 floods_sa1 <- st_read("data/safety/floods/sa1_floods_final.gpkg") |> st_drop_geometry()
