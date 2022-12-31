@@ -119,9 +119,14 @@ smallpark <- st_read("data/green infrastructure/smallpark_nodes.gpkg") |>
   st_transform(4326)# 27291
 sa1 <- get_distance(smallpark)
 
-#save final
-st_write(sa1, "data/geographic/allsa1_dist.gpkg")
-sa1 <- st_read("data/geographic/allsa1_dist.gpkg")
+edges <- st_read("data/network_analysis/auckland_waiheke_network_drive.gpkg", layer='edges') |> 
+  st_transform(4326) |> 
+  subset(select = -c(u,v,key,osmid, lanes, name, highway, oneway, reversed, from, to,ref, service, access, bridge,
+                     width, junction, tunnel)) #area
+#get network
+network <- as_sfnetwork(edges, directed = FALSE) |> 
+  st_transform(4326) |> 
+  activate("edges")
 
 petrol <- st_read("data/transport/petrol_st_all.gpkg") |>
   st_transform(4326)# 27291
@@ -131,8 +136,15 @@ evs2 <- st_read("data/transport/EV_NZ_charging_stations.geojson") |>
   st_transform(4326)# 27291
 sa1 <- get_distance(evs2)
 
-st_write(sa1, "data/geographic/allsa1_dist_wdriveing.gpkg")
+#save final
+st_write(sa1, "data/geographic/sa1_alldist_final.gpkg")
+
+sa1 <- st_read("data/geographic/allsa1_dist.gpkg")
 head(sa1)
+
+
+
+
 # old way pre-function
 dist_matrix = data.frame(st_network_cost(network, from = sa1, to = stations, weights = "length"))
 dist_matrix$station_dist <- do.call(pmin, dist_matrix)

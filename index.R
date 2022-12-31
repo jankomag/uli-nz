@@ -92,10 +92,10 @@ targetnorm <- function(x, threshold, penalty, lim, direction, log = FALSE){
 #vis different standarisation methods
 sa1_all |>
   ggplot() +
-  geom_density(aes(dist_petrol))
+  geom_density(aes(str_connectivity))
 sa1_all |>
   ggplot() +
-  geom_density(aes(minmaxNORM(-Winsorize(dist_evs, maxval = 5000))))
+  geom_density(aes(minmaxNORM(Winsorize(str_connectivity, maxval = 0.0003))))
 
 sa1_all_test <- sa1_all |> 
   mutate(fatalcrashes_permeas = minmaxNORM(Winsorize(log10(fatalcrashes_per), maxval = -4, minval = -6)))
@@ -109,14 +109,14 @@ sa1_all_index <- sa1_all |>
   mutate(damp1 = minmaxNORM(-dampness)) |>
   mutate(diversity1 = minmaxNORM(shannon)) |>
   mutate(crime1 = minmaxNORM(-Winsorize((crime_perarea), maxval = 0.0030, minval = 0))) |> 
-  mutate(crashes1 = minmaxNORM(-Winsorize(crashesperarea.x, minval=0, maxval = 0.001))) |> 
+  mutate(crashes1 = minmaxNORM(-Winsorize(crashesperarea, minval=0, maxval = 0.001))) |> 
   mutate(flood1 = minmaxNORM(-Winsorize(floodprone_prc, minval=0, maxval = 0.5))) |> 
   mutate(alcohol1 = alcoprohibited) |> 
   mutate(trstation1 = minmaxNORM(-Winsorize(dist_stations, maxval = 50000))) |> 
   mutate(bustop1 = minmaxNORM(-Winsorize(dist_stations, maxval = 5000))) |> 
   mutate(marae1 = minmaxNORM(-dist_marae)) |> 
   mutate(cinema1 = minmaxNORM(-Winsorize(dist_cinema, maxval = 20000))) |> 
-  mutate(galler1 = minmaxNORM(-Winsorize(dist_galleries, maxval = 30000))) |> 
+  mutate(gallery1 = minmaxNORM(-Winsorize(dist_galleries, maxval = 30000))) |> 
   mutate(library1 = minmaxNORM(-Winsorize(dist_libraries, maxval = 7000))) |> 
   mutate(museum1 = minmaxNORM(-Winsorize(dist_museums, maxval = 25000))) |> 
   mutate(theatre1 = minmaxNORM(-Winsorize(dist_theatre, maxval = 20000))) |> 
@@ -131,16 +131,17 @@ sa1_all_index <- sa1_all |>
   mutate(secondary1 = minmaxNORM(-Winsorize(dist_secondary, maxval = 7000))) |>
   mutate(primary1 = minmaxNORM(-Winsorize(dist_primary, maxval = 3000))) |>
   mutate(petrol1 = minmaxNORM(-Winsorize(dist_petrol, maxval = 5000))) |>
-  mutate(evch1 = minmaxNORM(-Winsorize(dist_evs, maxval = 5000)))
+  mutate(evch1 = minmaxNORM(-Winsorize(dist_evs, maxval = 5000))) |> 
+  mutate(strconnectivity1 = minmaxNORM(Winsorize(str_connectivity, maxval = 0.0003)))
   
 sa1_all_index <- sa1_all_index |> 
   mutate(kuli = popdens1 + housedens1 + damp1 + diversity1 +
            crime1 + crashes1 + flood1 +
            alcohol1 + trstation1 + bustop1 + marae1 + cinema1 +
-           galler1 +  library1 + museum1 + theatre1 +
+           gallery1 +  library1 + museum1 + theatre1 +
            chemist1 + dentist1 + healthcr1 + hospital1 + childcare1 +
            sport1 + convstor1 + supermarket1 + secondary1 + primary1 +
-           petrol1 + evch1) |> 
+           petrol1 + evch1 + strconnectivity1) |> 
   mutate(kuli_norm = minmaxNORM(kuli))
 
 # rejoin with geometry
@@ -149,7 +150,6 @@ index_sa1g <- left_join(sa1_allg, sa1_all_index, by = c("SA12018_V1_00"="SA12018
 tmap_mode("view")
 tm_shape(index_sa1g) +
   tm_polygons(col = "kuli_norm", style = "fixed", lwd=0.1,
-          breaks = c(0,.2,.3,.5,.7,.8,.9,.95,.99,1))
-          #palette = "Reds", title = str_glue('Penalty= {penalty}'))
-#st_write(grid_normed, "data/geographic/grids/grid_with_kuli.gpkg")
+          breaks = c(0,.2,.3,.5,.7,.8,.9,.95,.99,1), palette = "Reds")#, title = str_glue('Penalty= {penalty}'))
+st_write(index_sa1g, "data/geographic/sa1_kuli.gpkg")
 

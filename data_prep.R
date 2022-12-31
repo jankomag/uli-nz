@@ -150,6 +150,10 @@ alco_sa1 <- alco_sa1 |>
 sa1_all <- left_join(sa1_all, alco_sa1, by = c("SA12018_V1_00"="SA12018_V1"))
 sa1_all[which(is.na(sa1_all$alcoprohibited),), "alcoprohibited"] <- 0
 
+##### Alcohol Environments ####
+stconnectivity <- st_read("data/walkability/streetconnectivity.gpkg") |> st_drop_geometry()
+sa1_all <- left_join(sa1_all, stconnectivity, by = c("SA12018_V1_00"="SA12018_V1_00"))
+
 #### Distances ####
 sa1_dists <- st_read("data/geographic/allsa1_dist.gpkg")|> st_drop_geometry()
 sa1_all <- left_join(sa1_all, sa1_dists, by = c("SA12018_V1_00"="SA12018_V1_00"))
