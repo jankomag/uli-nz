@@ -132,14 +132,14 @@ petrol <- st_read("data/transport/petrol_st_all.gpkg") |>
   st_transform(4326)# 27291
 sa1 <- get_distance(petrol)
 
-evs2 <- st_read("data/transport/EV_NZ_charging_stations.geojson") |>
+evs_updated <- st_read("data/transport/EV_NZ_charging_stations.geojson") |>
   st_transform(4326)# 27291
-sa1 <- get_distance(evs2)
+sa1 <- get_distance(evs_updated)
 
 
 
 #save final
-st_write(sa1, "data/geographic/sa1_alldist_final2.gpkg")
+st_write(sa1, "data/geographic/sa1_alldist_final_updated.gpkg")
 
 sa1done <- st_read("data/geographic/sa1_alldist_final.gpkg")
 head(sa1done)
