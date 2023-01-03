@@ -111,13 +111,13 @@ supermarket <- st_read("data/walkability/supermarket_all.gpkg") |>
   st_transform(4326)# 27291
 sa1 <- get_distance(supermarket)
 
-bigpark <- st_read("data/green infrastructure/bigpark_nodes.gpkg") |>
+bigpark2 <- st_read("data/green infrastructure/bigaprks_points.geojson") |>
   st_transform(4326)# 27291
-sa1 <- get_distance(bigpark)
+sa1 <- get_distance(bigpark2)
 
-smallpark <- st_read("data/green infrastructure/smallpark_nodes.gpkg") |>
+smallpark2 <- st_read("data/green infrastructure/allsmallparknodes.geojson") |>
   st_transform(4326)# 27291
-sa1 <- get_distance(smallpark)
+sa1 <- get_distance(smallpark2)
 
 edges <- st_read("data/network_analysis/auckland_waiheke_network_drive.gpkg", layer='edges') |> 
   st_transform(4326) |> 
@@ -136,13 +136,13 @@ evs2 <- st_read("data/transport/EV_NZ_charging_stations.geojson") |>
   st_transform(4326)# 27291
 sa1 <- get_distance(evs2)
 
+
+
 #save final
-st_write(sa1, "data/geographic/sa1_alldist_final.gpkg")
+st_write(sa1, "data/geographic/sa1_alldist_final2.gpkg")
 
-sa1 <- st_read("data/geographic/allsa1_dist.gpkg")
-head(sa1)
-
-
+sa1done <- st_read("data/geographic/sa1_alldist_final.gpkg")
+head(sa1done)
 
 
 # old way pre-function

@@ -26,7 +26,7 @@ sa1_allg <- st_read("data/geographic/sa1_allvars.gpkg") |> st_transform(27291) #
 summary(sa1_allg)
 # strip from geography for EDA
 sa1_all <- sa1_allg |> st_drop_geometry()
-##### correlations #####
+##### Correlations #####
 cor <- cor(x = sa1_all[2:43], y = sa1_all[2:43], use="complete.obs")
 corrplot(cor, tl.srt = 25)
 corr <- rcorr(as.matrix(sa1_all))
