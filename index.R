@@ -16,6 +16,8 @@ library(tidyr)
 library(cowplot)
 library(stringr)
 library(DescTools)
+library(equatiomatic)
+
 
 #### Data imports ####
 # geographic data
@@ -76,6 +78,9 @@ plot_grid(plotlist = my_plots)
 minmaxNORM <- function(x) {
   return (((x - min(x))) / (max(x) - min(x))*(1-0)+0)
 }
+latexTranslate(minmaxNORM(2))
+extract_eq(minmaxNORM)
+
 # normalisation func
 targetnorm <- function(x, threshold, penalty, lim, direction, log = FALSE){
   x <- if (lim != 0) {
@@ -109,10 +114,10 @@ curve(testfunc, from=1, to=50, xlab="x", ylab="y")
 #vis different standarisation methods
 sa1_all |>
   ggplot() +
-  geom_density(aes(dist_smallpark))
+  geom_density(aes(dist_busstops))
 sa1_all |>
   ggplot() +
-  geom_density(aes(minmaxNORM(Winsorize(dist_smallpark, maxval = 1000))))
+  geom_density(aes(minmaxNORM(Winsorize(dist_busstops, maxval = 1000))))
 
 sa1_all_test <- sa1_all |> 
   mutate(dist_stations1 = minmaxNORM(Winsorize(dist_stations, maxval = 1000, minval = 10)))
@@ -133,7 +138,7 @@ sa1_all_index <- sa1_all |>
   mutate(flood1 = minmaxNORM(-Winsorize(floodprone_prc, minval=0, maxval = 0.5))) |> 
   mutate(alcohol1 = alcoprohibited) |> 
   mutate(station1 = minmaxNORM(-Winsorize(dist_stations, maxval = 50000))) |> 
-  mutate(bustop1 = minmaxNORM(-Winsorize(dist_stations, maxval = 5000))) |> 
+  mutate(bustop1 = minmaxNORM(-Winsorize(dist_busstops, maxval = 1000))) |> 
   mutate(marae1 = minmaxNORM(-dist_marae)) |> 
   mutate(cinema1 = minmaxNORM(-Winsorize(dist_cinema, maxval = 20000))) |> 
   mutate(gallery1 = minmaxNORM(-Winsorize(dist_galleries, maxval = 30000))) |> 
@@ -155,7 +160,10 @@ sa1_all_index <- sa1_all |>
   mutate(strconnectivity1 = minmaxNORM(Winsorize(str_connectivity, maxval = 0.0003))) |> 
   mutate(bigpark1 = minmaxNORM(-Winsorize(dist_bigpark, minval=50, maxval = 1000))) |> 
   mutate(smallpark1 = minmaxNORM(-Winsorize(dist_smallpark, minval=50, maxval = 1000)))
-sa1_all_index$station1[sa1_all_index$dist_stations < 1000] <- sa1_all_index$station1[sa1_all_index$dist_stations < 1000] + 10
+sa1_all_index$station1[sa1_all_index$dist_stations < 1000] <- sa1_all_index$station1[sa1_all_index$dist_stations < 1000] + 1
+sa1_all_index$bustop1[sa1_all_index$dist_busstops < 400] <- sa1_all_index$bustop1[sa1_all_index$dist_busstops < 400] + 1
+sa1_all_index$bigpark1[sa1_all_index$dist_bigpark < 1000] <- sa1_all_index$bigpark1[sa1_all_index$dist_bigpark < 1000] + 1
+sa1_all_index$smallpark1[sa1_all_index$dist_smallpark < 300] <- sa1_all_index$smallpark1[sa1_all_index$dist_smallpark < 300] + 1
 
 sa1_all_index <- sa1_all_index |> 
   mutate(kuli = popdens1 + housedens1 + damp1 + diversity1 +
