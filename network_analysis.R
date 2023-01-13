@@ -42,6 +42,11 @@ stations <- st_read("data/transport/public_transport/trains_auckland.gpkg") |>
 sa1 <- get_distance(stations)
 
 #calulate distances to bus stops
+busstopsfreq <- st_read("data/transport/public_transport/busstops_frequent.geojson") |>
+  st_transform(4326)# 27291
+sa1 <- get_distance(busstopsfreq)
+
+#calulate distances to bus stops with frequent service
 busstops <- st_read("data/transport/public_transport/bus_stops_auckland.geojson") |>
   st_transform(4326)# 27291
 sa1 <- get_distance(busstops)
@@ -139,7 +144,7 @@ sa1 <- get_distance(evs_updated)
 
 
 #save final
-st_write(sa1, "data/geographic/sa1_alldist_final_updated.gpkg")
+st_write(sa1, "data/geographic/sa1_alldist_final.gpkg")
 
 sa1done <- st_read("data/geographic/sa1_alldist_final.gpkg")
 head(sa1done)

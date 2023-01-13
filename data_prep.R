@@ -16,10 +16,10 @@ library(nngeo)
 #### Data imports ####
 # geographic data
 sa1_polys <- st_read("data/geographic/urban_sa1_landvalid.gpkg")
+sa1_polys <- sa1_polys |>
+  subset(select = c(SA12018_V1_00, area))
 #transforming to the same coordinate system
 sa1_base <- st_transform(sa1_polys, 27291) |> st_drop_geometry()
-sa1_base <- sa1_base |>
-  subset(select = c(SA12018_V1_00, area))
 
 ##### Census####
 census <- as.data.frame(read.csv("data/geographic/Census/auckland_census.csv"))
@@ -158,14 +158,21 @@ sa1_all <- left_join(sa1_all, stconnectivity, by = c("SA12018_V1_00"="SA12018_V1
 sa1_dists <- st_read("data/geographic/sa1_alldist_final.gpkg")|> st_drop_geometry()
 sa1_all <- left_join(sa1_all, sa1_dists, by = c("SA12018_V1_00"="SA12018_V1_00"))
 
+sa1_busfreq <- st_read("data/transport/sa1_dist_to_freqBus.gpkg")|> st_drop_geometry()
+sa1_busfreq <- sa1_busfreq |>
+  subset(select = c(SA12018_V1_00, dist_busstopsfreq))
+
+sa1_all <- left_join(sa1_all, sa1_busfreq, by = c("SA12018_V1_00"="SA12018_V1_00"))
+
 sa1_allg <- left_join(sa1_polys, sa1_all, by=c("SA12018_V1_00"="SA12018_V1_00"))
 sa1_allg <- sa1_allg |> 
-  subset(select = -c(LANDWATER, LANDWATER_NAME, LAND_AREA_SQ_KM, AREA_SQ_KM, Shape_Length, fid_2, TA2018_V1_, TA2018_V_1, LAND_AREA_, AREA_SQ_KM_2, Shape_Leng, area.x, area.y, na.rm, popdens.y))
+  subset(select = -c(area.x, area.y, na.rm))
 
-sa1_allg[which(is.infinite(sa1_allg$dist_stations),), "dist_stations"] <- 86000
-sa1_allg[which(is.infinite(sa1_allg$dist_childcare),), "dist_childcare"] <- 70000
-sa1_allg[which(is.infinite(sa1_allg$dist_hospital),), "dist_hospital"] <- 28000
-sa1_allg[which(is.infinite(sa1_allg$dist_chemist),), "dist_chemist"] <- 72000
+sa1_allg[which(is.infinite(sa1_allg$dist_stations),), "dist_stations"] <- 100000
+sa1_allg[which(is.infinite(sa1_allg$dist_childcare),), "dist_childcare"] <- 100000
+sa1_allg[which(is.infinite(sa1_allg$dist_hospital),), "dist_hospital"] <- 100000
+sa1_allg[which(is.infinite(sa1_allg$dist_chemist),), "dist_chemist"] <- 100000
+
 
 # plot
 tm_shape(sa1_allg) +

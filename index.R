@@ -78,8 +78,6 @@ plot_grid(plotlist = my_plots)
 minmaxNORM <- function(x) {
   return (((x - min(x))) / (max(x) - min(x))*(1-0)+0)
 }
-latexTranslate(minmaxNORM(2))
-extract_eq(minmaxNORM)
 
 # normalisation func
 targetnorm <- function(x, threshold, penalty, lim, direction, log = FALSE){
@@ -94,14 +92,6 @@ targetnorm <- function(x, threshold, penalty, lim, direction, log = FALSE){
     return (minmaxNORM(-x))
     }
 }
-customnorm <- function(x, threshold){
-  x <- if (x<=threshold){
-    x
-  } else {
-    x
-  }
-  x
-}
 
 testfunc <- function(x, threshold, penalty){
   trans_x = if_else(x<=10,
@@ -114,23 +104,15 @@ curve(testfunc, from=1, to=50, xlab="x", ylab="y")
 #vis different standarisation methods
 sa1_all |>
   ggplot() +
-  geom_density(aes(dist_busstops))
+  geom_density(aes(dist_busstopsfreq))
 sa1_all |>
   ggplot() +
-  geom_density(aes(minmaxNORM(Winsorize(dist_busstops, maxval = 1000))))
-
-sa1_all_test <- sa1_all |> 
-  mutate(dist_stations1 = minmaxNORM(Winsorize(dist_stations, maxval = 1000, minval = 10)))
-
-sa1_all_test$dist_stations1[sa1_all_test$dist_stations < 100] <- sa1_all_test$dist_stations1[sa1_all_test$dist_stations < 100] + 1
-
-ggplot(sa1_all_test) +
-  geom_density(aes(fatalcrashes_permeas))
+  geom_density(aes(minmaxNORM(Winsorize(dist_busstopsfreq, maxval = 1000))))
 
 ##### Normalaise variables #####
 sa1_all_index <- sa1_all |> 
-  mutate(popdens1 = minmaxNORM(Winsorize(log10(popdens.x), maxval = -2, minval = -2.7))) |>
-  mutate(housedens1 = minmaxNORM(Winsorize(log10(no_households/area), maxval = -2, minval = -4))) |> 
+  mutate(popdens1 = minmaxNORM(Winsorize(log10(popdens), maxval = -2, minval = -2.7))) |>
+  mutate(housedens1 = minmaxNORM(Winsorize(log10(no_households/area.x), maxval = -2, minval = -4))) |> 
   mutate(damp1 = minmaxNORM(-dampness)) |>
   mutate(diversity1 = minmaxNORM(shannon)) |>
   mutate(crime1 = minmaxNORM(-Winsorize((crime_perarea), maxval = 0.0030, minval = 0))) |> 
@@ -139,6 +121,7 @@ sa1_all_index <- sa1_all |>
   mutate(alcohol1 = alcoprohibited) |> 
   mutate(station1 = minmaxNORM(-Winsorize(dist_stations, maxval = 50000))) |> 
   mutate(bustop1 = minmaxNORM(-Winsorize(dist_busstops, maxval = 1000))) |> 
+  mutate(freqbusstop1 = minmaxNORM(-Winsorize(dist_busstopsfreq, maxval= 5000))) |> 
   mutate(marae1 = minmaxNORM(-dist_marae)) |> 
   mutate(cinema1 = minmaxNORM(-Winsorize(dist_cinema, maxval = 20000))) |> 
   mutate(gallery1 = minmaxNORM(-Winsorize(dist_galleries, maxval = 30000))) |> 
@@ -160,14 +143,26 @@ sa1_all_index <- sa1_all |>
   mutate(strconnectivity1 = minmaxNORM(Winsorize(str_connectivity, maxval = 0.0003))) |> 
   mutate(bigpark1 = minmaxNORM(-Winsorize(dist_bigpark, minval=50, maxval = 1000))) |> 
   mutate(smallpark1 = minmaxNORM(-Winsorize(dist_smallpark, minval=50, maxval = 1000)))
-sa1_all_index$station1[sa1_all_index$dist_stations < 1000] <- sa1_all_index$station1[sa1_all_index$dist_stations < 1000] + 1
-sa1_all_index$bustop1[sa1_all_index$dist_busstops < 400] <- sa1_all_index$bustop1[sa1_all_index$dist_busstops < 400] + 1
-sa1_all_index$bigpark1[sa1_all_index$dist_bigpark < 1000] <- sa1_all_index$bigpark1[sa1_all_index$dist_bigpark < 1000] + 1
-sa1_all_index$smallpark1[sa1_all_index$dist_smallpark < 300] <- sa1_all_index$smallpark1[sa1_all_index$dist_smallpark < 300] + 1
+
+reward=1
+sa1_all_index$station1[sa1_all_index$dist_stations < 1000] <- sa1_all_index$station1[sa1_all_index$dist_stations < 1000] + reward
+sa1_all_index$freqbusstop1[sa1_all_index$dist_busstopsfreq < 400] <- sa1_all_index$freqbusstop1[sa1_all_index$dist_busstopsfreq < 400] + reward
+sa1_all_index$bigpark1[sa1_all_index$dist_bigpark < 1000] <- sa1_all_index$bigpark1[sa1_all_index$dist_bigpark < 1000] + reward
+sa1_all_index$smallpark1[sa1_all_index$dist_smallpark < 300] <- sa1_all_index$smallpark1[sa1_all_index$dist_smallpark < 300] + reward
 
 sa1_all_index <- sa1_all_index |> 
-  mutate(kuli = popdens1 + housedens1 + damp1 + diversity1 +
-           2*crime1 + crashes1 + flood1 +
+  mutate(walkability1 = popdens1 + housedens1 +convstor1 + supermarket1 +strconnectivity1) |> 
+  mutate(medical1 = chemist1 + dentist1 + healthcr1 + hospital1) |> 
+  mutate(education1 = secondary1 + primary1 + childcare1) |> 
+  mutate(safety1 = 2*crime1 + crashes1 + flood1 + alcohol1) |> 
+  mutate(pt1 = station1 + bustop1 +freqbusstop1) |> 
+  mutate(culture1 = diversity1 +marae1) |> 
+  mutate(leisure1 = cinema1 + gallery1 +  library1 + museum1 + theatre1 + sport1) |> 
+  mutate(greenspace1 = bigpark1 + smallpark1) |> 
+  mutate(other1 = damp1 + petrol1 + evch1) |> 
+  mutate(kuli_subs = minmaxNORM(walkability1+other1+greenspace1+leisure1+medical1 +culture1+education1 +pt1+ safety1)) |> 
+  mutate(kuli = popdens1 + housedens1 + damp1 + diversity1 + 
+           2*crime1 + crashes1 + flood1 + freqbusstop1 +
            alcohol1 + station1 + bustop1 + marae1 + cinema1 +
            gallery1 +  library1 + museum1 + theatre1 +
            chemist1 + dentist1 + healthcr1 + hospital1 + childcare1 +
@@ -180,7 +175,7 @@ index_sa1g <- left_join(sa1_allg, sa1_all_index, by = c("SA12018_V1_00"="SA12018
 
 tmap_mode("plot")
 tm_shape(index_sa1g) +
-  tm_polygons(col = "kuli_norm", style = "fixed", lwd=0,
-          breaks = c(0,.35,.5,.75,.85,.9,.95,.99,1), palette = "Reds")#, title = str_glue('Penalty= {penalty}'))
+  tm_polygons(col = "kuli_subs", style = "fixed", lwd=0,
+          breaks = c(0,.35,.5,.75,.85,.9,.99,1), palette = "Reds")#, title = str_glue('Penalty= {penalty}'))
 st_write(index_sa1g, "data/geographic/sa1_kuli.gpkg")
 
