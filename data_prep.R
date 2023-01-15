@@ -173,14 +173,13 @@ sa1_allg[which(is.infinite(sa1_allg$dist_childcare),), "dist_childcare"] <- 1000
 sa1_allg[which(is.infinite(sa1_allg$dist_hospital),), "dist_hospital"] <- 100000
 sa1_allg[which(is.infinite(sa1_allg$dist_chemist),), "dist_chemist"] <- 100000
 
-
 # plot
 tm_shape(sa1_allg) +
   tm_polygons(col="dist_secondary", lwd=0)
 
 st_write(sa1_allg, "data/geographic/sa1_allvars.gpkg")
 
-#imputation by neighbouring values - not working yet
+d#imputation by neighbouring values - not working yet
 #sa1_all <- mutate(sa1_all, dampness = as.numeric(as.character(dampness)))
 #sa1 <- SpatialPoints(sa1)
 #knn5 <- knn2nb(knearneigh(sa1, k = 5))
