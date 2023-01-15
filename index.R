@@ -20,6 +20,7 @@ library(equatiomatic)
 library(moments)
 library(envalysis)
 require(gridExtra)
+library(stargazer)
 
 #### Data imports ####
 # geographic data
@@ -161,7 +162,7 @@ sa1_all_index <- sa1_all |>
   mutate(housedens1 = minmaxNORM(Winsorize(log10(no_households/area), maxval = -2, minval = -4))) |> 
   mutate(damp1 = minmaxNORM(-dampness)) |>
   mutate(diversity1 = minmaxNORM(shannon)) |>
-  mutate(crime1 = minmaxNORM(-Winsorize((crime_perarea), maxval = 0.002, minval = 0))) |> 
+  mutate(crime1 = minmaxNORM(-Winsorize(crime_perarea, maxval = 0.002, minval = 0))) |> 
   mutate(crashes1 = minmaxNORM(-Winsorize(crashesperarea, minval=0, maxval = 0.001))) |> 
   mutate(flood1 = minmaxNORM(-Winsorize(floodprone_prc, minval=0, maxval = 0.5))) |> 
   mutate(alcohol1 = alcoprohibited) |> 
@@ -222,13 +223,14 @@ sa1_all_index <- sa1_all_index |>
 densityplot = function(xpre, xpost, varN) {
   xpre <- deparse(substitute(xpre))
   xpost <- deparse(substitute(xpost))
+  varN <- toString(varN)
   Data <- c("Raw","Transformed")
-  Skewness <- c(skewness(sa1_all_index[[xpre]]), skewness(sa1_all_index[[xpost]]))
-  Kurtosis <- c(kurtosis(sa1_all_index[[xpre]]), kurtosis(sa1_all_index[[xpost]]))
+  Skewness <- c(round(skewness(sa1_all_index[[xpre]]),3), round(skewness(sa1_all_index[[xpost]]),3))
+  Kurtosis <- c(round(kurtosis(sa1_all_index[[xpre]]),3), round(kurtosis(sa1_all_index[[xpost]]),3))
   df <- data.frame(Data, Skewness, Kurtosis)
   print(df)
   
-  varN <- toString(varN)
+  
   pre_out = ggplot() +
     geom_density(aes(sa1_all_index[[xpre]])) + theme_publish() +
     xlab(varN) + ylab("Density") + ggtitle("Pre Transformation") +
@@ -272,6 +274,12 @@ densityplot(str_connectivity, strconnectivity1, "Street Connectivity")
 densityplot(dist_bigpark, bigpark1, "Big Park")
 densityplot(dist_smallpark, smallpark1, "Small Park")
 
+# testing table
+colname <- c("Variable","Skewness", "Kurtosis")
+SmallPark <- c("Small Park", skewness(sa1_all_index$dist_smallpark), skewness(sa1_all_index$smallpark1))
+BigPark <- c("Big Park",skewness(sa1_all_index$dist_bigpark), skewness(sa1_all_index$bigpark1))
+table <- rbind(colname, SmallPark, BigPark)
+stargazer(table, type="text")
 
 Transf <- function(xpre, xpost) {
   xpre <- deparse(substitute(xpre))
