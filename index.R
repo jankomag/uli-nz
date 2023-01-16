@@ -158,38 +158,39 @@ sa1_all_index_commonmax$smallpark1[sa1_all_index$dist_smallpark < 300] <- sa1_al
 
 ##### Custom Normalaise variables #####
 sa1_all_index <- sa1_all |> 
+  mutate(househdens = no_households/area) |> 
   mutate(popdens1 = minmaxNORM(Winsorize(log10(popdens), maxval = -2, minval = -3))) |>
-  mutate(housedens1 = minmaxNORM(Winsorize(log10(no_households/area), maxval = -2, minval = -4))) |> 
+  mutate(housedens1 = minmaxNORM(Winsorize(log10(househdens), maxval = -2, minval = -4))) |> 
   mutate(damp1 = minmaxNORM(-dampness)) |>
   mutate(diversity1 = minmaxNORM(shannon)) |>
   mutate(crime1 = minmaxNORM(-Winsorize(crime_perarea, maxval = 0.002, minval = 0))) |> 
-  mutate(crashes1 = minmaxNORM(-Winsorize(crashesperarea, minval=0, maxval = 0.001))) |> 
-  mutate(flood1 = minmaxNORM(-Winsorize(floodprone_prc, minval=0, maxval = 0.5))) |> 
+  mutate(crashes1 = minmaxNORM(-Winsorize(crashesperarea, minval=0, maxval = 0.0001))) |> 
+  mutate(flood1 = minmaxNORM(-Winsorize(floodprone_prc, minval=0, maxval = 0.19))) |> 
   mutate(alcohol1 = alcoprohibited) |> 
   mutate(station1 = minmaxNORM(-Winsorize(dist_stations, maxval = 50000))) |> 
   mutate(bustop1 = minmaxNORM(-Winsorize(dist_busstops, maxval = 1000))) |> 
   mutate(freqbusstop1 = minmaxNORM(-Winsorize(dist_busstopsfreq, maxval= 1500))) |> 
   mutate(marae1 = minmaxNORM(-dist_marae)) |> 
   mutate(cinema1 = minmaxNORM(-Winsorize(dist_cinema, maxval = 20000))) |> 
-  mutate(gallery1 = minmaxNORM(-Winsorize(dist_galleries, maxval = 30000))) |> 
-  mutate(library1 = minmaxNORM(-Winsorize(dist_libraries, maxval = 7000))) |> 
+  mutate(gallery1 = minmaxNORM(-Winsorize(dist_galleries, maxval = 35000))) |> 
+  mutate(library1 = minmaxNORM(-Winsorize(dist_libraries, maxval = 8000))) |> 
   mutate(museum1 = minmaxNORM(-Winsorize(dist_museums, maxval = 25000))) |> 
   mutate(theatre1 = minmaxNORM(-Winsorize(dist_theatre, maxval = 20000))) |> 
   mutate(chemist1 = minmaxNORM(-Winsorize(dist_chemist, maxval = 20000))) |> 
   mutate(dentist1 = minmaxNORM(-Winsorize(dist_dentist, maxval = 5000))) |> 
-  mutate(healthcr1 = minmaxNORM(-Winsorize(dist_healthcentre, maxval = 6000))) |> 
+  mutate(healthcr1 = minmaxNORM(-Winsorize(dist_healthcentre, maxval = 5000))) |> 
   mutate(hospital1 = minmaxNORM(-Winsorize(dist_hospital, maxval = 15000))) |>
-  mutate(childcare1 = minmaxNORM(-Winsorize(dist_childcare, maxval = 10000))) |> 
-  mutate(sport1 = minmaxNORM(-Winsorize(dist_sport, maxval = 5000))) |>
-  mutate(convstor1 = minmaxNORM(-Winsorize(dist_conveniencestore, maxval = 2000))) |>
-  mutate(supermarket1 = minmaxNORM(-Winsorize(dist_supermarket, maxval = 5000))) |>
-  mutate(secondary1 = minmaxNORM(-Winsorize(dist_secondary, maxval = 7000))) |>
-  mutate(primary1 = minmaxNORM(-Winsorize(dist_primary, maxval = 2000))) |>
+  mutate(childcare1 = minmaxNORM(-Winsorize(dist_childcare, maxval = 6000))) |> 
+  mutate(sport1 = minmaxNORM(-Winsorize(dist_sport, maxval = 4000))) |>
+  mutate(convstor1 = minmaxNORM(-Winsorize(dist_conveniencestore, maxval = 3000))) |>
+  mutate(supermarket1 = minmaxNORM(-Winsorize(dist_supermarket, maxval = 5500))) |>
+  mutate(secondary1 = minmaxNORM(-Winsorize(dist_secondary, maxval = 6000))) |>
+  mutate(primary1 = minmaxNORM(-Winsorize(dist_primary, maxval = 3500))) |>
   mutate(petrol1 = minmaxNORM(-Winsorize(dist_petrol, maxval = 5000))) |>
-  mutate(evch1 = minmaxNORM(-Winsorize(dist_evs, maxval = 10000))) |> 
-  mutate(strconnectivity1 = minmaxNORM(Winsorize(str_connectivity, maxval = 0.0005))) |> 
-  mutate(bigpark1 = minmaxNORM(-Winsorize(dist_bigpark, minval=50, maxval = 1000))) |> 
-  mutate(smallpark1 = minmaxNORM(-Winsorize(dist_smallpark, minval=50, maxval = 1000)))
+  mutate(evch1 = minmaxNORM(-Winsorize(dist_evs, maxval = 13000))) |> 
+  mutate(strconnectivity1 = minmaxNORM(Winsorize(str_connectivity, maxval = 0.0008))) |> 
+  mutate(bigpark1 = minmaxNORM(-Winsorize(dist_bigpark, minval=50, maxval = 2500))) |> 
+  mutate(smallpark1 = minmaxNORM(-Winsorize(dist_smallpark, minval=50, maxval = 2000)))
 
 #add reward parameters
 #reward=1
@@ -217,7 +218,8 @@ sa1_all_index <- sa1_all_index |>
            chemist1 + dentist1 + healthcr1 + hospital1 + childcare1 +
            sport1 + convstor1 + supermarket1 + secondary1 + primary1 +
            petrol1 + evch1 + strconnectivity1 + bigpark1 + smallpark1) |> 
-  mutate(kuli_norm = minmaxNORM(kuli_subs))
+  mutate(kuli_subsnorm = minmaxNORM(kuli_subs)) |> 
+  mutate(kuli_norm = minmaxNORM(kuli))
 
 #vis transformation methods
 densityplot = function(xpre, xpost, varN) {
@@ -246,7 +248,7 @@ densityplot(dist_stations, station1, "Train Station")
 densityplot(dist_busstops, bustop1, "Bus Stop")
 densityplot(dist_busstopsfreq,freqbusstop1, "Frequent Buses")
 densityplot(popdens, popdens1, "Pop Density")
-densityplot(no_households/area, housedens1, "House Density")
+densityplot(househdens, housedens1, "House Density")
 densityplot(dampness, damp1, "Dampness")
 densityplot(shannon, diversity1, "Shannon Index")
 densityplot(crashesperarea, crashes1, "Crashes")
@@ -277,7 +279,7 @@ densityplot(dist_smallpark, smallpark1, "Small Park")
 # testing table
 colname <- c("Variable","Skewness", "Kurtosis")
 SmallPark <- c("Small Park", skewness(sa1_all_index$dist_smallpark), skewness(sa1_all_index$smallpark1))
-BigPark <- c("Big Park",skewness(sa1_all_index$dist_bigpark), skewness(sa1_all_index$bigpark1))
+BigPark <- c("Big Park", skewness(sa1_all_index$dist_bigpark), skewness(sa1_all_index$bigpark1))
 table <- rbind(colname, SmallPark, BigPark)
 stargazer(table, type="text")
 
@@ -295,13 +297,12 @@ Transf <- function(xpre, xpost) {
 }
 Transf(popdens, popdens1)
 
-
 # rejoin with geometry
 index_sa1g <- left_join(sa1_allg, sa1_all_index, by = c("SA12018_V1_00"="SA12018_V1_00"))
-
+#walkability1 other1 greenspace1 leisure1 medical1 culture1 education1pt1 safety1
 tmap_mode("plot")
 tm_shape(index_sa1g) +
-  tm_polygons(col = "strconnectivity1", palette = "Reds", style = "kmeans", lwd=0)
+  tm_polygons(col = "kuli_norm", palette = "Reds", style = "kmeans", lwd=0)
           #breaks = c(0,.35,.5,.75,.85,.9,.99,1), )#, title = str_glue('Penalty= {penalty}'))
-st_write(index_sa1g, "data/geographic/sa1_kuli_5kmax.gpkg")
+st_write(index_sa1g, "data/geographic/sa1_kuli_all.gpkg")
 

@@ -141,9 +141,12 @@ evs_updated <- st_read("data/transport/EV_NZ_charging_stations.geojson") |>
   st_transform(4326)# 27291
 sa1 <- get_distance(evs_updated)
 
-
+crash <- st_read("data/safety/crash/Crash_Analysis_System_(CAS)_data.geojson") |>
+  st_transform(4326)# 27291
+sa1 <- get_distance(crash)
 
 #save final
+st_write(sa1, "data/safety/crash/sa1_crashdist.gpkg")
 st_write(sa1, "data/geographic/sa1_alldist_final.gpkg")
 
 sa1done <- st_read("data/geographic/sa1_alldist_final.gpkg")
