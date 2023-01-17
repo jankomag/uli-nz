@@ -161,8 +161,15 @@ sa1_all <- left_join(sa1_all, sa1_dists, by = c("SA12018_V1_00"="SA12018_V1_00")
 sa1_busfreq <- st_read("data/transport/sa1_dist_to_freqBus.gpkg")|> st_drop_geometry()
 sa1_busfreq <- sa1_busfreq |>
   subset(select = c(SA12018_V1_00, dist_busstopsfreq))
-
 sa1_all <- left_join(sa1_all, sa1_busfreq, by = c("SA12018_V1_00"="SA12018_V1_00"))
+
+sa1_restdistances <- st_read("data/geographic/sa1_cafeandrestaurantsandother_andallestnesestDONE.gpkg")|> st_drop_geometry()
+sa1_restdistances <- sa1_restdistances |>
+  subset(select = c(SA12018_V1_00, dist_cafe, dist_restaurants, dist_pubs, dist_bbq, dist_gym, dist_beach))
+sa1_all <- left_join(sa1_all, sa1_restdistances, by = c("SA12018_V1_00"="SA12018_V1_00"))
+
+sa1_bikeability <- st_read("data/transport/bikeability.gpkg")|> st_drop_geometry()
+sa1_all <- left_join(sa1_all, sa1_bikeability, by = c("SA12018_V1_00"="SA12018_V1_00"))
 
 sa1_allg <- left_join(sa1_polys, sa1_all, by=c("SA12018_V1_00"="SA12018_V1_00"))
 sa1_allg <- sa1_allg |> 
@@ -172,10 +179,11 @@ sa1_allg[which(is.infinite(sa1_allg$dist_stations),), "dist_stations"] <- 100000
 sa1_allg[which(is.infinite(sa1_allg$dist_childcare),), "dist_childcare"] <- 100000
 sa1_allg[which(is.infinite(sa1_allg$dist_hospital),), "dist_hospital"] <- 100000
 sa1_allg[which(is.infinite(sa1_allg$dist_chemist),), "dist_chemist"] <- 100000
+sa1_allg[which(is.infinite(sa1_allg$dist_gym),), "dist_gym"] <- 100000
 
 # plot
 tm_shape(sa1_allg) +
-  tm_polygons(col="dist_secondary", lwd=0)
+  tm_polygons(col="dist_gym", lwd=0)
 
 st_write(sa1_allg, "data/geographic/sa1_allvars.gpkg")
 

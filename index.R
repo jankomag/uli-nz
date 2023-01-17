@@ -106,49 +106,15 @@ curve(testfunc, from=1, to=50, xlab="x", ylab="y")
 
 sa1_all |>
   ggplot() +
-  geom_density(aes((dist_crash)))
+  geom_density(aes((bikeperarea)))
 
-sa1_alltest <- sa1_all |> 
-  mutate(popdens1t = minmaxNORM(Winsorize(log10(popdens), minval = -3, maxval=-2)))
+sa1_all |> 
+  ggplot() +
+  geom_density(aes(minmaxNORM(Winsorize(bikeperarea, maxval=0.03))))
 
 skewness(sa1_alltest$popdens1t)
 kurtosis(sa1_alltest$popdens1t)
 
-##### Common Normalaise variables #####
-commonMaxval = 5000
-sa1_all_index_commonmax <- sa1_all |> 
-  mutate(popdens1 = minmaxNORM(Winsorize(log10(popdens), maxval = -2, minval = -2.7))) |>
-  mutate(housedens1 = minmaxNORM(Winsorize(log10(no_households/area), maxval = -2, minval = -4))) |> 
-  mutate(damp1 = minmaxNORM(-dampness)) |>
-  mutate(diversity1 = minmaxNORM(shannon)) |>
-  mutate(crime1 = minmaxNORM(-Winsorize((crime_perarea), maxval = 0.0030, minval = 0))) |> 
-  mutate(crashes1 = minmaxNORM(-Winsorize(crashesperarea, minval=0, maxval = 0.001))) |> 
-  mutate(flood1 = minmaxNORM(-Winsorize(floodprone_prc, minval=0, maxval = 0.5))) |> 
-  mutate(alcohol1 = alcoprohibited) |> 
-  mutate(station1 = minmaxNORM(-Winsorize(dist_stations, maxval = commonMaxval))) |> 
-  mutate(bustop1 = minmaxNORM(-Winsorize(dist_busstops, maxval = commonMaxval))) |> 
-  mutate(freqbusstop1 = minmaxNORM(-Winsorize(dist_busstopsfreq, maxval= commonMaxval))) |> 
-  mutate(marae1 = minmaxNORM(-Winsorize(dist_marae, maxval=commonMaxval))) |> 
-  mutate(cinema1 = minmaxNORM(-Winsorize(dist_cinema, maxval = commonMaxval))) |> 
-  mutate(gallery1 = minmaxNORM(-Winsorize(dist_galleries, maxval = commonMaxval))) |> 
-  mutate(library1 = minmaxNORM(-Winsorize(dist_libraries, maxval = commonMaxval))) |> 
-  mutate(museum1 = minmaxNORM(-Winsorize(dist_museums, maxval = commonMaxval))) |> 
-  mutate(theatre1 = minmaxNORM(-Winsorize(dist_theatre, maxval = commonMaxval))) |> 
-  mutate(chemist1 = minmaxNORM(-Winsorize(dist_chemist, maxval = commonMaxval))) |> 
-  mutate(dentist1 = minmaxNORM(-Winsorize(dist_dentist, maxval = commonMaxval))) |> 
-  mutate(healthcr1 = minmaxNORM(-Winsorize(dist_healthcentre, maxval = commonMaxval))) |> 
-  mutate(hospital1 = minmaxNORM(-Winsorize(dist_hospital, maxval = commonMaxval))) |>
-  mutate(childcare1 = minmaxNORM(-Winsorize(dist_childcare, maxval = commonMaxval))) |> 
-  mutate(sport1 = minmaxNORM(-Winsorize(dist_sport, maxval = commonMaxval))) |>
-  mutate(convstor1 = minmaxNORM(-Winsorize(dist_conveniencestore, maxval = commonMaxval))) |>
-  mutate(supermarket1 = minmaxNORM(-Winsorize(dist_supermarket, maxval = commonMaxval))) |>
-  mutate(secondary1 = minmaxNORM(-Winsorize(dist_secondary, maxval = commonMaxval))) |>
-  mutate(primary1 = minmaxNORM(-Winsorize(dist_primary, maxval = commonMaxval))) |>
-  mutate(petrol1 = minmaxNORM(-Winsorize(dist_petrol, maxval = commonMaxval))) |>
-  mutate(evch1 = minmaxNORM(-Winsorize(dist_evs, maxval = commonMaxval))) |> 
-  mutate(strconnectivity1 = minmaxNORM(Winsorize(str_connectivity, maxval = 0.0003))) |> 
-  mutate(bigpark1 = minmaxNORM(-Winsorize(dist_bigpark, minval=50, maxval = commonMaxval))) |> 
-  mutate(smallpark1 = minmaxNORM(-Winsorize(dist_smallpark, minval=50, maxval = commonMaxval)))
 #add reward parameters
 reward=1
 sa1_all_index_commonmax$station1[sa1_all_index$dist_stations < 1000] <- sa1_all_index_commonmax$station1[sa1_all_index$dist_stations < 1000] + reward
@@ -190,8 +156,16 @@ sa1_all_index <- sa1_all |>
   mutate(evch1 = minmaxNORM(-Winsorize(dist_evs, maxval = 13000))) |> 
   mutate(strconnectivity1 = minmaxNORM(Winsorize(str_connectivity, maxval = 0.0008))) |> 
   mutate(bigpark1 = minmaxNORM(-Winsorize(dist_bigpark, minval=50, maxval = 2500))) |> 
-  mutate(smallpark1 = minmaxNORM(-Winsorize(dist_smallpark, minval=50, maxval = 2000)))
-
+  mutate(smallpark1 = minmaxNORM(-Winsorize(dist_smallpark, minval=50, maxval = 2000))) |> 
+  mutate(bigpark1 = minmaxNORM(-Winsorize(dist_bigpark, minval=50, maxval = 2500))) |> 
+  mutate(cafe1 = minmaxNORM(-Winsorize(dist_cafe, minval=, maxval = 5000))) |> 
+  mutate(restaurant1 = minmaxNORM(-Winsorize(dist_restaurants, maxval = 4500))) |> 
+  mutate(pub1 = minmaxNORM(-Winsorize(dist_pubs, maxval = 9000))) |> 
+  mutate(bbq1 = minmaxNORM(-Winsorize(dist_bbq, maxval = 20000))) |> 
+  mutate(bikeability1 = minmaxNORM(Winsorize(bikeperarea, maxval = 0.04))) |> 
+  mutate(gym1 = minmaxNORM(-Winsorize(dist_gym, maxval = 10000))) |> 
+  mutate(beach1 = minmaxNORM(-Winsorize(dist_beach, maxval = 12000)))
+  
 #add reward parameters
 #reward=1
 #sa1_all_index$station1[sa1_all_index$dist_stations < 1000] <- sa1_all_index$station1[sa1_all_index$dist_stations < 1000] + reward
@@ -204,20 +178,21 @@ sa1_all_index <- sa1_all_index |>
   mutate(walkability1 = minmaxNORM(popdens1 + housedens1 +convstor1 + supermarket1 +strconnectivity1)) |> 
   mutate(medical1 = minmaxNORM(chemist1 + dentist1 + healthcr1 + hospital1)) |> 
   mutate(education1 = minmaxNORM(secondary1 + primary1 + childcare1)) |> 
-  mutate(safety1 = minmaxNORM(2*crime1 + crashes1 + flood1 + alcohol1)) |> 
-  mutate(pt1 = minmaxNORM(station1 + bustop1 +freqbusstop1)) |> 
-  mutate(culture1 = minmaxNORM(diversity1 +marae1)) |> 
-  mutate(leisure1 = minmaxNORM(cinema1 + gallery1 +  library1 + museum1 + theatre1 + sport1)) |> 
-  mutate(greenspace1 = minmaxNORM(bigpark1 + smallpark1)) |> 
-  mutate(other1 = minmaxNORM(damp1 + petrol1 + evch1)) |> 
-  mutate(kuli_subs = minmaxNORM(walkability1+other1+greenspace1+leisure1+medical1 +culture1+education1 +pt1+ safety1)) |> 
+  mutate(safety1 = minmaxNORM(2*crime1 + crashes1 + flood1 + alcohol1 + damp1)) |> 
+  mutate(transport1 = minmaxNORM(station1 + bustop1 +freqbusstop1 +bikeability1 + evch1 + petrol1)) |> 
+  mutate(culture1 = minmaxNORM(diversity1+marae1)) |> 
+  mutate(leisure1 = minmaxNORM(cinema1 + gallery1 +  library1 + museum1 + theatre1 + sport1 + gym1)) |> 
+  mutate(food1 = minmaxNORM(cafe1 + restaurant1 +  pub1 + bbq1)) |> 
+  mutate(greenspace1 = minmaxNORM(bigpark1 + smallpark1 + dist_beach)) |> 
+  mutate(kuli_subs = minmaxNORM(walkability1+greenspace1+leisure1+medical1 +culture1+education1 +transport1+ safety1 + food1)) |> 
   mutate(kuli = popdens1 + housedens1 + damp1 + diversity1 + 
            2*crime1 + crashes1 + flood1 + freqbusstop1 +
            alcohol1 + station1 + bustop1 + marae1 + cinema1 +
-           gallery1 +  library1 + museum1 + theatre1 +
+           gallery1 +  library1 + museum1 + theatre1 + beach1 +
            chemist1 + dentist1 + healthcr1 + hospital1 + childcare1 +
            sport1 + convstor1 + supermarket1 + secondary1 + primary1 +
-           petrol1 + evch1 + strconnectivity1 + bigpark1 + smallpark1) |> 
+           petrol1 + evch1 + strconnectivity1 + bigpark1 + smallpark1 +
+           cafe1 + restaurant1 + pub1 + bbq1 + bikeability1 + gym1) |> 
   mutate(kuli_subsnorm = minmaxNORM(kuli_subs)) |> 
   mutate(kuli_norm = minmaxNORM(kuli))
 
@@ -274,7 +249,13 @@ densityplot(dist_petrol, petrol1, "Petrol")
 densityplot(dist_evs, evch1, "EVs")
 densityplot(str_connectivity, strconnectivity1, "Street Connectivity")
 densityplot(dist_bigpark, bigpark1, "Big Park")
-densityplot(dist_smallpark, smallpark1, "Small Park")
+densityplot(dist_cafe, cafe1, "Cafe")
+densityplot(dist_restaurants, restaurant1, "Restaurant")
+densityplot(dist_pubs, pub1, "Pub")
+densityplot(dist_bbq, bbq1, "BBQ")
+densityplot(bikeperarea, bikeability1, "Bikeability")
+densityplot(dist_gym, gym1, "Gym")
+densityplot(dist_beach, beach1, "Beach")
 
 # testing table
 colname <- c("Variable","Skewness", "Kurtosis")
@@ -305,4 +286,41 @@ tm_shape(index_sa1g) +
   tm_polygons(col = "kuli_subsnorm", palette = "Reds", style = "kmeans", lwd=0)
           #breaks = c(0,.35,.5,.75,.85,.9,.99,1), )#, title = str_glue('Penalty= {penalty}'))
 st_write(index_sa1g, "data/geographic/sa1_kuli_all.gpkg")
+
+
+##### Common Normalaise variables #####
+commonMaxval = 5000
+sa1_all_index_commonmax <- sa1_all |> 
+  mutate(popdens1 = minmaxNORM(Winsorize(log10(popdens), maxval = -2, minval = -2.7))) |>
+  mutate(housedens1 = minmaxNORM(Winsorize(log10(no_households/area), maxval = -2, minval = -4))) |> 
+  mutate(damp1 = minmaxNORM(-dampness)) |>
+  mutate(diversity1 = minmaxNORM(shannon)) |>
+  mutate(crime1 = minmaxNORM(-Winsorize((crime_perarea), maxval = 0.0030, minval = 0))) |> 
+  mutate(crashes1 = minmaxNORM(-Winsorize(crashesperarea, minval=0, maxval = 0.001))) |> 
+  mutate(flood1 = minmaxNORM(-Winsorize(floodprone_prc, minval=0, maxval = 0.5))) |> 
+  mutate(alcohol1 = alcoprohibited) |> 
+  mutate(station1 = minmaxNORM(-Winsorize(dist_stations, maxval = commonMaxval))) |> 
+  mutate(bustop1 = minmaxNORM(-Winsorize(dist_busstops, maxval = commonMaxval))) |> 
+  mutate(freqbusstop1 = minmaxNORM(-Winsorize(dist_busstopsfreq, maxval= commonMaxval))) |> 
+  mutate(marae1 = minmaxNORM(-Winsorize(dist_marae, maxval=commonMaxval))) |> 
+  mutate(cinema1 = minmaxNORM(-Winsorize(dist_cinema, maxval = commonMaxval))) |> 
+  mutate(gallery1 = minmaxNORM(-Winsorize(dist_galleries, maxval = commonMaxval))) |> 
+  mutate(library1 = minmaxNORM(-Winsorize(dist_libraries, maxval = commonMaxval))) |> 
+  mutate(museum1 = minmaxNORM(-Winsorize(dist_museums, maxval = commonMaxval))) |> 
+  mutate(theatre1 = minmaxNORM(-Winsorize(dist_theatre, maxval = commonMaxval))) |> 
+  mutate(chemist1 = minmaxNORM(-Winsorize(dist_chemist, maxval = commonMaxval))) |> 
+  mutate(dentist1 = minmaxNORM(-Winsorize(dist_dentist, maxval = commonMaxval))) |> 
+  mutate(healthcr1 = minmaxNORM(-Winsorize(dist_healthcentre, maxval = commonMaxval))) |> 
+  mutate(hospital1 = minmaxNORM(-Winsorize(dist_hospital, maxval = commonMaxval))) |>
+  mutate(childcare1 = minmaxNORM(-Winsorize(dist_childcare, maxval = commonMaxval))) |> 
+  mutate(sport1 = minmaxNORM(-Winsorize(dist_sport, maxval = commonMaxval))) |>
+  mutate(convstor1 = minmaxNORM(-Winsorize(dist_conveniencestore, maxval = commonMaxval))) |>
+  mutate(supermarket1 = minmaxNORM(-Winsorize(dist_supermarket, maxval = commonMaxval))) |>
+  mutate(secondary1 = minmaxNORM(-Winsorize(dist_secondary, maxval = commonMaxval))) |>
+  mutate(primary1 = minmaxNORM(-Winsorize(dist_primary, maxval = commonMaxval))) |>
+  mutate(petrol1 = minmaxNORM(-Winsorize(dist_petrol, maxval = commonMaxval))) |>
+  mutate(evch1 = minmaxNORM(-Winsorize(dist_evs, maxval = commonMaxval))) |> 
+  mutate(strconnectivity1 = minmaxNORM(Winsorize(str_connectivity, maxval = 0.0003))) |> 
+  mutate(bigpark1 = minmaxNORM(-Winsorize(dist_bigpark, minval=50, maxval = commonMaxval))) |> 
+  mutate(smallpark1 = minmaxNORM(-Winsorize(dist_smallpark, minval=50, maxval = commonMaxval)))
 
