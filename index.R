@@ -106,7 +106,7 @@ curve(testfunc, from=1, to=50, xlab="x", ylab="y")
 
 sa1_all |>
   ggplot() +
-  geom_density(aes(log10(popdens)))
+  geom_density(aes((dist_crash)))
 
 sa1_alltest <- sa1_all |> 
   mutate(popdens1t = minmaxNORM(Winsorize(log10(popdens), minval = -3, maxval=-2)))
@@ -164,7 +164,7 @@ sa1_all_index <- sa1_all |>
   mutate(damp1 = minmaxNORM(-dampness)) |>
   mutate(diversity1 = minmaxNORM(shannon)) |>
   mutate(crime1 = minmaxNORM(-Winsorize(crime_perarea, maxval = 0.002, minval = 0))) |> 
-  mutate(crashes1 = minmaxNORM(-Winsorize(crashesperarea, minval=0, maxval = 0.0001))) |> 
+  mutate(crashes1 = minmaxNORM(Winsorize(dist_crash, minval=0, maxval = 5000))) |> 
   mutate(flood1 = minmaxNORM(-Winsorize(floodprone_prc, minval=0, maxval = 0.19))) |> 
   mutate(alcohol1 = alcoprohibited) |> 
   mutate(station1 = minmaxNORM(-Winsorize(dist_stations, maxval = 50000))) |> 
@@ -251,7 +251,7 @@ densityplot(popdens, popdens1, "Pop Density")
 densityplot(househdens, housedens1, "House Density")
 densityplot(dampness, damp1, "Dampness")
 densityplot(shannon, diversity1, "Shannon Index")
-densityplot(crashesperarea, crashes1, "Crashes")
+densityplot(dist_crash, crashes1, "Crashes")
 densityplot(floodprone_prc,flood1, "Floods")
 densityplot(alcoprohibited,alcohol1, "Alcohol Prohibited")
 densityplot(dist_marae,marae1, "Marae")
@@ -302,7 +302,7 @@ index_sa1g <- left_join(sa1_allg, sa1_all_index, by = c("SA12018_V1_00"="SA12018
 #walkability1 other1 greenspace1 leisure1 medical1 culture1 education1pt1 safety1
 tmap_mode("plot")
 tm_shape(index_sa1g) +
-  tm_polygons(col = "kuli_norm", palette = "Reds", style = "kmeans", lwd=0)
+  tm_polygons(col = "kuli_subsnorm", palette = "Reds", style = "kmeans", lwd=0)
           #breaks = c(0,.35,.5,.75,.85,.9,.99,1), )#, title = str_glue('Penalty= {penalty}'))
 st_write(index_sa1g, "data/geographic/sa1_kuli_all.gpkg")
 

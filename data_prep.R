@@ -128,9 +128,9 @@ sa1_all <- left_join(sa1_all, sa1_crime, by = c("SA12018_V1_00"="SA12018_V1_00")
 sa1_all[which(is.na(sa1_all$crime_perarea),), "crime_perarea"] <- 0
 
 ##### Road Safety ####
-crashes_sa1 <- st_read("data/safety/crash/crashes-perarea.gpkg") |> st_drop_geometry()
+crashes_sa1 <- st_read("data/safety/crash/sa1_crashdist.gpkg") |> st_drop_geometry()
 crashes_sa1 <- crashes_sa1 |>
-  subset(select = c(SA12018_V1_00, crashesperarea))
+  subset(select = c(SA12018_V1_00, dist_crash))
 
 sa1_all <- left_join(sa1_all, crashes_sa1, by = c("SA12018_V1_00"="SA12018_V1_00"))
 
@@ -179,7 +179,7 @@ tm_shape(sa1_allg) +
 
 st_write(sa1_allg, "data/geographic/sa1_allvars.gpkg")
 
-d#imputation by neighbouring values - not working yet
+#imputation by neighbouring values - not working yet
 #sa1_all <- mutate(sa1_all, dampness = as.numeric(as.character(dampness)))
 #sa1 <- SpatialPoints(sa1)
 #knn5 <- knn2nb(knearneigh(sa1, k = 5))
