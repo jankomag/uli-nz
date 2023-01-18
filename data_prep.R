@@ -26,14 +26,15 @@ census <- as.data.frame(read.csv("data/geographic/Census/auckland_census.csv"))
 census <- census |>
   select(subset = -c(maori_desc, median_income, born_overseas, PacificNum)) |> 
   mutate(code = as.character(code)) |> 
-  mutate(dampness = as.numeric(dampness), na.rm=T) |> 
-  mutate(European = as.numeric(European), na.rm=T) |> 
-  mutate(Maori = as.numeric(Maori), na.rm=T) |>
-  mutate(Pacific = as.numeric(Pacific), na.rm=T) |>
-  mutate(Asian = as.numeric(Asian), na.rm=T) |>
-  mutate(MiddleEasternLatinAmericanAfrican = as.numeric(MiddleEasternLatinAmericanAfrican), na.rm=T) |>
-  mutate(OtherEthnicity = as.numeric(OtherEthnicity), na.rm=T) |>
-  mutate(pop_usual = as.numeric(pop_usual))
+  mutate(dampness = as.numeric(dampness)) |> 
+  mutate(European = as.numeric(European)) |> 
+  mutate(Maori = as.numeric(Maori)) |>
+  mutate(Pacific = as.numeric(Pacific)) |>
+  mutate(Asian = as.numeric(Asian)) |>
+  mutate(MiddleEasternLatinAmericanAfrican = as.numeric(MiddleEasternLatinAmericanAfrican)) |>
+  mutate(OtherEthnicity = as.numeric(OtherEthnicity)) |>
+  mutate(pop_usual = as.numeric(pop_usual)) |> 
+  mutate(medianRent = as.numeric(medianRent))
 
 # Dealing with missing values #
 # find NAs
@@ -41,12 +42,6 @@ md.pattern(census)
 aggr_plot <- aggr(census, col=c('navyblue','red'), numbers=TRUE, sortVars=TRUE, labels=names(census), cex.axis=.7, gap=3, ylab=c("Histogram of missing data","Pattern"))
 # replace with 0s
 census[which(census$pop_usual == 0,),5:10] <- 0 # assign ethnicity values to 0 in rows where no population is registered
-census[which(is.na(census$European),), "European"] <- 0
-census[which(is.na(census$Maori),), "Maori"] <- 0
-census[which(is.na(census$Pacific),), "Pacific"] <- 0
-census[which(is.na(census$Asian),), "Asian"] <- 0
-census[which(is.na(census$MiddleEasternLatinAmericanAfrican),), "MiddleEasternLatinAmericanAfrican"] <- 0
-census[which(is.na(census$OtherEthnicity),), "OtherEthnicity"] <- 0
 
 #calculate percentages ethnicity
 census <- census |>
@@ -56,36 +51,48 @@ census <- census |>
   mutate(pcAsian = Asian/pop_usual, na.rm=T) |> 
   mutate(pcMiddleEasternLatinAmericanAfrican = MiddleEasternLatinAmericanAfrican/pop_usual, na.rm=T) |> 
   mutate(pcOtherEthnicity = OtherEthnicity/pop_usual, na.rm=T)
-
-# again clean rows where population is zero
-census[which(is.na(census$pcEuropean),), "pcEuropean"] <- 0
-census[which(is.na(census$pcMaori),), "pcMaori"] <- 0
-census[which(is.na(census$pcPacific),), "pcPacific"] <- 0
-census[which(is.na(census$pcAsian),), "pcAsian"] <- 0
-census[which(is.na(census$pcMiddleEasternLatinAmericanAfrican),), "pcMiddleEasternLatinAmericanAfrican"] <- 0
-census[which(is.na(census$pcOtherEthnicity),), "pcOtherEthnicity"] <- 0
+census[which(census$pop_usual == 0,),12:18] <- 0 # 0 in rows where no population is registered
 census[which(census$pcEuropean>1), "pcEuropean"] <- 1 # 3 rows where white pop is larger than total pop
-census[which(is.na(census$dampness),), "dampness"] <- mean(census$dampness, na.rm=T)
 
-##### NN impute  #####
-#impute NAs based on neighbouring values
-sa1_geo_imp <- left_join(sa1_polys, census, by = c("SA12018_V1_00"="code"))
-tmap_mode("view")
-tm_shape(sa1_geo_imp) + tm_polygons(col="dampness", lwd=0)
-
-sa1.nb <- poly2nb(sa1_geo_imp)
-idx <- as.vector(which(is.na(sa1_geo_imp$dampness)))
-sa1_nongeo_imp <- st_drop_geometry(sa1_geo_imp)
-#impute neigbouring values
-for (i in idx) {
-  neigs_idx <- sa1.nb[[idx[i]]]
-  sa1_nongeo_imp[i, "dampness"] <- mean(sa1_nongeo_imp[neigs_idx, "dampness"])
-}
-geosa1_imputed <- left_join(sa1_polys, sa1_nongeo_imp, by = c("SA12018_V1_00"="SA12018_V1_00"))
-tm_shape(geosa1_imputed) + tm_polygons(col="dampness", lwd=0.1)
-summary(census)
-
-
+#### NN impute - impute NAs based on neighbouring values
+sa1_imp <- left_join(sa1_polys, census, by = c("SA12018_V1_00"="code"))
+index <- st_touches(sa1_imp, sa1_imp)
+sa1_imped <- sa1_imp %>% 
+  mutate(dampness = ifelse(is.na(dampness),
+                       apply(index, 1, function(i){mean(.$dampness[i], na.rm=T)}),
+                       dampness))
+sa1_imped <- sa1_imped %>% 
+  mutate(medianRent = ifelse(is.na(medianRent),
+                             apply(index, 1, function(i){mean(.$medianRent[i], na.rm=T)}),
+                             medianRent))
+sa1_imped <- sa1_imped %>% 
+  mutate(pcEuropean = ifelse(is.na(pcEuropean),
+                             apply(index, 1, function(i){mean(.$pcEuropean[i], na.rm=T)}),
+                             pcEuropean))
+sa1_imped <- sa1_imped %>% 
+  mutate(pcMaori = ifelse(is.na(pcMaori),
+                             apply(index, 1, function(i){mean(.$pcMaori[i], na.rm=T)}),
+                             pcMaori))
+sa1_imped <- sa1_imped %>% 
+  mutate(pcPacific = ifelse(is.na(pcPacific),
+                             apply(index, 1, function(i){mean(.$pcPacific[i], na.rm=T)}),
+                             pcPacific))
+sa1_imped <- sa1_imped %>% 
+  mutate(pcAsian = ifelse(is.na(pcAsian),
+                             apply(index, 1, function(i){mean(.$pcAsian[i], na.rm=T)}),
+                             pcAsian))
+sa1_imped <- sa1_imped %>% 
+  mutate(pcMiddleEasternLatinAmericanAfrican = ifelse(is.na(pcMiddleEasternLatinAmericanAfrican),
+                             apply(index, 1, function(i){mean(.$pcMiddleEasternLatinAmericanAfrican[i], na.rm=T)}),
+                             pcMiddleEasternLatinAmericanAfrican))
+sa1_imped <- sa1_imped %>% 
+  mutate(pcOtherEthnicity = ifelse(is.na(pcOtherEthnicity),
+                             apply(index, 1, function(i){mean(.$pcOtherEthnicity[i], na.rm=T)}),
+                             pcOtherEthnicity))
+sa1_imped[which(is.na(sa1_imped$dampness),), "dampness"] <- mean(sa1_imped$dampness, na.rm=T)
+sa1_imped[which(is.na(sa1_imped$medianRent),), "medianRent"] <- mean(sa1_imped$medianRent, na.rm=T)
+census <- st_drop_geometry(sa1_imped) |> 
+  subset(select = -c(na.rm))
 ##### Diversity ####
 # Compute Diversity Index #
 shannon <- function(p){
@@ -97,9 +104,8 @@ shannon <- function(p){
   H = -sum(p*log(p))
   return (H)
 }
-census$shannon <- apply(census[,12:17], 1, shannon)
-
-sa1_all <- left_join(sa1_base, census, by = c("SA12018_V1_00"="code"))
+census$shannon <- apply(census[,13:18], 1, shannon)
+sa1_all <- left_join(sa1_base, census, by = c("SA12018_V1_00"="SA12018_V1_00"))
 ##### Crimes ####
 # Compute crime measure
 crime <- as.data.frame(read.csv("data/safety/crime/crimes_originaldata.csv"))
@@ -158,7 +164,7 @@ sa1_all <- left_join(sa1_all, stconnectivity, by = c("SA12018_V1_00"="SA12018_V1
 sa1_dists <- st_read("data/geographic/sa1_alldist_final.gpkg")|> st_drop_geometry()
 sa1_all <- left_join(sa1_all, sa1_dists, by = c("SA12018_V1_00"="SA12018_V1_00"))
 
-sa1_busfreq <- st_read("data/transport/sa1_dist_to_freqBus.gpkg")|> st_drop_geometry()
+sa1_busfreq <- st_read("data/transport/public_transport/sa1_frequentbuses.gpkg")|> st_drop_geometry()
 sa1_busfreq <- sa1_busfreq |>
   subset(select = c(SA12018_V1_00, dist_busstopsfreq))
 sa1_all <- left_join(sa1_all, sa1_busfreq, by = c("SA12018_V1_00"="SA12018_V1_00"))
@@ -173,7 +179,7 @@ sa1_all <- left_join(sa1_all, sa1_bikeability, by = c("SA12018_V1_00"="SA12018_V
 
 sa1_allg <- left_join(sa1_polys, sa1_all, by=c("SA12018_V1_00"="SA12018_V1_00"))
 sa1_allg <- sa1_allg |> 
-  subset(select = -c(area.x, area.y, na.rm))
+  subset(select = -c(area.x.x))
 
 sa1_allg[which(is.infinite(sa1_allg$dist_stations),), "dist_stations"] <- 100000
 sa1_allg[which(is.infinite(sa1_allg$dist_childcare),), "dist_childcare"] <- 100000
@@ -183,20 +189,9 @@ sa1_allg[which(is.infinite(sa1_allg$dist_gym),), "dist_gym"] <- 100000
 
 # plot
 tm_shape(sa1_allg) +
-  tm_polygons(col="dist_gym", lwd=0)
+  tm_polygons(col="medianRent", lwd=0)
 
 st_write(sa1_allg, "data/geographic/sa1_allvars.gpkg")
-
-#imputation by neighbouring values - not working yet
-#sa1_all <- mutate(sa1_all, dampness = as.numeric(as.character(dampness)))
-#sa1 <- SpatialPoints(sa1)
-#knn5 <- knn2nb(knearneigh(sa1, k = 5))
-#sapply(1:length(knn5), function(N){mean(dampness[N])})
-#sa1s_na_damp <- sa1_all[which(is.na(sa1_all$dampness)),]
-#sa1s_na_damp$dampness
-
-
-
 
 #### Spatial Interpolation ####
 grid <- st_sample(sa1, 10000, type = "regular")

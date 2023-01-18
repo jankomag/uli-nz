@@ -42,7 +42,7 @@ stations <- st_read("data/transport/public_transport/trains_auckland.gpkg") |>
 sa1 <- get_distance(stations)
 
 #calulate distances to bus stops
-busstopsfreq <- st_read("data/transport/public_transport/busstops_frequent.geojson") |>
+busstopsfreq <- st_read("data/transport/public_transport/frequentBusStoptsDone.gpkg") |>
   st_transform(4326)# 27291
 sa1 <- get_distance(busstopsfreq)
 
@@ -170,7 +170,7 @@ crash <- st_read("data/safety/crash/Crash_Analysis_System_(CAS)_data.geojson") |
 sa1 <- get_distance(crash)
 
 #save final
-st_write(sa1, "data/social infrastructure/food/sa1_2cafeandrestaurantsandother_andallestnesestDONE.gpkg")
+st_write(sa1, "data/transport/public_transport/sa1_frequentbuses.gpkg")
 st_write(sa1, "data/geographic/sa1_alldist_final.gpkg")
 
 sa1done <- st_read("data/geographic/sa1_alldist_final.gpkg")
