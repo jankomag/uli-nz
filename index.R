@@ -22,6 +22,7 @@ library(envalysis)
 require(gridExtra)
 library(stargazer)
 library(MASS)
+library(gstat)
 
 #### Data imports ####
 # geographic data
@@ -79,23 +80,29 @@ plot_grid(plotlist = my_plots)
 minmaxNORM <- function(x) {
   return (((x - min(x))) / (max(x) - min(x))*(1-0)+0)
 }
-minmaxNORM1_10 <- function(x) {
+minmaxNORM1_max <- function(x) {
   return (((x - min(x))) / (max(x) - min(x))*(max(x)-1)+1)
 }
-
 # testing box cox transformation
-sa1_test <- sa1_all |> 
-  mutate(traintest = minmaxNORM1_10(dist_cinema))
-b <- boxcox(lm(traintest ~ 1, data=sa1_test))
+boxcoxnormalise <- function(x) {
+  x <- deparse(substitute(x))
+  lmodel <- lm(sa1_alltest[[x]] ~ 1, data=sa1_alltest)
+  b <- boxcox(lmodel)
+  print(b)
+  #b <- boxcox(lm(minmaxNORM1_10(sa1_all[[x]]) ~ 1, data=sa1_all))
+  #lambda <- b$x[which.max(b$y)]
+  #return ((x ^ lambda - 1) / lambda)
+}
+b <- boxcox(lm(minmaxNORM1_10(dist_busstopsfreq) ~ 1, data=sa1_all))
 lambda <- b$x[which.max(b$y)]
-new_x_exact <- (sa1_test$traintest ^ lambda - 1) / lambda
-sa1_test |>
+sa1_alltest <- sa1_all |> 
+  mutate(testvar = (dist_busstopsfreq ^ lambda - 1) / lambda)
+sa1_all |>
   ggplot() +
-  geom_histogram(aes((dist_cinema)), bins=1000)
-newdf <- data.frame(new_x_exact)
-newdf |>
+  geom_histogram(aes(dist_busstopsfreq), bins=1000)
+sa1_alltest |>
   ggplot() +
-  geom_histogram(aes(new_x_exact), bins=1000)
+  geom_histogram(aes(testvar), bins=1000)
 
 ##### Custom Transformation of each variable #####
 sa1_all_index <- sa1_all |> 

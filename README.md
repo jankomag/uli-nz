@@ -6,7 +6,7 @@
 - data_prep.R : gathering, cleaning data and dealing with 
 missing values
 - index.R : manual index construction, with data transformations, and saving the final index
-- coinR6.R : alternative version of constructing the index with the COINr6 
+- coinR6.R : alternative version of constructing the index with the COINr 
 package
 
 Jan Magnuszewski
