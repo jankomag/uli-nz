@@ -21,6 +21,7 @@ library(moments)
 library(envalysis)
 require(gridExtra)
 library(stargazer)
+library(MASS)
 
 #### Data imports ####
 # geographic data
@@ -78,12 +79,23 @@ plot_grid(plotlist = my_plots)
 minmaxNORM <- function(x) {
   return (((x - min(x))) / (max(x) - min(x))*(1-0)+0)
 }
-sa1_all |>
+minmaxNORM1_10 <- function(x) {
+  return (((x - min(x))) / (max(x) - min(x))*(max(x)-1)+1)
+}
+
+# testing box cox transformation
+sa1_test <- sa1_all |> 
+  mutate(traintest = minmaxNORM1_10(dist_cinema))
+b <- boxcox(lm(traintest ~ 1, data=sa1_test))
+lambda <- b$x[which.max(b$y)]
+new_x_exact <- (sa1_test$traintest ^ lambda - 1) / lambda
+sa1_test |>
   ggplot() +
-  geom_histogram(aes((dist_busstops)), bins=1000)
-sa1_all |>
+  geom_histogram(aes((dist_cinema)), bins=1000)
+newdf <- data.frame(new_x_exact)
+newdf |>
   ggplot() +
-  geom_histogram(aes(Winsorize(dist_busstops, minval=0, maxval=5000)), bins=1000)
+  geom_histogram(aes(new_x_exact), bins=1000)
 
 ##### Custom Transformation of each variable #####
 sa1_all_index <- sa1_all |> 

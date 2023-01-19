@@ -8,65 +8,87 @@ library(tibble)
 library(dplyr)
 
 ##### Data Preparation #####
-grid <- st_read("data/geographic/grids/grid_all-v-07.11.22_20.02.gpkg")
-idx <- data.frame(1:nrow(grid))  |> 
-  mutate(UnitName = as.character(1:nrow(grid))) |> 
+df <- st_read("data/geographic/sa1_kuli_all.gpkg")
+df <- df |> 
+  st_drop_geometry() |> 
+  mutate(x_SA12018_V1_00 = as.numeric(SA12018_V1_00))
+idx <- data.frame(1:nrow(df))  |> 
+  mutate(UnitName = as.character(1:nrow(df))) |> 
   mutate(UnitCode = UnitName)
 
-grid_df <- idx |> 
-  cbind(grid) |> 
-  mutate(x_lon = lon) |>
-  mutate(x_lat = lat) |>
-  mutate(x_income = income) |>
-  mutate(x_maori_pr = maori_pr) |>
-  subset(select = c(-lat, -lon, -X1.nrow.grid., -geom, -income, -maori_pr))
+df2 <- idx |> 
+  cbind(df) |>
+  subset(select = c(UnitCode, UnitName, x_SA12018_V1_00, househdens, dampness.x,
+                    medianRent.x, shannon.x, crime_perarea.x,dist_crash.x, floodprone_prc.x,
+                    alcoprohibited.x, str_connectivity.x, dist_stations.x, dist_busstops.x, dist_marae.x,
+                    dist_cinema.x, dist_galleries.x, dist_libraries.x, dist_museums.x,
+                    dist_theatre.x, dist_chemist.x, dist_dentist.x, dist_healthcentre.x, dist_hospital.x,
+                    dist_childcare.x, dist_sport.x, dist_conveniencestore.x, dist_supermarket.x,
+                    dist_secondary.x, dist_primary.x, dist_petrol.x, dist_bigpark.x, dist_smallpark.x,
+                    dist_evs.x, dist_busstopsfreq.x, dist_cafe.x, dist_restaurants.x,
+                    dist_pubs.x, dist_bbq.x, dist_gym.x, dist_beach.x, bikeperarea.x))
 
-
-summary(grid_df)
+summary(df2)
 # Indicators Data
-data <- grid_df
+data <- df2
 
 # Indicators Metadata
-IndName<-c("Number of Households","Percentage Dampness", "no_intersections_in_100m",
-           "station_dist", "bus_dist", "ev_dist", "conv_st_dist", "petrol_st_dist", 
-           "biking_len_100m", "second_dist", "primary_dist","childcare_dist", 
-           "cinemas_dist", "galleries_dist", "libraries_dist", "museum_dist",
-           "theatre_dist","bigpark_dist","smallpark_dist","chemists_dist",
-           "dentist_dist","supermarket_dist")
-IndCode <- c("no_households","dampness","no_intersections_in_100m",
-             "station_dist", "bus_dist","ev_dist","conv_st_dist", "petrol_st_dist", 
-             "biking_len_100m","second_dist","primary_dist","childcare_dist", 
-             "cinemas_dist", "galleries_dist", "libraries_dist", "museum_dist",
-             "theatre_dist","bigpark_dist","smallpark_dist","chemists_dist",
-             "dentist_dist","supermarket_dist")
-Direction <- c(1,-1,1,
+IndName <- c("Housing Density","Dampness",
+                     "Affordability", "Diversity", "Crime","Road Safety", "Floods",
+                     "Alcohol Env", "Street Connectivity", "dist_stations.x", "dist_busstops.x", "dist_marae.x",
+                     "dist_cinema.x", "dist_galleries.x", "dist_libraries.x", "dist_museums.x",
+                     "dist_theatre.x", "dist_chemist.x", "dist_dentist.x", "dist_healthcentre.x", "dist_hospital.x",
+                     "dist_childcare.x", "dist_sport.x", "dist_conveniencestore.x", "dist_supermarket.x",
+                     "dist_secondary.x", "dist_primary.x", "dist_petrol.x", "dist_bigpark.x","dist_smallpark.x",
+                     "dist_evs.x", "dist_busstopsfreq.x", "dist_cafe.x", "dist_restaurants.x",
+                     "dist_pubs.x", "dist_bbq.x", "dist_gym.x", "dist_beach.x", "bikeperarea.x")
+IndCode <- c("househdens","dampness.x",
+             "medianRent.x", "shannon.x", "crime_perarea.x","dist_crash.x", "floodprone_prc.x",
+             "alcoprohibited.x", "str_connectivity.x", "dist_stations.x", "dist_busstops.x", "dist_marae.x",
+             "dist_cinema.x", "dist_galleries.x", "dist_libraries.x", "dist_museums.x",
+             "dist_theatre.x", "dist_chemist.x", "dist_dentist.x", "dist_healthcentre.x", "dist_hospital.x",
+             "dist_childcare.x", "dist_sport.x", "dist_conveniencestore.x", "dist_supermarket.x",
+             "dist_secondary.x", "dist_primary.x", "dist_petrol.x", "dist_bigpark.x","dist_smallpark.x",
+             "dist_evs.x", "dist_busstopsfreq.x", "dist_cafe.x", "dist_restaurants.x",
+             "dist_pubs.x", "dist_bbq.x", "dist_gym.x", "dist_beach.x", "bikeperarea.x")
+Direction <- c(1,-1,
+               -1,1,-1,1,-1,
+               1,1,-1,-1,-1,
+               -1,-1,-1,-1,
                -1,-1,-1,-1,-1,
-               1,-1,-1,-1,
                -1,-1,-1,-1,
+               -1,-1,-1,-1,-1,
                -1,-1,-1,-1,
-               -1,-1)
-IndUnit <- c("","percentage","number within 100 m buffer",
-             "m", "m","ev","m", "m", 
-             "metres within 100 m buffer","m","m","m", 
+               -1,-1,-1,-1,1)
+IndUnit <- c("","",
+             "NZD", "", "no","m", "",
+             "yes", "", "m", "m", "m",
              "m", "m", "m", "m",
-             "m","m","m","m",
-             "m","m")
-IndWeight <- rep(1,22)
-Agg1 <- c("Walkability","Social","Walkability",
-          "Transportation", "Transportation","Transportation","Walkability", "Walkability", 
-          "Bikeability","Social","Social","Social", 
+             "m", "m", "m", "m", "m",
+             "m", "m", "m", "m",
+             "m", "m", "m", "m","m",
+             "m", "m", "m", "m",
+             "m", "m", "m", "m", "")
+IndWeight <- rep(1,39)
+Agg1 <- c("Walkability","Housing",
+          "Housing", "Social", "Safety","Safety", "Safety",
+          "Safety", "Walkability", "Transport", "Transport", "Social",
           "Social", "Social", "Social", "Social",
-          "Social","Greenery","Greenery","Medical",
-          "Medical","Walkability")
-Agg2 <- rep("Index", 22)
+          "Social", "Social", "Social", "Social", "Social",
+          "Social", "Social", "Walkability", "Walkability",
+          "Social", "Social", "Transport", "Green","Green",
+          "Transport", "Transport", "Walkability", "Social",
+          "Walkability", "Social", "Social", "Green", "Bikeability")
+  
+Agg2 <- rep("Index", 39)
 
 metadata <- data.frame(IndName,IndCode,Direction,IndUnit,IndWeight,Agg1, Agg2)
 
 # Aggregation table
-AgLevel <- c(rep(2,6),3)
-Code <- c("Walkability","Transportation","Bikeability","Social","Greenery","Medical","Index")
-Name <- c("Walkability","Transportation","Bikeability","Social","Greenery","Medical","Index")
-Weight <- rep(1,7)
+AgLevel <- c(rep(2,7),3)
+Code <- c("Walkability","Transport","Safety", "Bikeability","Social","Green","Housing","Index")
+Name <- c("Walkability","Transport","Safety", "Bikeability","Social","Green","Housing","Index")
+Weight <- rep(1,8)
 
 aggmeta <- data.frame(AgLevel,Code,Name,Weight)
 
@@ -95,7 +117,7 @@ statlist <- getStats(KULI, dset = "Raw", out2 = "list")
 
 # Correlations
 statlist$StatTable[ c("Indicator", "Collinearity", "Neg.Correls")] |> 
-  head(24) |> print(n=21)
+  head(39) |> print(n=39)
 
 # correlation plot
 plotCorr(KULI, dset = "Raw", aglevs = 1, showvals = F)
@@ -109,8 +131,8 @@ getCronbach(KULI, dset = "Raw", icodes = "Walkability", aglev = 1)
 
 ##### Data Transformation ####
 # Treatment - Winsorisation
-df <- data.frame(GDP = grid_df$museum_dist,
-                 LogGDP = log(grid_df$museum_dist))
+df <- data.frame(GDP = df$museum_dist,
+                 LogGDP = log(df$museum_dist))
 plotIndDist(df, type = "Histogram")
 
 KULI_treated <- treat(KULI, dset = "Raw", winmax = 20000)
@@ -120,34 +142,6 @@ iplotIndDist2(KULI_treated, dsets = c("Raw", "Treated"), icodes = "bigpark_dist"
 
 # Normalisation
 # define nonlinear normalisation functions
-busnorm <- function(x){
-  x = ifelse(x<=400,
-             x, #normal linear
-             min(x*1.1,5000)) # penalty for not meeting the target capped at a limit
-  minmaxed = ((x - min(x)) / (max(x) - min(x)))*(0-10)+10 #then scaling 0-10
-  return (minmaxed)
-}
-stationnorm <- function(x){
-  x = ifelse(x<=800,
-             x, #normal linear
-             min(x*1.1,10000)) # penalty for not meeting the target capped at a limit
-  minmaxed = ((x - min(x)) / (max(x) - min(x)))*(0-10)+10 #then scaling 0-10
-  return (minmaxed)
-}
-bigparknorm <- function(x){
-  x = ifelse(x<=1000,
-             x, #normal linear
-             min(x*1.1,10000)) # penalty for not meeting the target capped at a limit
-  minmaxed = ((x - min(x)) / (max(x) - min(x)))*(0-10)+10 #then scaling 0-10
-  return (minmaxed)
-}
-smallparknorm <- function(x){
-  x = ifelse(x<=600,
-             x, #normal linear
-             min(x*1.1,5000)) # penalty for not meeting the target capped at a limit
-  minmaxed = ((x - min(x)) / (max(x) - min(x)))*(0-10)+10 #then scaling 0-10
-  return (minmaxed)
-}
 
 indiv = list(
   bigpark_dist = list(ntype = "custom", npara = bigparknorm),
@@ -156,19 +150,22 @@ indiv = list(
   bus_dist = list(ntype = "custom", npara = busnorm))
 
 # Minmax in [0,10] for all indicators, except custom individual normalisation
-KULI <- normalise(KULI, dset = "Raw", ntype = "minmax", npara = list(minmax = c(0,10)),
-                  individual = indiv, indiv_only = FALSE)
+KULI <- normalise(KULI, dset = "Raw", ntype = "minmax", npara = list(minmax = c(1,10)),indiv_only = FALSE)#individual = indiv,
 
 # Aggregation
-KULI <- aggregate(KULI_treated, dset = "Normalised", agtype = "geom_mean")
-
+KULI <- aggregate(KULI, dset = "Normalised", agtype = "geom_mean")
 
 #plotting on map
 result <- getResults(KULI, tab_type = "Full")
+result <- result |> 
+  mutate(x_SA12018_V1_00 = as.character(x_SA12018_V1_00))
+sa1_allg <- st_read("data/geographic/sa1_allvars.gpkg") |> st_transform(27291)
+index_sa1g <- left_join(sa1_allg, result, by = c("SA12018_V1_00"="x_SA12018_V1_00"))
 
-sdf <- SpatialPointsDataFrame(result[,c("x_lon", "x_lat")], result, proj4string=CRS("+init=epsg:3857"))
-sdf <- st_as_sf(sdf)
+tmap_mode("plot")
+tm_shape(index_sa1g) +
+  tm_polygons(col = c("Index","Walkability","Transport","Safety","Bikeability","Social","Green","Housing"), palette = "Reds", style = "kmeans", lwd=0)
 
-tm_shape(sdf) +
-  tm_dots(col="Index")
+st_write(index_sa1g, "data/geographic/sa1_kuli_COIN6R.gpkg")
+
 
