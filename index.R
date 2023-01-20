@@ -34,6 +34,41 @@ summary(sa1_allg)
 # strip from geography for EDA
 sa1_all <- sa1_allg |> st_drop_geometry()
 
+# ChatGPT
+box_cox_transformerold <- function(dataframe, column_name) {
+  #dataframe <- deparse(substitute(dataframe))
+  model <- lm(as.formula(paste(column_name, "~ 1")), data = dataframe)
+  b <- MASS::boxcox(model)
+  return(b)
+  #lambda <- b$x[which.max(b$y)] # Determine the optimal lambda value for the Box-Cox transformation
+  # Perform the Box-Cox transformation
+  #return ((dataframe[, column_name] ^ lambda - 1) / lambda)
+}
+
+create_model <- function(dataframe, column_name) {
+  model <- lm(as.formula(paste(column_name, "~ 1")), data = dataframe)
+  return(model)
+}
+
+
+box_cox_transformer <- function(dataframe, column_name) {
+  #odel <- create_model(dataframe, column_name)
+  model <- lm(as.formula(paste(column_name, "~ 1")), data = dataframe)
+  
+  MASS::boxcox(model$residuals)
+  #lambda <- b$x[which.max(b$y)] # Determine the optimal lambda value for the Box-Cox transformation
+  # Perform the Box-Cox transformation
+  #return ((dataframe[,column_name] ^ lambda - 1) / lambda)
+}
+box_cox_transformer(sa1_all, "testvar")
+sa1_all$testvar = as.numeric(sa1_all$dist_dentist + 1)
+
+histogram(sa1_all$dist_dentist, bins=100)
+
+transformed <- 3
+histogram(sa1_all$dist_dentist, bins=100)
+
+
 ##### Correlations #####
 cor <- cor(x = sa1_all[2:43], y = sa1_all[2:43], use="complete.obs")
 corrplot(cor, tl.srt = 25)
@@ -84,20 +119,10 @@ minmaxNORM01 <- function(x) {
   return (((x - min(x))) / (max(x) - min(x))*(1-0)+0)
 }
 minmaxNORM1max <- function(x) {
-  return (((x - min(x))) / (max(x) - min(x))*(max(x)-0.0000001)+0.0000001)
+  return (((x - min(x))) / (max(x) - min(x))*(max(x)-0.0001)+0.0001)
 }
 
-# testing box cox transformation
-boxcoxnormalise <- function(x) {
-  x <- deparse(substitute(x))
-  lmodel <- lm(sa1_alltest[[x]] ~ 1, data=sa1_alltest)
-  b <- boxcox(lmodel)
-  print(b)
-  #b <- boxcox(lm(minmaxNORM1_10(sa1_all[[x]]) ~ 1, data=sa1_all))
-  #lambda <- b$x[which.max(b$y)]
-  #return ((x ^ lambda - 1) / lambda)
-}
-
+# testing box cox transformation - no function
 b <- boxcox(lm(minmaxNORM1max(dist_dentist) ~ 1, data=sa1_all))
 lambda <- b$x[which.max(b$y)]
 sa1_alltest <- sa1_all |> 
