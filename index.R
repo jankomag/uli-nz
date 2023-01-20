@@ -83,6 +83,10 @@ minmaxNORM <- function(x) {
 minmaxNORM01 <- function(x) {
   return (((x - min(x))) / (max(x) - min(x))*(1-0)+0)
 }
+minmaxNORM1max <- function(x) {
+  return (((x - min(x))) / (max(x) - min(x))*(max(x)-0.0000001)+0.0000001)
+}
+
 # testing box cox transformation
 boxcoxnormalise <- function(x) {
   x <- deparse(substitute(x))
@@ -93,7 +97,8 @@ boxcoxnormalise <- function(x) {
   #lambda <- b$x[which.max(b$y)]
   #return ((x ^ lambda - 1) / lambda)
 }
-b <- boxcox(lm(minmaxNORM1_10(dist_busstopsfreq) ~ 1, data=sa1_all))
+
+b <- boxcox(lm(minmaxNORM1max(dist_busstopsfreq) ~ 1, data=sa1_all))
 lambda <- b$x[which.max(b$y)]
 sa1_alltest <- sa1_all |> 
   mutate(testvar = (dist_busstopsfreq ^ lambda - 1) / lambda)
@@ -107,12 +112,17 @@ sa1_alltest |>
 ##### Custom Transformation of each variable #####
 sa1_all_index <- sa1_all |> 
   mutate(househdens = no_households/area.y.y) |> 
-  mutate(popdens1 = minmaxNORM(Winsorize(log10(popdens), maxval = -2, minval = -3))) |>
-  mutate(housedens1 = minmaxNORM(Winsorize(log10(househdens), maxval = -2, minval = -4))) |> 
-  mutate(damp1 = minmaxNORM(-dampness)) |>
+  mutate(popdensbc = (popdens ^ lambdapopdens - 1) / lambdapopdens) |> 
+  mutate(popdens1 = minmaxNORM(Winsorize(popdensbc, maxval = -2, minval = -4))) |>
+  mutate(househdensbc = (househdens ^ lambdahousdens - 1) / lambdahousdens) |> 
+  mutate(housedens1 = minmaxNORM(Winsorize(househdensbc, minval = min(househdensbc), maxval = -2.5))) |> 
+  mutate(dampbc = (dampness ^ lambdadamp - 1) / lambdadamp) |> 
+  mutate(damp1 = minmaxNORM(-dampbc)) |>
   mutate(diversity1 = minmaxNORM(shannon)) |>
-  mutate(crime1 = minmaxNORM(2*(-Winsorize(crime_perarea, maxval = 0.002, minval = 0)))) |> 
-  mutate(crashes1 = minmaxNORM(Winsorize(dist_crash, minval=0, maxval = 5000))) |> 
+  mutate(crimebc = (crime_perarea ^ lambdacrime - 1) / lambdacrime) |> 
+  mutate(crime1 = minmaxNORM(-crimebc)) |> 
+  mutate(crashesBC = (dist_crash ^ lambdacrash - 1) / lambdacrash)  |> 
+  mutate(crashes1 = minmaxNORM(Winsorize(crashesBC, minval=min(crashesBC), maxval = 70))) |> 
   mutate(flood1 = minmaxNORM(-Winsorize(floodprone_prc, minval=0, maxval = 0.19))) |> 
   mutate(alcohol1 = minmaxNORM(alcoprohibited)) |> 
   mutate(station1 = minmaxNORM(-Winsorize(dist_stations, minval=0, maxval = 50000))) |> 
@@ -148,67 +158,6 @@ sa1_all_index <- sa1_all |>
   mutate(gym1 = minmaxNORM(-Winsorize(dist_gym, minval=0, maxval = 10000))) |> 
   mutate(beach1 = minmaxNORM(-Winsorize(dist_beach, minval=0, maxval = 12000))) |> 
   mutate(affordability1 = minmaxNORM(-Winsorize(medianRent, minval=0, maxval=1000)))
-
-# Evaluate the transformation method of each indicator
-densityplot = function(xpre, xpost, varN) {
-  xpre <- deparse(substitute(xpre))
-  xpost <- deparse(substitute(xpost))
-  varN <- toString(varN)
-  Data <- c("Raw","Transformed")
-  Skewness <- c(round(skewness(sa1_all_index[[xpre]]),3), round(skewness(sa1_all_index[[xpost]]),3))
-  Kurtosis <- c(round(kurtosis(sa1_all_index[[xpre]]),3), round(kurtosis(sa1_all_index[[xpost]]),3))
-  df <- data.frame(Data, Skewness, Kurtosis)
-  print(df)
-  
-  pre_out = ggplot() +
-    geom_histogram(aes(sa1_all_index[[xpre]]), bins=200) + theme_publish() +
-    xlab(varN) + ylab("Density") + ggtitle("Pre Transformation") +
-    theme(plot.title = element_text(hjust = 0.5))
-  post_out = ggplot() +
-    geom_histogram(aes(sa1_all_index[[xpost]]), bins=200) + theme_publish() +
-    xlab(varN) + ylab("Density") + ggtitle("Post Transformation") +
-    theme(plot.title = element_text(hjust = 0.5))
-  grid.arrange(pre_out, post_out, ncol=2)
-}
-densityplot(crime_perarea, crime1, "Crime")
-densityplot(dist_stations, station1, "Train Station")
-densityplot(dist_busstops, bustop1, "Bus Stop")
-densityplot(dist_busstopsfreq,freqbusstop1, "Frequent Buses")
-densityplot(popdens, popdens1, "Pop Density")
-densityplot(househdens, housedens1, "House Density")
-densityplot(dampness, damp1, "Dampness")
-densityplot(shannon, diversity1, "Shannon Index")
-densityplot(dist_crash, crashes1, "Crashes")
-densityplot(floodprone_prc,flood1, "Floods")
-densityplot(alcoprohibited,alcohol1, "Alcohol Prohibited")
-densityplot(dist_marae,marae1, "Marae")
-densityplot(dist_cinema,cinema1, "Cinema")
-densityplot(dist_galleries, gallery1,"Gallery")
-densityplot(dist_libraries,library1, "Library")
-densityplot(dist_museums,museum1, "Museum")
-densityplot(dist_theatre,theatre1, "Theatre")
-densityplot(dist_chemist, chemist1, "Chemist")
-densityplot(dist_dentist, dentist1, "Dentist")
-densityplot(dist_healthcentre, healthcr1, "Healthcentre")
-densityplot(dist_hospital, hospital1, "Hospital")
-densityplot(dist_childcare, childcare1, "Childcare")
-densityplot(dist_sport, sport1, "Sport Facilities")
-densityplot(dist_conveniencestore, convstor1, "Convenience Store")
-densityplot(dist_supermarket, supermarket1, "Supermarket")
-densityplot(dist_secondary, secondary1, "Secondary")
-densityplot(dist_primary, primary1 , "Primary")
-densityplot(dist_petrol, petrol1, "Petrol")
-densityplot(dist_evs, evch1, "EVs")
-densityplot(str_connectivity, strconnectivity1, "Street Connectivity")
-densityplot(dist_bigpark, bigpark1, "Big Park")
-densityplot(dist_cafe, cafe1, "Cafe")
-densityplot(dist_restaurants, restaurant1, "Restaurant")
-densityplot(dist_pubs, pub1, "Pub")
-densityplot(dist_bbq, bbq1, "BBQ")
-densityplot(bikeperarea, bikeability1, "Bikeability")
-densityplot(dist_gym, gym1, "Gym")
-densityplot(dist_beach, beach1, "Beach")
-densityplot(medianRent, affordability1, "Affordability")
 
 ##### Final Index Construction ####
 sa1_all_index <- sa1_all_index |> 
@@ -258,8 +207,69 @@ a_gmean <- function(x, w = NULL){
   }
   gm
 }
-sa1_all_index$geom_kuli <- apply(sa1_all_index[,c(59:85,88:98,109)], 1, FUN = a_gmean) #,c(59:85,88:98,109
-sa1_all_index$geom_kuli <- minmaxNORM01(sa1_all_index$geom_kuli)
+#sa1_all_index$geom_kuli <- apply(sa1_all_index[,c("popdens1":"primary1","strconnectivity1":"affordability1","carInfrastructure1")], 1, FUN = a_gmean) #,c(59:85,88:98,109
+#sa1_all_index$geom_kuli <- minmaxNORM01(sa1_all_index$geom_kuli)
+
+# Evaluate the transformation method of each indicator
+densityplot = function(xpre, xpost, varN) {
+  xpre <- deparse(substitute(xpre))
+  xpost <- deparse(substitute(xpost))
+  varN <- toString(varN)
+  Data <- c("Raw","Transformed")
+  Skewness <- c(round(skewness(sa1_all_index[[xpre]]),3), round(skewness(sa1_all_index[[xpost]]),3))
+  Kurtosis <- c(round(kurtosis(sa1_all_index[[xpre]]),3), round(kurtosis(sa1_all_index[[xpost]]),3))
+  df <- data.frame(Data, Skewness, Kurtosis)
+  print(df)
+  
+  pre_out = ggplot() +
+    geom_histogram(aes(sa1_all_index[[xpre]]), bins=200) + theme_publish() +
+    xlab(varN) + ylab("Density") + ggtitle("Pre Transformation") +
+    theme(plot.title = element_text(hjust = 0.5))
+  post_out = ggplot() +
+    geom_histogram(aes(sa1_all_index[[xpost]]), bins=200) + theme_publish() +
+    xlab(varN) + ylab("Density") + ggtitle("Post Transformation") +
+    theme(plot.title = element_text(hjust = 0.5))
+  grid.arrange(pre_out, post_out, ncol=2)
+}
+densityplot(dist_stations, station1, "Train Station")
+densityplot(dist_busstops, bustop1, "Bus Stop")
+densityplot(dist_busstopsfreq,freqbusstop1, "Frequent Buses")
+densityplot(popdens, popdens1, "Pop Density")
+densityplot(househdens, housedens1, "House Density")
+densityplot(dampness, damp1, "Dampness")
+densityplot(shannon, diversity1, "Shannon Index")
+densityplot(crime_perarea, crime1, "Crime")
+densityplot(dist_crash, crashes1, "Crashes")
+densityplot(floodprone_prc,flood1, "Floods")
+densityplot(alcoprohibited,alcohol1, "Alcohol Prohibited")
+densityplot(dist_marae,marae1, "Marae")
+densityplot(dist_cinema,cinema1, "Cinema")
+densityplot(dist_galleries, gallery1,"Gallery")
+densityplot(dist_libraries,library1, "Library")
+densityplot(dist_museums,museum1, "Museum")
+densityplot(dist_theatre,theatre1, "Theatre")
+densityplot(dist_chemist, chemist1, "Chemist")
+densityplot(dist_dentist, dentist1, "Dentist")
+densityplot(dist_healthcentre, healthcr1, "Healthcentre")
+densityplot(dist_hospital, hospital1, "Hospital")
+densityplot(dist_childcare, childcare1, "Childcare")
+densityplot(dist_sport, sport1, "Sport Facilities")
+densityplot(dist_conveniencestore, convstor1, "Convenience Store")
+densityplot(dist_supermarket, supermarket1, "Supermarket")
+densityplot(dist_secondary, secondary1, "Secondary")
+densityplot(dist_primary, primary1 , "Primary")
+densityplot(dist_petrol, petrol1, "Petrol")
+densityplot(dist_evs, evch1, "EVs")
+densityplot(str_connectivity, strconnectivity1, "Street Connectivity")
+densityplot(dist_bigpark, bigpark1, "Big Park")
+densityplot(dist_cafe, cafe1, "Cafe")
+densityplot(dist_restaurants, restaurant1, "Restaurant")
+densityplot(dist_pubs, pub1, "Pub")
+densityplot(dist_bbq, bbq1, "BBQ")
+densityplot(bikeperarea, bikeability1, "Bikeability")
+densityplot(dist_gym, gym1, "Gym")
+densityplot(dist_beach, beach1, "Beach")
+densityplot(medianRent, affordability1, "Affordability")
 
 sa1_all_index |>
   ggplot() +
@@ -276,6 +286,52 @@ st_write(index_sa1g, "data/geographic/sa1_kuli_all.gpkg")
 
 
 #### Other ####
+##### Custom Transformation of each variable ##### original no box-cox
+sa1_all_index <- sa1_all |> 
+  mutate(househdens = no_households/area.y.y) |> 
+  mutate(popdens1 = minmaxNORM(Winsorize(log10(popdens), maxval = -2, minval = -3))) |>
+  mutate(housedens1 = minmaxNORM(Winsorize(log10(househdens), maxval = -2, minval = -4))) |> 
+  mutate(damp1 = minmaxNORM(-dampness)) |>
+  mutate(diversity1 = minmaxNORM(shannon)) |>
+  mutate(crime1 = minmaxNORM(2*(-Winsorize(crime_perarea, maxval = 0.002, minval = 0)))) |> 
+  mutate(crashes1 = minmaxNORM(Winsorize(dist_crash, minval=0, maxval = 5000))) |> 
+  mutate(flood1 = minmaxNORM(-Winsorize(floodprone_prc, minval=0, maxval = 0.19))) |> 
+  mutate(alcohol1 = minmaxNORM(alcoprohibited)) |> 
+  mutate(station1 = minmaxNORM(-Winsorize(dist_stations, minval=0, maxval = 50000))) |> 
+  mutate(bustop1 = minmaxNORM(-Winsorize(dist_busstops, minval=0, maxval = 1000))) |> 
+  mutate(freqbusstop1 = minmaxNORM(-Winsorize(dist_busstopsfreq, minval=0, maxval= 1500))) |> 
+  mutate(marae1 = minmaxNORM(-dist_marae)) |> 
+  mutate(cinema1 = minmaxNORM(-Winsorize(dist_cinema, minval=0, maxval = 20000))) |> 
+  mutate(gallery1 = minmaxNORM(-Winsorize(dist_galleries, minval=0, maxval = 35000))) |> 
+  mutate(library1 = minmaxNORM(-Winsorize(dist_libraries, minval=0, maxval = 8000))) |> 
+  mutate(museum1 = minmaxNORM(-Winsorize(dist_museums, minval=0, maxval = 25000))) |> 
+  mutate(theatre1 = minmaxNORM(-Winsorize(dist_theatre, minval=0, maxval = 20000))) |> 
+  mutate(chemist1 = minmaxNORM(-Winsorize(dist_chemist, minval=0, maxval = 20000))) |> 
+  mutate(dentist1 = minmaxNORM(-Winsorize(dist_dentist, minval=0, maxval = 5000))) |> 
+  mutate(healthcr1 = minmaxNORM(-Winsorize(dist_healthcentre, minval=0, maxval = 5000))) |> 
+  mutate(hospital1 = minmaxNORM(-Winsorize(dist_hospital, minval=0, maxval = 15000))) |>
+  mutate(childcare1 = minmaxNORM(-Winsorize(dist_childcare, minval=0, maxval = 6000))) |> 
+  mutate(sport1 = minmaxNORM(-Winsorize(dist_sport, minval=0, maxval = 4000))) |>
+  mutate(convstor1 = minmaxNORM(-Winsorize(dist_conveniencestore, minval=0, maxval = 3000))) |>
+  mutate(supermarket1 = minmaxNORM(-Winsorize(dist_supermarket, minval=0, maxval = 5500))) |>
+  mutate(secondary1 = minmaxNORM(-Winsorize(dist_secondary, minval=0, maxval = 6000))) |>
+  mutate(primary1 = minmaxNORM(-Winsorize(dist_primary, minval=0, maxval = 3500))) |>
+  mutate(petrol1 = minmaxNORM(-Winsorize(dist_petrol, minval=0, maxval = 5000))) |>
+  mutate(evch1 = minmaxNORM(-Winsorize(dist_evs, minval=0, maxval = 13000))) |> 
+  mutate(strconnectivity1 = minmaxNORM(Winsorize(str_connectivity, maxval = 0.0008))) |> 
+  mutate(bigpark1 = minmaxNORM(-Winsorize(dist_bigpark, minval=50, maxval = 2500))) |> 
+  mutate(smallpark1 = minmaxNORM(-Winsorize(dist_smallpark, minval=50, maxval = 2000))) |> 
+  mutate(bigpark1 = minmaxNORM(-Winsorize(dist_bigpark, minval=50, maxval = 2500))) |> 
+  mutate(cafe1 = minmaxNORM(-Winsorize(dist_cafe, minval=0, maxval = 5000))) |> 
+  mutate(restaurant1 = minmaxNORM(-Winsorize(dist_restaurants, minval=0, maxval = 4500))) |> 
+  mutate(pub1 = minmaxNORM(-Winsorize(dist_pubs, minval=0, maxval = 9000))) |> 
+  mutate(bbq1 = minmaxNORM(-Winsorize(dist_bbq, minval=0, maxval = 20000))) |> 
+  mutate(bikeability1 = minmaxNORM(Winsorize(bikeperarea, minval=0, maxval = 0.04))) |> 
+  mutate(gym1 = minmaxNORM(-Winsorize(dist_gym, minval=0, maxval = 10000))) |> 
+  mutate(beach1 = minmaxNORM(-Winsorize(dist_beach, minval=0, maxval = 12000))) |> 
+  mutate(affordability1 = minmaxNORM(-Winsorize(medianRent, minval=0, maxval=1000)))
+
+
 #Common maximum value for tranformations
 commonMaxval = 5000
 sa1_all_index_commonmax <- sa1_all |> 
