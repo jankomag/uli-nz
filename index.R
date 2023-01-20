@@ -78,10 +78,10 @@ plot_grid(plotlist = my_plots)
 #### Index Construcion ####
 # min-max normalise function 
 minmaxNORM <- function(x) {
-  return (((x - min(x))) / (max(x) - min(x))*(1-0)+0)
+  return (((x - min(x))) / (max(x) - min(x))*(10-1)+1)
 }
-minmaxNORM1_max <- function(x) {
-  return (((x - min(x))) / (max(x) - min(x))*(max(x)-1)+1)
+minmaxNORM01 <- function(x) {
+  return (((x - min(x))) / (max(x) - min(x))*(1-0)+0)
 }
 # testing box cox transformation
 boxcoxnormalise <- function(x) {
@@ -114,7 +114,7 @@ sa1_all_index <- sa1_all |>
   mutate(crime1 = minmaxNORM(-Winsorize(crime_perarea, maxval = 0.002, minval = 0))) |> 
   mutate(crashes1 = minmaxNORM(Winsorize(dist_crash, minval=0, maxval = 5000))) |> 
   mutate(flood1 = minmaxNORM(-Winsorize(floodprone_prc, minval=0, maxval = 0.19))) |> 
-  mutate(alcohol1 = alcoprohibited) |> 
+  mutate(alcohol1 = minmaxNORM(alcoprohibited)) |> 
   mutate(station1 = minmaxNORM(-Winsorize(dist_stations, minval=0, maxval = 50000))) |> 
   mutate(bustop1 = minmaxNORM(-Winsorize(dist_busstops, minval=0, maxval = 1000))) |> 
   mutate(freqbusstop1 = minmaxNORM(-Winsorize(dist_busstopsfreq, minval=0, maxval= 1500))) |> 
@@ -212,34 +212,61 @@ densityplot(medianRent, affordability1, "Affordability")
 
 ##### Final Index Construction ####
 sa1_all_index <- sa1_all_index |> 
-  mutate(walkability1 = minmaxNORM(popdens1 + housedens1 +convstor1 + supermarket1 + strconnectivity1)) |> 
-  mutate(medical1 = minmaxNORM(chemist1 + dentist1 + healthcr1 + hospital1)) |> 
-  mutate(education1 = minmaxNORM(secondary1 + primary1 + childcare1)) |> 
-  mutate(safety1 = minmaxNORM(2*crime1 + crashes1 + flood1 + alcohol1)) |> 
-  mutate(transport1 = minmaxNORM(station1 + bustop1 +freqbusstop1 +bikeability1 + evch1 + petrol1)) |> 
-  mutate(culture1 = minmaxNORM(diversity1+marae1)) |> 
-  mutate(leisure1 = minmaxNORM(cinema1 + gallery1 +  library1 + museum1 + theatre1 + sport1 + gym1)) |> 
-  mutate(food1 = minmaxNORM(cafe1 + restaurant1 +  pub1 + bbq1)) |> 
-  mutate(greenspace1 = minmaxNORM(bigpark1 + smallpark1 + dist_beach)) |> 
-  mutate(housing1 = affordability1 + damp1) |> 
-  mutate(kuli_subs = minmaxNORM(walkability1+greenspace1+leisure1+medical1 +culture1+education1 +transport1+ safety1 + food1 + housing1)) |> 
-  mutate(kuli = popdens1 + housedens1 + damp1 + diversity1 + 
-           2*crime1 + crashes1 + flood1 + freqbusstop1 + affordability1 +
-           alcohol1 + station1 + bustop1 + marae1 + cinema1 +
-           gallery1 +  library1 + museum1 + theatre1 + beach1 +
-           chemist1 + dentist1 + healthcr1 + hospital1 + childcare1 +
-           sport1 + convstor1 + supermarket1 + secondary1 + primary1 +
-           petrol1 + evch1 + strconnectivity1 + bigpark1 + smallpark1 +
-           cafe1 + restaurant1 + pub1 + bbq1 + bikeability1 + gym1) |> 
-  mutate(kuli_subsnorm = minmaxNORM(kuli_subs)) |> 
+  mutate(walkability2 = minmaxNORM(popdens1 + housedens1 +convstor1 + supermarket1 + strconnectivity1)) |> 
+  mutate(medical2 = minmaxNORM(chemist1 + dentist1 + healthcr1 + hospital1)) |> 
+  mutate(education2 = minmaxNORM(secondary1 + primary1 + childcare1)) |> 
+  mutate(safety2 = minmaxNORM(crime1 + crashes1 + flood1 + alcohol1)) |> 
+  mutate(transport2 = minmaxNORM(station1 + bustop1 +freqbusstop1)) |> 
+  mutate(culture2 = minmaxNORM(diversity1+marae1)) |> 
+  mutate(leisure2 = minmaxNORM(cinema1 + gallery1 +  library1 + museum1 + theatre1 + sport1 + gym1)) |> 
+  mutate(food2 = minmaxNORM(cafe1 + restaurant1 +  pub1 + bbq1)) |> 
+  mutate(greenspace2 = minmaxNORM(bigpark1 + smallpark1 + beach1)) |> 
+  mutate(housing2 = affordability1 + damp1) |> 
+  mutate(carInfrastructure1 = minmaxNORM(evch1 + petrol1)) |> 
+  mutate(kuli_subs = minmaxNORM(carInfrastructure1+bikeability1+walkability2+greenspace2+leisure2+medical2 +culture2+education2 +transport2+ safety2 + food2 + housing2)) |> 
+  mutate(kuli = popdens1 + housedens1 +convstor1 + supermarket1 + strconnectivity1 +
+           chemist1 + dentist1 + healthcr1 + hospital1 +
+           secondary1 + primary1 + childcare1 +
+           crime1 + crashes1 + flood1 + alcohol1 +
+           station1 + bustop1 +freqbusstop1 +
+           diversity1+marae1 +
+           cinema1 + gallery1 + library1 + museum1 + theatre1 + sport1 + gym1 +
+           cafe1 + restaurant1 +  pub1 + bbq1 +
+           bigpark1 + smallpark1 + beach1 +
+           affordability1 + damp1+
+           carInfrastructure1 + bikeability1) |> 
   mutate(kuli_norm = minmaxNORM(kuli))
+
+#Geometric Mean
+a_gmean <- function(x, w = NULL){
+  if(is.null(w)){
+    # default equal weights
+    w <- rep(1,length(x))
+    #message("No weights specified for geometric mean, using equal weights.")
+  }
+  if(any(!is.na(x))){
+    if(any((x <= 0), na.rm = TRUE)){
+      stop("Negative or zero values found when applying geometric mean. This doesn't work because geometric
+         mean uses log. Normalise to remove negative/zero values first or use another aggregation method.")}
+    # have to set any weights to NA to correspond to NAs in x
+    w[is.na(x)] <- NA
+    # calculate geom mean
+    gm <- exp( sum(w * log(x), na.rm = TRUE)/sum(w, na.rm = TRUE) )
+  } else {
+    gm <- NA
+  }
+  gm
+}
+sa1_all_index$geom_kuli <- apply(sa1_all_index[,c(59:85,88:98,109)], 1, FUN = a_gmean) #,c(59:85,88:98,109
+sa1_all_index$geom_kuli <- minmaxNORM01(sa1_all_index$geom_kuli)
+
 
 # rejoin with geometry
 index_sa1g <- left_join(sa1_allg, sa1_all_index, by = c("SA12018_V1_00"="SA12018_V1_00"))
 #walkability1 other1 greenspace1 leisure1 medical1 culture1 education1pt1 safety1
 tmap_mode("plot")
 tm_shape(index_sa1g) +
-  tm_polygons(col = "transport1", palette = "Reds", style = "kmeans", lwd=0)
+  tm_polygons(col = c("geom_kuli","kuli_norm"), palette = "Reds", style = "kmeans", lwd=0)
          # breaks = c(0,1,100000) )#, title = str_glue('Penalty= {penalty}'))
 st_write(index_sa1g, "data/geographic/sa1_kuli_all.gpkg")
 
