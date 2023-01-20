@@ -98,44 +98,66 @@ boxcoxnormalise <- function(x) {
   #return ((x ^ lambda - 1) / lambda)
 }
 
-b <- boxcox(lm(minmaxNORM1max(dist_busstopsfreq) ~ 1, data=sa1_all))
+b <- boxcox(lm(minmaxNORM1max(dist_dentist) ~ 1, data=sa1_all))
 lambda <- b$x[which.max(b$y)]
 sa1_alltest <- sa1_all |> 
-  mutate(testvar = (dist_busstopsfreq ^ lambda - 1) / lambda)
+  mutate(testvar = (dist_dentist ^ lambda - 1) / lambda)
 sa1_all |>
   ggplot() +
-  geom_histogram(aes(dist_busstopsfreq), bins=1000)
+  geom_histogram(aes(dist_dentist), bins=1000)
 sa1_alltest |>
   ggplot() +
   geom_histogram(aes(testvar), bins=1000)
+lambdapopdens <- 0.3030303
+lambdahousdens <- 0.2626263
+lambdadamp <- 0.5858586
+lambdacrime <- 0.1414141
+lambdacrash <- 0.3838384
+lambdafreqbus <- 0.1818182
+lambdacinema <- 0.1818182
+lambdagall <- 0.1818182
+lambdalibr <-0.2222222
+lambdamuseum <- 0.3838384
+lambdatheatre <- 0.1414141
+lambdachem <- 0.06060606
+lambdadent <- 0.06060606
 
 ##### Custom Transformation of each variable #####
 sa1_all_index <- sa1_all |> 
   mutate(househdens = no_households/area.y.y) |> 
   mutate(popdensbc = (popdens ^ lambdapopdens - 1) / lambdapopdens) |> 
-  mutate(popdens1 = minmaxNORM(Winsorize(popdensbc, maxval = -2, minval = -4))) |>
+  mutate(dentistBC = (dist_dentist ^ lambdadent - 1) / lambdadent)  |> 
   mutate(househdensbc = (househdens ^ lambdahousdens - 1) / lambdahousdens) |> 
-  mutate(housedens1 = minmaxNORM(Winsorize(househdensbc, minval = min(househdensbc), maxval = -2.5))) |> 
   mutate(dampbc = (dampness ^ lambdadamp - 1) / lambdadamp) |> 
+  mutate(crimebc = (crime_perarea ^ lambdacrime - 1) / lambdacrime) |> 
+  mutate(crashesBC = (dist_crash ^ lambdacrash - 1) / lambdacrash)  |> 
+  mutate(busfrqBC = (dist_busstopsfreq ^ lambdafreqbus - 1) / lambdafreqbus)  |> 
+  mutate(cinemaBC = (dist_cinema ^ lambdacinema - 1) / lambdacinema)  |> 
+  mutate(libraryBC = (dist_libraries ^ lambdalibr - 1) / lambdalibr)  |> 
+  mutate(galleryBC = (dist_galleries ^ lambdagall - 1) / lambdagall)  |> 
+  mutate(museumBC = (dist_museums ^ lambdamuseum - 1) / lambdamuseum)  |> 
+  mutate(chemistBC = (dist_chemist ^ lambdachem - 1) / lambdachem)  |> 
+  mutate(theatreBC = (dist_theatre ^ lambdatheatre - 1) / lambdatheatre)  |> 
+  mutate(popdens1 = minmaxNORM(Winsorize(popdensbc, maxval = -2, minval = -4))) |>
+  mutate(housedens1 = minmaxNORM(Winsorize(househdensbc, minval = min(househdensbc), maxval = -2.5))) |> 
   mutate(damp1 = minmaxNORM(-dampbc)) |>
   mutate(diversity1 = minmaxNORM(shannon)) |>
-  mutate(crimebc = (crime_perarea ^ lambdacrime - 1) / lambdacrime) |> 
   mutate(crime1 = minmaxNORM(-crimebc)) |> 
-  mutate(crashesBC = (dist_crash ^ lambdacrash - 1) / lambdacrash)  |> 
   mutate(crashes1 = minmaxNORM(Winsorize(crashesBC, minval=min(crashesBC), maxval = 70))) |> 
   mutate(flood1 = minmaxNORM(-Winsorize(floodprone_prc, minval=0, maxval = 0.19))) |> 
   mutate(alcohol1 = minmaxNORM(alcoprohibited)) |> 
   mutate(station1 = minmaxNORM(-Winsorize(dist_stations, minval=0, maxval = 50000))) |> 
   mutate(bustop1 = minmaxNORM(-Winsorize(dist_busstops, minval=0, maxval = 1000))) |> 
-  mutate(freqbusstop1 = minmaxNORM(-Winsorize(dist_busstopsfreq, minval=0, maxval= 1500))) |> 
+  mutate(freqbusstop1 = minmaxNORM(-Winsorize(busfrqBC, minval=0, maxval= 22))) |> 
   mutate(marae1 = minmaxNORM(-dist_marae)) |> 
-  mutate(cinema1 = minmaxNORM(-Winsorize(dist_cinema, minval=0, maxval = 20000))) |> 
-  mutate(gallery1 = minmaxNORM(-Winsorize(dist_galleries, minval=0, maxval = 35000))) |> 
-  mutate(library1 = minmaxNORM(-Winsorize(dist_libraries, minval=0, maxval = 8000))) |> 
-  mutate(museum1 = minmaxNORM(-Winsorize(dist_museums, minval=0, maxval = 25000))) |> 
-  mutate(theatre1 = minmaxNORM(-Winsorize(dist_theatre, minval=0, maxval = 20000))) |> 
-  mutate(chemist1 = minmaxNORM(-Winsorize(dist_chemist, minval=0, maxval = 20000))) |> 
-  mutate(dentist1 = minmaxNORM(-Winsorize(dist_dentist, minval=0, maxval = 5000))) |> 
+  mutate(cinema1 = minmaxNORM(-dist_cinema)) |> 
+  mutate(gallery1 = minmaxNORM(-galleryBC)) |> 
+  mutate(library1 = minmaxNORM(-Winsorize(libraryBC, minval=min(libraryBC), maxval = 35))) |> 
+  mutate(museum1 = minmaxNORM(-museumBC)) |> 
+  mutate(theatre1 = minmaxNORM(-theatreBC)) |> 
+  mutate(chemist1 = minmaxNORM(-chemistBC)) |> 
+  mutate(dentist1 = minmaxNORM(-Winsorize(dentistBC, minval=0, maxval = max(dentistBC)))) |> 
+  
   mutate(healthcr1 = minmaxNORM(-Winsorize(dist_healthcentre, minval=0, maxval = 5000))) |> 
   mutate(hospital1 = minmaxNORM(-Winsorize(dist_hospital, minval=0, maxval = 15000))) |>
   mutate(childcare1 = minmaxNORM(-Winsorize(dist_childcare, minval=0, maxval = 6000))) |> 
@@ -144,8 +166,6 @@ sa1_all_index <- sa1_all |>
   mutate(supermarket1 = minmaxNORM(-Winsorize(dist_supermarket, minval=0, maxval = 5500))) |>
   mutate(secondary1 = minmaxNORM(-Winsorize(dist_secondary, minval=0, maxval = 6000))) |>
   mutate(primary1 = minmaxNORM(-Winsorize(dist_primary, minval=0, maxval = 3500))) |>
-  mutate(petrol1 = minmaxNORM(-Winsorize(dist_petrol, minval=0, maxval = 5000))) |>
-  mutate(evch1 = minmaxNORM(-Winsorize(dist_evs, minval=0, maxval = 13000))) |> 
   mutate(strconnectivity1 = minmaxNORM(Winsorize(str_connectivity, maxval = 0.0008))) |> 
   mutate(bigpark1 = minmaxNORM(-Winsorize(dist_bigpark, minval=50, maxval = 2500))) |> 
   mutate(smallpark1 = minmaxNORM(-Winsorize(dist_smallpark, minval=50, maxval = 2000))) |> 
@@ -157,10 +177,13 @@ sa1_all_index <- sa1_all |>
   mutate(bikeability1 = minmaxNORM(Winsorize(bikeperarea, minval=0, maxval = 0.04))) |> 
   mutate(gym1 = minmaxNORM(-Winsorize(dist_gym, minval=0, maxval = 10000))) |> 
   mutate(beach1 = minmaxNORM(-Winsorize(dist_beach, minval=0, maxval = 12000))) |> 
-  mutate(affordability1 = minmaxNORM(-Winsorize(medianRent, minval=0, maxval=1000)))
+  mutate(affordability1 = minmaxNORM(-Winsorize(medianRent, minval=0, maxval=1000))) |> 
+  mutate(petrol1 = minmaxNORM(-Winsorize(dist_petrol, minval=0, maxval = 5000))) |>
+  mutate(evch1 = minmaxNORM(-Winsorize(dist_evs, minval=0, maxval = 13000)))
 
 ##### Final Index Construction ####
 sa1_all_index <- sa1_all_index |> 
+  mutate(carInfrastructure1 = minmaxNORM(evch1 + petrol1)) |> 
   mutate(walkability2 = minmaxNORM(popdens1 + housedens1 +convstor1 + supermarket1 + strconnectivity1)) |> 
   mutate(medical2 = minmaxNORM(chemist1 + dentist1 + healthcr1 + hospital1)) |> 
   mutate(education2 = minmaxNORM(secondary1 + primary1 + childcare1)) |> 
@@ -171,7 +194,6 @@ sa1_all_index <- sa1_all_index |>
   mutate(food2 = minmaxNORM(cafe1 + restaurant1 +  pub1 + bbq1)) |> 
   mutate(greenspace2 = minmaxNORM(bigpark1 + smallpark1 + beach1)) |> 
   mutate(housing2 = affordability1 + damp1) |> 
-  mutate(carInfrastructure1 = minmaxNORM(evch1 + petrol1)) |> 
   mutate(kuli_subs = minmaxNORM(carInfrastructure1+bikeability1+walkability2+greenspace2+leisure2+medical2 +culture2+education2 +transport2+ safety2 + food2 + housing2)) |> 
   mutate(kuli = popdens1 + housedens1 +convstor1 + supermarket1 + strconnectivity1 +
            chemist1 + dentist1 + healthcr1 + hospital1 +
@@ -207,8 +229,8 @@ a_gmean <- function(x, w = NULL){
   }
   gm
 }
-#sa1_all_index$geom_kuli <- apply(sa1_all_index[,c("popdens1":"primary1","strconnectivity1":"affordability1","carInfrastructure1")], 1, FUN = a_gmean) #,c(59:85,88:98,109
-#sa1_all_index$geom_kuli <- minmaxNORM01(sa1_all_index$geom_kuli)
+sa1_all_index$geom_kuli <- apply(sa1_all_index[,c(72:109)], 1, FUN = a_gmean)
+sa1_all_index$geom_kuli <- minmaxNORM01(sa1_all_index$geom_kuli)
 
 # Evaluate the transformation method of each indicator
 densityplot = function(xpre, xpost, varN) {
@@ -250,6 +272,7 @@ densityplot(dist_museums,museum1, "Museum")
 densityplot(dist_theatre,theatre1, "Theatre")
 densityplot(dist_chemist, chemist1, "Chemist")
 densityplot(dist_dentist, dentist1, "Dentist")
+
 densityplot(dist_healthcentre, healthcr1, "Healthcentre")
 densityplot(dist_hospital, hospital1, "Hospital")
 densityplot(dist_childcare, childcare1, "Childcare")
