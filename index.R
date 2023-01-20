@@ -111,7 +111,7 @@ sa1_all_index <- sa1_all |>
   mutate(housedens1 = minmaxNORM(Winsorize(log10(househdens), maxval = -2, minval = -4))) |> 
   mutate(damp1 = minmaxNORM(-dampness)) |>
   mutate(diversity1 = minmaxNORM(shannon)) |>
-  mutate(crime1 = minmaxNORM(-Winsorize(crime_perarea, maxval = 0.002, minval = 0))) |> 
+  mutate(crime1 = minmaxNORM(2*(-Winsorize(crime_perarea, maxval = 0.002, minval = 0)))) |> 
   mutate(crashes1 = minmaxNORM(Winsorize(dist_crash, minval=0, maxval = 5000))) |> 
   mutate(flood1 = minmaxNORM(-Winsorize(floodprone_prc, minval=0, maxval = 0.19))) |> 
   mutate(alcohol1 = minmaxNORM(alcoprohibited)) |> 
@@ -227,7 +227,7 @@ sa1_all_index <- sa1_all_index |>
   mutate(kuli = popdens1 + housedens1 +convstor1 + supermarket1 + strconnectivity1 +
            chemist1 + dentist1 + healthcr1 + hospital1 +
            secondary1 + primary1 + childcare1 +
-           crime1 + crashes1 + flood1 + alcohol1 +
+           minmaxNORM01(crime1*2) + crashes1 + flood1 + alcohol1 +
            station1 + bustop1 +freqbusstop1 +
            diversity1+marae1 +
            cinema1 + gallery1 + library1 + museum1 + theatre1 + sport1 + gym1 +
@@ -235,7 +235,8 @@ sa1_all_index <- sa1_all_index |>
            bigpark1 + smallpark1 + beach1 +
            affordability1 + damp1+
            carInfrastructure1 + bikeability1) |> 
-  mutate(kuli_norm = minmaxNORM(kuli))
+  mutate(arithm_kuli = minmaxNORM01(kuli/39)) |> 
+  mutate(kuli_norm = minmaxNORM01(kuli))
 
 #Geometric Mean
 a_gmean <- function(x, w = NULL){
@@ -260,16 +261,18 @@ a_gmean <- function(x, w = NULL){
 sa1_all_index$geom_kuli <- apply(sa1_all_index[,c(59:85,88:98,109)], 1, FUN = a_gmean) #,c(59:85,88:98,109
 sa1_all_index$geom_kuli <- minmaxNORM01(sa1_all_index$geom_kuli)
 
+sa1_all_index |>
+  ggplot() +
+  geom_histogram(aes(geom_kuli), bins=1000)
 
 # rejoin with geometry
 index_sa1g <- left_join(sa1_allg, sa1_all_index, by = c("SA12018_V1_00"="SA12018_V1_00"))
 #walkability1 other1 greenspace1 leisure1 medical1 culture1 education1pt1 safety1
 tmap_mode("plot")
 tm_shape(index_sa1g) +
-  tm_polygons(col = c("geom_kuli","kuli_norm"), palette = "Reds", style = "kmeans", lwd=0)
-         # breaks = c(0,1,100000) )#, title = str_glue('Penalty= {penalty}'))
+  tm_polygons(col = c("geom_kuli","kuli_norm","arithm_kuli"), palette = "Reds", style = "fixed", lwd=0,
+          breaks = c(0,.1,.3,.6,.7,.8,.95,1))#, title = str_glue('Penalty= {penalty}'))
 st_write(index_sa1g, "data/geographic/sa1_kuli_all.gpkg")
-
 
 
 #### Other ####
