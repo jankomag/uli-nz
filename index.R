@@ -121,27 +121,30 @@ minmaxNORM1max <- function(x) {
 }
 
 # testing box cox transformation - no function
-b <- boxcox(lm((dist_healthcentre+0.1) ~ 1, data=sa1_all))
+b <- boxcox(lm(((dist_secondary+0.1)) ~ 1, data=sa1_all))
 lambda <- b$x[which.max(b$y)]
 sa1_alltest <- sa1_all |> 
-  mutate(testvar = ((dist_healthcentre) ^ lambda - 1) / lambda)
+  mutate(testvar = ((dist_secondary) ^ lambda - 1) / lambda)
 sa1_all |>
   ggplot() +
-  geom_histogram(aes(dist_healthcentre), bins=1000)
+  geom_histogram(aes(dist_secondary), bins=1000)
 sa1_alltest |>
   ggplot() +
-  geom_histogram(aes(testvar), bins=1000)
+  geom_histogram(aes(testvar), bins=400)
 
 sa1_all |>
   ggplot() +
-  geom_histogram(aes((dist_healthcentre)), bins=500)
+  geom_histogram(aes(log(dist_secondary+0.1)), bins=400)
 sa1_all |>
   ggplot() +
-  geom_histogram(aes(Winsorize(log(dist_dentist), minval=4.8, maxval=9)), bins=500)
+  geom_histogram(aes(Winsorize(log(dist_secondary+0.1), minval=4.6, maxval=10)), bins=400)
 
 
 lambdaFlood <- -0.06060606
 lambdahealth <- 0.3434343
+lambdachildcare <- 0.06060606
+lambdasport <- 0.3838384
+lambdasecond <- 0.3434343
 ##### Custom Transformation of each variable ##### original no box-cox
 sa1_all_index <- sa1_all |> 
   mutate(househdens = no_households/area) |> 
@@ -165,15 +168,18 @@ sa1_all_index <- sa1_all |>
   mutate(theatre1 = minmaxNORM(-Winsorize(dist_theatre, minval=0, maxval=11000))) |> 
   mutate(chemist1 = minmaxNORM(-Winsorize(log(Winsorize((dist_chemist), minval=0, maxval=20000)),minval=6.2, maxval=10))) |> 
   mutate(dentist1 = minmaxNORM(-Winsorize(log(dist_dentist), minval=4.8, maxval=9))) |> 
-  mutate(healthcBC = ((dist_healthcentre+1) ^ lambdahealth - 1) / lambdahealth) |> 
+  mutate(healthcBC = ((dist_healthcentre+0.1) ^ lambdahealth - 1) / lambdahealth) |> 
   mutate(healthcr1 = minmaxNORM(-Winsorize(healthcBC, minval=0, maxval = 58))) |> 
+  mutate(hospital1 = minmaxNORM(-Winsorize(dist_hospital,minval=0, maxval=11000))) |>
+  mutate(childcareBC = ((dist_childcare+0.1) ^ lambdahealth - 1) / lambdahealth) |> 
+  mutate(childcare1 = minmaxNORM(-Winsorize(childcareBC, minval=0, maxval = max(childcareBC)))) |> 
+  mutate(sportBC = ((dist_sport+0.1) ^ lambdasport - 1) / lambdasport) |> 
+  mutate(sport1 = minmaxNORM(-Winsorize((sportBC), minval=0, maxval=60))) |>
+  mutate(convstor1 = minmaxNORM(-Winsorize(log(dist_conveniencestore+0.1), minval=3, maxval=10))) |>
+  mutate(supermarket1 = minmaxNORM(-Winsorize(log(dist_supermarket+0.1), minval=4.5, maxval=10))) |>
+  mutate(secondaryBC = ((dist_secondary+0.1) ^ lambdasecond - 1) / lambdasecond) |> 
+  mutate(secondary1 = minmaxNORM(-secondaryBC)) |>
   
-  mutate(hospital1 = minmaxNORM(-Winsorize(dist_hospital, minval=0, maxval = 15000))) |>
-  mutate(childcare1 = minmaxNORM(-Winsorize(dist_childcare, minval=0, maxval = 6000))) |> 
-  mutate(sport1 = minmaxNORM(-Winsorize(dist_sport, minval=0, maxval = 4000))) |>
-  mutate(convstor1 = minmaxNORM(-Winsorize(dist_conveniencestore, minval=0, maxval = 3000))) |>
-  mutate(supermarket1 = minmaxNORM(-Winsorize(dist_supermarket, minval=0, maxval = 5500))) |>
-  mutate(secondary1 = minmaxNORM(-Winsorize(dist_secondary, minval=0, maxval = 6000))) |>
   mutate(primary1 = minmaxNORM(-Winsorize(dist_primary, minval=0, maxval = 3500))) |>
   mutate(petrol1 = minmaxNORM(-Winsorize(dist_petrol, minval=0, maxval = 5000))) |>
   mutate(evch1 = minmaxNORM(-Winsorize(dist_evs, minval=0, maxval = 13000))) |> 
