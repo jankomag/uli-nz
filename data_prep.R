@@ -15,16 +15,16 @@ library(nngeo)
 
 #### Data imports ####
 # geographic data
-sa1_polys <- st_read("data/geographic/urban_sa1_landvalid.gpkg")
+sa1_polys <- st_read("data/geographic/sa1_auckland_waiheke_urban_new_final.gpkg")
 sa1_polys <- sa1_polys |>
-  subset(select = c(SA12018_V1_00, area))
+  subset(select = c(SA12018_V1_00, area.x.x))
 #transforming to the same coordinate system
 sa1_base <- st_transform(sa1_polys, 27291) |> st_drop_geometry()
 
 ##### Census####
 census <- as.data.frame(read.csv("data/geographic/Census/auckland_census.csv"))
 census <- census |>
-  select(subset = -c(maori_desc, median_income, born_overseas, PacificNum)) |> 
+  subset(select = -c(maori_desc, median_income, born_overseas, PacificNum)) |> 
   mutate(code = as.character(code)) |> 
   mutate(dampness = as.numeric(dampness)) |> 
   mutate(European = as.numeric(European)) |> 
@@ -92,7 +92,7 @@ sa1_imped <- sa1_imped %>%
 sa1_imped[which(is.na(sa1_imped$dampness),), "dampness"] <- mean(sa1_imped$dampness, na.rm=T)
 sa1_imped[which(is.na(sa1_imped$medianRent),), "medianRent"] <- mean(sa1_imped$medianRent, na.rm=T)
 census <- st_drop_geometry(sa1_imped) |> 
-  subset(select = -c(na.rm))
+  subset(select = -c(na.rm, area.x.x, European,Maori, Pacific, Asian, MiddleEasternLatinAmericanAfrican, OtherEthnicity))
 ##### Diversity ####
 # Compute Diversity Index #
 shannon <- function(p){
@@ -104,7 +104,7 @@ shannon <- function(p){
   H = -sum(p*log(p))
   return (H)
 }
-census$shannon <- apply(census[,13:18], 1, shannon)
+census$shannon <- apply(census[,6:11], 1, shannon)
 sa1_all <- left_join(sa1_base, census, by = c("SA12018_V1_00"="SA12018_V1_00"))
 ##### Crimes ####
 # Compute crime measure
@@ -161,25 +161,35 @@ stconnectivity <- st_read("data/walkability/streetconnectivity.gpkg") |> st_drop
 sa1_all <- left_join(sa1_all, stconnectivity, by = c("SA12018_V1_00"="SA12018_V1_00"))
 
 #### Distances ####
-sa1_dists <- st_read("data/geographic/sa1_alldist_final.gpkg")|> st_drop_geometry()
+sa1_dists <- st_read("data/geographic/sa1_alldist_final.gpkg")|> st_drop_geometry() |> subset(select = -c(dist_marae))
 sa1_all <- left_join(sa1_all, sa1_dists, by = c("SA12018_V1_00"="SA12018_V1_00"))
 
+#add frequent bus stops
 sa1_busfreq <- st_read("data/transport/public_transport/sa1_frequentbuses.gpkg")|> st_drop_geometry()
 sa1_busfreq <- sa1_busfreq |>
   subset(select = c(SA12018_V1_00, dist_busstopsfreq))
 sa1_all <- left_join(sa1_all, sa1_busfreq, by = c("SA12018_V1_00"="SA12018_V1_00"))
 
+# add marae
+sa1_marae <- st_read("data/kiwi/sa1_maraefinal.gpkg")|> st_drop_geometry()
+sa1_marae <- sa1_marae |>
+  subset(select = c(SA12018_V1_00, dist_marae))
+sa1_all <- left_join(sa1_all, sa1_marae, by = c("SA12018_V1_00"="SA12018_V1_00"))
+
+# add other distances
 sa1_restdistances <- st_read("data/geographic/sa1_cafeandrestaurantsandother_andallestnesestDONE.gpkg")|> st_drop_geometry()
 sa1_restdistances <- sa1_restdistances |>
   subset(select = c(SA12018_V1_00, dist_cafe, dist_restaurants, dist_pubs, dist_bbq, dist_gym, dist_beach))
 sa1_all <- left_join(sa1_all, sa1_restdistances, by = c("SA12018_V1_00"="SA12018_V1_00"))
 
+#add bikeability
 sa1_bikeability <- st_read("data/transport/bikeability.gpkg")|> st_drop_geometry()
 sa1_all <- left_join(sa1_all, sa1_bikeability, by = c("SA12018_V1_00"="SA12018_V1_00"))
 
+#join with spatial
 sa1_allg <- left_join(sa1_polys, sa1_all, by=c("SA12018_V1_00"="SA12018_V1_00"))
 sa1_allg <- sa1_allg |> 
-  subset(select = -c(area.x.x))
+  subset(select = -c(area.x.x.x,area.x.x.y))
 
 sa1_allg[which(is.infinite(sa1_allg$dist_stations),), "dist_stations"] <- 100000
 sa1_allg[which(is.infinite(sa1_allg$dist_childcare),), "dist_childcare"] <- 100000
@@ -189,7 +199,7 @@ sa1_allg[which(is.infinite(sa1_allg$dist_gym),), "dist_gym"] <- 100000
 
 # plot
 tm_shape(sa1_allg) +
-  tm_polygons(col="medianRent", lwd=0)
+  tm_polygons(col="dist_restaurants",style="kmeans", lwd=0)
 
 st_write(sa1_allg, "data/geographic/sa1_allvars.gpkg")
 

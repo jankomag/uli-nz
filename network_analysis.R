@@ -52,7 +52,7 @@ busstops <- st_read("data/transport/public_transport/bus_stops_auckland.geojson"
 sa1 <- get_distance(busstops)
 
 #calulate distances to marae
-marae <- st_read("data/kiwi/marae.gpkg") |>
+marae <- st_read("data/kiwi/auckland_marae_final.gpkg") |>
   st_transform(4326)# 27291
 sa1 <- get_distance(marae)
 
@@ -169,8 +169,8 @@ crash <- st_read("data/safety/crash/Crash_Analysis_System_(CAS)_data.geojson") |
   st_transform(4326)# 27291
 sa1 <- get_distance(crash)
 
-#save final
-st_write(sa1, "data/transport/public_transport/sa1_frequentbuses.gpkg")
+#save
+#st_write(sa1, "data/kiwi/sa1_maraefinal.gpkg")
 st_write(sa1, "data/geographic/sa1_alldist_final.gpkg")
 
 sa1done <- st_read("data/geographic/sa1_alldist_final.gpkg")
