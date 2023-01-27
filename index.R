@@ -165,10 +165,10 @@ sa1_all_index <- sa1_all |>
   mutate(bikeability1 = minmaxNORM(Winsorize(bikeBC, minval=-50, maxval = -25))) |> 
   mutate(gym1 = minmaxNORM(-Winsorize(log(dist_gym+0.1), minval=4.5, maxval=10))) |> 
   mutate(beach1 = minmaxNORM(-Winsorize(dist_beach, minval=0, maxval=10000))) |> 
-  mutate(affordability1 = minmaxNORM(-Winsorize(rentBC, minval=0, maxval=2500))) |> 
-  mutate(carInfrastructure1 = minmaxNORM(evch1 + petrol1))
+  mutate(affordability1 = minmaxNORM(-Winsorize(rentBC, minval=0, maxval=2500)))
 
 # second level aggregation - geometric average method
+sa1_all_index$carInfra2_geom <- minmaxNORM(apply(sa1_all_index[,63:64], 1, FUN = a_gmean))
 sa1_all_index$transport2_geom <- minmaxNORM(apply(sa1_all_index[,73:75], 1, FUN = a_gmean))
 sa1_all_index$walkability2_geom <- minmaxNORM(apply(sa1_all_index[,c(65:66,88:89,92)], 1, FUN = a_gmean))
 sa1_all_index$medical2_geom <- minmaxNORM(apply(sa1_all_index[,82:85], 1, FUN = a_gmean))
@@ -225,7 +225,7 @@ sa1_all_index <- sa1_all_index |>
            cafe1 + restaurant1 +  pub1 + bbq1 +
            bigpark1 + smallpark1 + beach1 +
            affordability1 + damp1+
-           carInfrastructure1 + bikeability1) |> 
+           carInfrastructure2_add + bikeability1) |> 
   # KULI aggregation - without 2nd level agg - arithmetic average method
   mutate(kuli_no2s_arithAgg = minmaxNORM01(kuli_addAgg/39)) |> 
   # KULI aggregation - without 2nd level agg - additive method
@@ -252,13 +252,13 @@ a_gmean <- function(x, w = NULL){
   gm
 }
 # KULI aggregation - without 2nd level agg - geometric average method
-sa1_all_index$kuli_no2s_geomAgg <- minmaxNORM(apply(sa1_all_index[,65:103], 1, FUN = a_gmean))
+sa1_all_index$kuli_no2s_geomAgg <- minmaxNORM01(apply(sa1_all_index[,c(65:102,126)], 1, FUN = a_gmean))
 # KULI aggregation - with 2nd level agg(geom) - geometric average method
-sa1_all_index$kuli_geom2s_geomAgg <- minmaxNORM01(apply(sa1_all_index[,104:114], 1, FUN = a_gmean))
+sa1_all_index$kuli_geom2s_geomAgg <- minmaxNORM01(apply(sa1_all_index[,103:114], 1, FUN = a_gmean))
 # KULI aggregation - with 2nd level agg(add) - geometric average method
-sa1_all_index$kuli_add2s_geomAgg <- minmaxNORM01(apply(sa1_all_index[,c(103,115:125)], 1, FUN = a_gmean))
+sa1_all_index$kuli_add2s_geomAgg <- minmaxNORM01(apply(sa1_all_index[,c(115:126)], 1, FUN = a_gmean))
 # KULI aggregation - with 2nd level agg(arith) - geometric average method
-sa1_all_index$kuli_arith2s_geomAgg <- minmaxNORM01(apply(sa1_all_index[,c()], 1, FUN = a_gmean))
+sa1_all_index$kuli_arith2s_geomAgg <- minmaxNORM01(apply(sa1_all_index[,c(127:138)], 1, FUN = a_gmean))
 
 # Evaluate the transformation method of each indicator
 densityplot = function(xpre, xpost, varN) {
@@ -322,16 +322,16 @@ densityplot(dist_gym, gym1, "Gym")
 densityplot(dist_beach, beach1, "Beach")
 densityplot(medianRent, affordability1, "Affordability")
 
-sa1_all_index |>
+index_sa1g |>
   ggplot() +
-  geom_histogram(aes(geom_kuli_subs), bins=300)
+  geom_histogram(aes(kuli_no2s_geomAgg), bins=300)
 
 # rejoin with geometry
 index_sa1g <- left_join(sa1_allg, sa1_all_index, by = c("SA12018_V1_00"="SA12018_V1_00"))
 #walkability1 other1 greenspace1 leisure1 medical1 culture1 education1pt1 safety1
 tmap_mode("plot")
 tm_shape(index_sa1g) +
-  tm_polygons(col = c("kuli_subs_add","kuli_add","kuli_arithm","kuli_geom","kuli_geomSubs_aggGeom","kuli_addSubs_aggGeom"),
+  tm_polygons(col = c("kuli_add2s_geomAgg","kuli_arith2s_geomAgg","kuli_geom2s_geomAgg", "kuli_no2s_geomAgg"),
               palette = "Reds", style = "kmeans", lwd=0)#,
           #breaks = c(0,.1,.3,.6,.7,.8,.95,1))#, title = str_glue('Penalty= {penalty}'))
 st_write(index_sa1g, "data/geographic/sa1_kuli_all.gpkg")
