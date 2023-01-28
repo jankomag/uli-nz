@@ -23,6 +23,7 @@ require(gridExtra)
 library(stargazer)
 library(MASS)
 library(gstat)
+library(ltm)
 
 #### Data imports ####
 # geographic data
@@ -260,6 +261,14 @@ sa1_all_index$kuli_add2s_geomAgg <- minmaxNORM01(apply(sa1_all_index[,c(115:126)
 # KULI aggregation - with 2nd level agg(arith) - geometric average method
 sa1_all_index$kuli_arith2s_geomAgg <- minmaxNORM01(apply(sa1_all_index[,c(127:138)], 1, FUN = a_gmean))
 
+# Reward Points
+reward = 0.05
+sa1_all_index$kuli_no2s_geomAgg_wrewards <- sa1_all_index$kuli_no2s_geomAgg
+sa1_all_index$kuli_no2s_geomAgg_wrewards[sa1_all_index$dist_stations < 1000] <- sa1_all_index$kuli_no2s_geomAgg_wrewards[sa1_all_index$dist_stations < 1000] + reward
+sa1_all_index$kuli_no2s_geomAgg_wrewards[sa1_all_index$dist_busstopsfreq < 300] <- sa1_all_index$kuli_no2s_geomAgg_wrewards[sa1_all_index$dist_busstopsfreq < 300] + reward
+sa1_all_index$kuli_no2s_geomAgg_wrewards[sa1_all_index$dist_bigpark < 800] <- sa1_all_index$kuli_no2s_geomAgg_wrewards[sa1_all_index$dist_bigpark < 800] + reward
+sa1_all_index$kuli_no2s_geomAgg_wrewards <- minmaxNORM01(sa1_all_index$kuli_no2s_geomAgg_wrewards)
+
 # Evaluate the transformation method of each indicator
 densityplot = function(xpre, xpost, varN) {
   xpre <- deparse(substitute(xpre))
@@ -279,7 +288,13 @@ densityplot = function(xpre, xpost, varN) {
     geom_histogram(aes(sa1_all_index[[xpost]]), bins=70) + theme_publish() +
     xlab(varN) + ylab("Density") + ggtitle("Post Transformation") +
     theme(plot.title = element_text(hjust = 0.5))
+  # save as png image in specific directory with 600*350 resolution
+  png(file=str_glue("outputs/distributions/distributions_{xpost}.png"),
+      width=1000, height=400)
+  # a histogram we want to save
   grid.arrange(pre_out, post_out, ncol=2)
+  # a function call to save the file
+  dev.off()
 }
 densityplot(dist_stations, station1, "Train Station")
 densityplot(dist_busstops, bustop1, "Bus Stop")
@@ -322,24 +337,32 @@ densityplot(dist_gym, gym1, "Gym")
 densityplot(dist_beach, beach1, "Beach")
 densityplot(medianRent, affordability1, "Affordability")
 
-index_sa1g |>
-  ggplot() +
-  geom_histogram(aes(kuli_no2s_geomAgg), bins=300)
-
 # rejoin with geometry
 index_sa1g <- left_join(sa1_allg, sa1_all_index, by = c("SA12018_V1_00"="SA12018_V1_00"))
 #walkability1 other1 greenspace1 leisure1 medical1 culture1 education1pt1 safety1
 tmap_mode("plot")
 tm_shape(index_sa1g) +
-  tm_polygons(col = c("kuli_add2s_geomAgg","kuli_arith2s_geomAgg","kuli_geom2s_geomAgg", "kuli_no2s_geomAgg"),
+  tm_polygons(col = c("kuli_no2s_geomAgg_wrewards", "kuli_no2s_geomAgg"),
               palette = "Reds", style = "kmeans", lwd=0)#,
           #breaks = c(0,.1,.3,.6,.7,.8,.95,1))#, title = str_glue('Penalty= {penalty}'))
+index_sa1g |> ggplot() + geom_histogram(aes(c(kuli_no2s_geomAgg)),bins=300)
+index_sa1g |> ggplot() + geom_histogram(aes(c(kuli_no2s_geomAgg_wrewards)),bins=300)
 st_write(index_sa1g, "data/geographic/sa1_kuli_all.gpkg")
 
 # "walkability2", "carInfrastructure1","bikeability1","greenspace2","leisure2","medical2","culture2","education2","transport2", "safety2", "food2", "housing2"
 tm_shape(index_sa1g) +
   tm_polygons(col = c("transport2_add","transport2_geom"),
               palette = "Reds", style = "kmeans", lwd=0)
+
+#### EDA2 ####
+df_indicators <- sa1_all_index[,c(65:102,126)]
+# Cronbach Alpha #
+cronbach.alpha(df_indicators)
+# Correlations #
+cor <- cor(x = df_indicators, y = df_indicators, use="complete.obs")
+corrplot(cor, tl.srt = 25)
+corr <- rcorr(as.matrix(df_indicators))
+flattenCorrMatrix(corr$r, corr$P)
 
 #### Other ####
 # lambdas
