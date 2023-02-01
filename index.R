@@ -262,7 +262,7 @@ sa1_all_index$kuli_add2s_geomAgg <- minmaxNORM01(apply(sa1_all_index[,c(115:126)
 sa1_all_index$kuli_arith2s_geomAgg <- minmaxNORM01(apply(sa1_all_index[,c(127:138)], 1, FUN = a_gmean))
 
 # Reward Points
-reward = 0.05
+reward = 0.025
 sa1_all_index$kuli_no2s_geomAgg_wrewards <- sa1_all_index$kuli_no2s_geomAgg
 sa1_all_index$kuli_no2s_geomAgg_wrewards[sa1_all_index$dist_stations < 1000] <- sa1_all_index$kuli_no2s_geomAgg_wrewards[sa1_all_index$dist_stations < 1000] + reward
 sa1_all_index$kuli_no2s_geomAgg_wrewards[sa1_all_index$dist_busstopsfreq < 300] <- sa1_all_index$kuli_no2s_geomAgg_wrewards[sa1_all_index$dist_busstopsfreq < 300] + reward
@@ -295,6 +295,7 @@ densityplot = function(xpre, xpost, varN) {
   grid.arrange(pre_out, post_out, ncol=2)
   # a function call to save the file
   dev.off()
+  grid.arrange(pre_out, post_out, ncol=2)
 }
 densityplot(dist_stations, station1, "Train Station")
 densityplot(dist_busstops, bustop1, "Bus Stop")
