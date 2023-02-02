@@ -88,6 +88,26 @@ minmaxNORM01 <- function(x) {
 minmaxNORM1max <- function(x) {
   return (((x - min(x))) / (max(x) - min(x))*(max(x)-0.0001)+0.0001)
 }
+#Geometric Mean
+a_gmean <- function(x, w = NULL){
+  if(is.null(w)){
+    # default equal weights
+    w <- rep(1,length(x))
+    #message("No weights specified for geometric mean, using equal weights.")
+  }
+  if(any(!is.na(x))){
+    if(any((x <= 0), na.rm = TRUE)){
+      stop("Negative or zero values found when applying geometric mean. This doesn't work because geometric
+         mean uses log. Normalise to remove negative/zero values first or use another aggregation method.")}
+    # have to set any weights to NA to correspond to NAs in x
+    w[is.na(x)] <- NA
+    # calculate geom mean
+    gm <- exp( sum(w * log(x), na.rm = TRUE)/sum(w, na.rm = TRUE) )
+  } else {
+    gm <- NA
+  }
+  gm
+}
 
 # testing box cox transformation - no function
 b <- boxcox(lm(((dist_childcare+0.1)) ~ 1, data=sa1_all))
@@ -96,10 +116,16 @@ sa1_alltest <- sa1_all |>
   mutate(testvar = ((dist_childcare+0.1) ^ lambda - 1) / lambda)
 sa1_all |>
   ggplot() +
-  geom_histogram(aes(dist_childcare+0.1), bins=1000)
+  geom_histogram(aes(log(popdens)), bins=1000)
 sa1_alltest |>
   ggplot() +
   geom_histogram(aes((testvar)), bins=400)
+sa1_all_index |>
+  ggplot() +
+  geom_histogram(aes(Winsorize(log(popdens+0.0001), maxval = -2, minval = -10)), bins=100)
+sa1_all_index |>
+  ggplot() +
+  geom_histogram(aes((log(popdens+0.0001))), bins=100)
 
 # optimised lambda values for chosen variables
 lambdaFlood <- -0.06060606
@@ -129,8 +155,8 @@ sa1_all_index <- sa1_all |>
   mutate(bikeBC = ((bikeperarea+0.1) ^ lambdabike - 1) / lambdabike) |> 
   mutate(petrol1 = minmaxNORM(-Winsorize(petrolBC, minval=1, maxval = 80))) |>
   mutate(evch1 = minmaxNORM(-(evchBC))) |> 
-  mutate(housedens1 = minmaxNORM(Winsorize(log10(househdens), maxval = -2, minval = -4))) |> 
-  mutate(popdens1 = minmaxNORM(Winsorize(log10(popdens), maxval = -1, minval = -4))) |>
+  mutate(housedens1 = minmaxNORM(Winsorize(log(househdens+0.0001), maxval = -4, minval = -10))) |> 
+  mutate(popdens1 = minmaxNORM(Winsorize(log(popdens+0.0001), maxval = -2, minval = -10))) |>
   mutate(damp1 = minmaxNORM(-Winsorize(dampness, maxval = 0.5, minval = 0))) |>
   mutate(diversity1 = minmaxNORM(shannon)) |>
   mutate(crime1 = minmaxNORM(-Winsorize(log(crime_perarea), minval=-11, maxval=-5))) |> 
@@ -231,27 +257,7 @@ sa1_all_index <- sa1_all_index |>
   mutate(kuli_no2s_arithAgg = minmaxNORM01(kuli_addAgg/39)) |> 
   # KULI aggregation - without 2nd level agg - additive method
   mutate(kuli_no2s_addAgg = minmaxNORM01(kuli_addAgg))
-  
-#Geometric Mean
-a_gmean <- function(x, w = NULL){
-  if(is.null(w)){
-    # default equal weights
-    w <- rep(1,length(x))
-    #message("No weights specified for geometric mean, using equal weights.")
-  }
-  if(any(!is.na(x))){
-    if(any((x <= 0), na.rm = TRUE)){
-      stop("Negative or zero values found when applying geometric mean. This doesn't work because geometric
-         mean uses log. Normalise to remove negative/zero values first or use another aggregation method.")}
-    # have to set any weights to NA to correspond to NAs in x
-    w[is.na(x)] <- NA
-    # calculate geom mean
-    gm <- exp( sum(w * log(x), na.rm = TRUE)/sum(w, na.rm = TRUE) )
-  } else {
-    gm <- NA
-  }
-  gm
-}
+
 # KULI aggregation - without 2nd level agg - geometric average method
 sa1_all_index$kuli_no2s_geomAgg <- minmaxNORM01(apply(sa1_all_index[,c(65:102,126)], 1, FUN = a_gmean))
 # KULI aggregation - with 2nd level agg(geom) - geometric average method
