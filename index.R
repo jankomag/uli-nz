@@ -24,6 +24,7 @@ library(stargazer)
 library(MASS)
 library(gstat)
 library(ltm)
+library(Compind)
 
 #### Data imports ####
 # geographic data
@@ -267,6 +268,10 @@ sa1_all_index$kuli_add2s_geomAgg <- minmaxNORM01(apply(sa1_all_index[,c(115:126)
 # KULI aggregation - with 2nd level agg(arith) - geometric average method
 sa1_all_index$kuli_arith2s_geomAgg <- minmaxNORM01(apply(sa1_all_index[,c(127:138)], 1, FUN = a_gmean))
 
+
+# KULI aggregation - without 2nd level agg - MPI aggregation method
+kuli_MPI <- ci_mpi(sa1_all_index,c(65:102,126),penalty="POS")
+sa1_all_index$kuli_no2s_MPIAgg <- minmaxNORM01(kuli_MPI$ci_mpi_est)
 # Reward Points
 reward = 0.025
 sa1_all_index$kuli_no2s_geomAgg_wrewards <- sa1_all_index$kuli_no2s_geomAgg
@@ -349,9 +354,10 @@ index_sa1g <- left_join(sa1_allg, sa1_all_index, by = c("SA12018_V1_00"="SA12018
 #walkability1 other1 greenspace1 leisure1 medical1 culture1 education1pt1 safety1
 tmap_mode("plot")
 tm_shape(index_sa1g) +
-  tm_polygons(col = c("kuli_no2s_geomAgg_wrewards", "kuli_no2s_geomAgg"),
-              palette = "Reds", style = "kmeans", lwd=0)#,
+  tm_polygons(col = c("kuli_no2s_MPIAgg", "kuli_no2s_geomAgg"),
+              palette = "Reds", style = "kmeans", lwd=0, )#,
           #breaks = c(0,.1,.3,.6,.7,.8,.95,1))#, title = str_glue('Penalty= {penalty}'))
+index_sa1g |> ggplot() + geom_histogram(aes(c(kuli_no2s_MPIAgg)),bins=300)
 index_sa1g |> ggplot() + geom_histogram(aes(c(kuli_no2s_geomAgg)),bins=300)
 index_sa1g |> ggplot() + geom_histogram(aes(c(kuli_no2s_geomAgg_wrewards)),bins=300)
 st_write(index_sa1g, "data/geographic/sa1_kuli_all.gpkg")
