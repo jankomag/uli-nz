@@ -35,7 +35,7 @@ library(spatialreg)
 # load the kuli data
 kuli = st_read('data/geographic/sa1_kuli_all.gpkg', quiet = T) # transform to OSGB projection
 kuli <- kuli |> 
-  subset(select = c(SA12018_V1_00, kuli_no2s_geomAgg_wrewards)) |> st_transform(27291)
+  subset(select = c(SA12018_V1_00, kuli_no2s_MPIAgg)) |> st_transform(27291)
 
 sa1_polys <- kuli |>
   subset(select = c(SA12018_V1_00))
@@ -127,9 +127,9 @@ dfg <- left_join(sa1_imped, kulinong, by = c("SA12018_V1_00"="SA12018_V1_00"))
 df <- st_drop_geometry(dfg)
 summary(dfg)
 #### EDA ####
-cor <- cor(x = df[2:13], y = df[2:13], use="complete.obs")
+cor <- cor(x = df[3:13], y = df[3:13], use="complete.obs")
 corrplot(cor, tl.srt = 25)
-corr <- rcorr(as.matrix(df[2:13]))
+corr <- rcorr(as.matrix(df[3:13]))
 
 # function to make correlation matrix§-
 flattenCorrMatrix <- function(cormat, pmat) {
@@ -149,7 +149,7 @@ corrmatrix <- corrmatrix |>
   filter(row == 'income')
 
 # plot correlations
-df[2:13] |>
+df[3:13] |>
   gather(-kuli_no2s_geomAgg_wrewards, key = "var", value = "value") |> 
   ggplot(aes(x = kuli_no2s_geomAgg_wrewards, y = value)) +
   facet_wrap(~ var, scales = "free") +
@@ -158,7 +158,7 @@ df[2:13] |>
   geom_smooth(method="lm")
 
 #### OLS model ####
-formula = as.formula(kuli_no2s_geomAgg_wrewards ~ medianIncome + bornOverseas + privateTransporTtoWork +
+formula = as.formula(kuli_no2s_MPIAgg ~ medianIncome + bornOverseas + privateTransporTtoWork +
                        PTtoWork + cycleToWork + noCar + carsPerPreson + PrEuropeanDesc + PrMaoriDesc) # construct the OLS model
 m = lm(formula, data = df)
 summary(m)
@@ -169,7 +169,7 @@ summary(m)
 step.res = stepAIC(m, trace = 0)
 summary(step.res)
 
-stargazer(m, flip=F, type="text", style="qje", single.row = F)
+stargazer(m, flip=F, type="latex", single.row = F, style="qje")
 #### Autocorrelation ####
 ##### Moran's I####
 g.nb <- poly2nb(dfg)
@@ -186,32 +186,32 @@ g.nb[[6926]] = as.integer(4256)
 
 g.lw = nb2listw(g.nb)
 #plot spatially lagged mean
-dfg$lagged.means <- lag.listw(g.lw, dfg$kuli_no2s_geomAgg_wrewards)
+dfg$lagged.means <- lag.listw(g.lw, dfg$kuli_no2s_MPIAgg)
 tm_shape(dfg) + 
   tm_polygons(col='lagged.means', 
               title='KULI',
               palette = "YlGnBu", lwd=0, style="kmeans")
 
 # moran scatterplot
-ggplot(data = dfg, aes(x = kuli_no2s_geomAgg_wrewards, y = lagged.means)) +
+ggplot(data = dfg, aes(x = kuli_no2s_MPIAgg, y = lagged.means)) +
   geom_point(shape = 1, alpha = 0.5) +
   geom_hline(yintercept = mean(dfg$lagged.means), lty = 2) +
-  geom_vline(xintercept = mean(dfg$kuli_no2s_geomAgg), lty = 2) +
+  geom_vline(xintercept = mean(dfg$kuli_no2s_MPIAgg), lty = 2) +
   geom_abline() +
   coord_equal()
 # create and assign the Moran plot - with more details
-moran.plot(x = dfg$kuli_no2s_geomAgg, listw = g.lw)
+moran.plot(x = dfg$kuli_no2s_MPIAgg, listw = g.lw)
 # get Moran's I statistic
-moran.test(x = dfg$kuli_no2s_geomAgg, listw = g.lw) 
+moran.test(x = dfg$kuli_no2s_MPIAgg, listw = g.lw) 
 # normlaise Moran's I to interpret
 moran.range <- function(lw) {
   wmat <- listw2mat(lw)
   return(range(eigen((wmat + t(wmat))/ 2) $values))
 } 
-#moran.range(g.lw)
+moran.range(g.lw)
 ##### LISA ####
 # note how the result is assigned directly to gb
-dfg$lI <- localmoran(x = dfg$kuli_no2s_geomAgg_wrewards, listw = g.lw)[, 1] 
+dfg$lI <- localmoran(x = dfg$kuli_no2s_MPIAgg, listw = g.lw)[, 1] 
 # create the map
 p1 = tm_shape(dfg) +
   tm_polygons(col= 'lI',title= "Local Moran's I", lwd = 0,
@@ -219,7 +219,7 @@ p1 = tm_shape(dfg) +
   tm_style('col_blind') +
   tm_layout(legend.position = c("left", "top")) + tm_layout(frame = F)
 # print the map
-dfg$localmoranpval <- localmoran(dfg$kuli_no2s_geomAgg_wrewards,g.lw)[, 5]
+dfg$localmoranpval <- localmoran(dfg$kuli_no2s_MPIAgg,g.lw)[, 5]
 # create the map
 mypalette = c("#31A354", "#A1D99B","#E5F5E0", "lightgrey")
 p2 = tm_shape(dfg) +
@@ -228,7 +228,7 @@ p2 = tm_shape(dfg) +
               palette = mypalette) +
   tm_layout(legend.position = c("left", "top")) + tm_layout(frame = F) 
 #plot all 3
-p0 = tm_shape(dfg) + tm_fill("kuli_no2s_geomAgg_wrewards") +
+p0 = tm_shape(dfg) + tm_fill("kuli_no2s_MPIAgg") +
   tm_layout(legend.position = c("left", "top")) 
 tmap_arrange(p0, p1, p2,ncol = 3)
 # outline significant pvals as borders

@@ -273,12 +273,11 @@ sa1_all_index$kuli_arith2s_geomAgg <- minmaxNORM01(apply(sa1_all_index[,c(127:13
 kuli_MPI <- ci_mpi(sa1_all_index,c(65:102,126),penalty="POS")
 sa1_all_index$kuli_no2s_MPIAgg <- minmaxNORM01(kuli_MPI$ci_mpi_est)
 # Reward Points
-reward = 0.025
+reward = 0.1
 sa1_all_index$kuli_no2s_geomAgg_wrewards <- sa1_all_index$kuli_no2s_geomAgg
-sa1_all_index$kuli_no2s_geomAgg_wrewards[sa1_all_index$dist_stations < 1000] <- sa1_all_index$kuli_no2s_geomAgg_wrewards[sa1_all_index$dist_stations < 1000] + reward
-sa1_all_index$kuli_no2s_geomAgg_wrewards[sa1_all_index$dist_busstopsfreq < 300] <- sa1_all_index$kuli_no2s_geomAgg_wrewards[sa1_all_index$dist_busstopsfreq < 300] + reward
-sa1_all_index$kuli_no2s_geomAgg_wrewards[sa1_all_index$dist_bigpark < 800] <- sa1_all_index$kuli_no2s_geomAgg_wrewards[sa1_all_index$dist_bigpark < 800] + reward
-sa1_all_index$kuli_no2s_geomAgg_wrewards <- minmaxNORM01(sa1_all_index$kuli_no2s_geomAgg_wrewards)
+sa1_all_index$kuli_no2s_MPIAgg_wrewards <- sa1_all_index$kuli_no2s_MPIAgg
+sa1_all_index$kuli_no2s_geomAgg_wrewards[sa1_all_index$dist_stations < 1000 & sa1_all_index$dist_busstopsfreq < 300 & sa1_all_index$dist_bigpark < 800] <- minmaxNORM01(sa1_all_index$kuli_no2s_geomAgg_wrewards[sa1_all_index$dist_stations < 1000 & sa1_all_index$dist_busstopsfreq < 300 & sa1_all_index$dist_bigpark < 800] + reward)
+sa1_all_index$kuli_no2s_MPIAgg_wrewards[sa1_all_index$dist_stations < 1000 & sa1_all_index$dist_busstopsfreq < 300 & sa1_all_index$dist_bigpark < 800] <- minmaxNORM01(sa1_all_index$kuli_no2s_MPIAgg_wrewards[sa1_all_index$dist_stations < 1000 & sa1_all_index$dist_busstopsfreq < 300 & sa1_all_index$dist_bigpark < 800] + reward)
 
 # Evaluate the transformation method of each indicator
 densityplot = function(xpre, xpost, varN) {
@@ -293,15 +292,27 @@ densityplot = function(xpre, xpost, varN) {
   
   pre_out = ggplot() +
     geom_histogram(aes(sa1_all_index[[xpre]]), bins=70) + theme_publish() +
-    xlab(varN) + ylab("Density") + ggtitle("Pre Transformation") +
-    theme(plot.title = element_text(hjust = 0.5))
+    ggtitle("Pre") +
+    theme(plot.title = element_text(hjust = 0.5),
+          axis.title.x=element_blank(),
+          axis.text.x=element_blank(),
+          axis.ticks.x=element_blank(),
+          axis.title.y=element_blank(),
+          axis.text.y=element_blank(),
+          axis.ticks.y=element_blank()) #ylab("Density") + xlab(varN) + xlab(varN)
   post_out = ggplot() +
     geom_histogram(aes(sa1_all_index[[xpost]]), bins=70) + theme_publish() +
-    xlab(varN) + ylab("Density") + ggtitle("Post Transformation") +
-    theme(plot.title = element_text(hjust = 0.5))
+    ggtitle("Post") +
+    theme(plot.title = element_text(hjust = 0.5),
+          axis.title.x=element_blank(),
+          axis.text.x=element_blank(),
+          axis.ticks.x=element_blank(),
+          axis.title.y=element_blank(),
+          axis.text.y=element_blank(),
+          axis.ticks.y=element_blank())
   # save as png image in specific directory with 600*350 resolution
   png(file=str_glue("outputs/distributions/distributions_{xpost}.png"),
-      width=1000, height=400)
+      width=300, height=100)
   # a histogram we want to save
   grid.arrange(pre_out, post_out, ncol=2)
   # a function call to save the file
@@ -354,7 +365,7 @@ index_sa1g <- left_join(sa1_allg, sa1_all_index, by = c("SA12018_V1_00"="SA12018
 #walkability1 other1 greenspace1 leisure1 medical1 culture1 education1pt1 safety1
 tmap_mode("plot")
 tm_shape(index_sa1g) +
-  tm_polygons(col = c("kuli_no2s_MPIAgg", "kuli_no2s_geomAgg"),
+  tm_polygons(col = c("kuli_no2s_MPIAgg", "kuli_no2s_geomAgg", "kuli_no2s_geomAgg_wrewards", "kuli_no2s_MPIAgg_wrewards"),
               palette = "Reds", style = "kmeans", lwd=0, )#,
           #breaks = c(0,.1,.3,.6,.7,.8,.95,1))#, title = str_glue('Penalty= {penalty}'))
 index_sa1g |> ggplot() + geom_histogram(aes(c(kuli_no2s_MPIAgg)),bins=300)
