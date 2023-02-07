@@ -30,6 +30,8 @@ library(rgdal)
 library(rgeos)
 library(stargazer)
 library(spatialreg)
+library(rgeoda)
+library(geosphere)
 
 #### Loading data ####
 # load the kuli data
@@ -174,16 +176,6 @@ stargazer(m, flip=F, type="latex", single.row = F, style="qje")
 ##### Moran's I####
 g.nb <- poly2nb(dfg)
 
-# examine zero links locations
-dfg$rn = rownames(dfg) 
-dfg[dfg$rn == 6926,]
-
-## edit the islands
-g.nb[[1773]] = as.integer(4245)
-g.nb[[3980]] = as.integer(3981)
-g.nb[[4228]] = as.integer((c(4256,4229)))
-g.nb[[6926]] = as.integer(4256)
-
 g.lw = nb2listw(g.nb)
 #plot spatially lagged mean
 dfg$lagged.means <- lag.listw(g.lw, dfg$kuli_no2s_MPIAgg)
@@ -208,8 +200,91 @@ moran.range <- function(lw) {
   wmat <- listw2mat(lw)
   return(range(eigen((wmat + t(wmat))/ 2) $values))
 } 
-moran.range(g.lw)
+#moran.range(g.lw)
+
+# Moran's I at different distances
+start <- 0 # Starting distance in meters (the From)
+end <- 5000 # Ending distance in meters (the To)
+incr <- 200 # Distance increment (which also defines the annulus width)
+incr.v <- seq(start, end, incr)
+s.center <- st_point_on_surface(dfg)
+s.coord <- st_coordinates(s.center)
+# Define empty vector elements to store the I and p-values
+morI.mc <- vector()
+sign.mc <- vector()
+
+# Loop through each distance band
+for (i in (2:length(incr.v))) {
+  s.dist <- dnearneigh(s.coord, incr.v[i - 1], incr.v[i])
+  s.lw <- nb2listw(s.dist, style = "W", zero.policy=T)
+  s.mor <- moran.mc(dfg$kuli_no2s_MPIAgg, s.lw, nsim=599, zero.policy = TRUE)
+  sign.mc[i] <- s.mor$p.value
+  morI.mc[i] <- s.mor$statistic
+}
+
+# Modify p-value to reflect extremes at each end
+sign.mc <- ifelse(sign.mc > 0.5, 1 - sign.mc, sign.mc)
+# First, generate an empty plot
+plot(morI.mc ~ eval(incr.v - incr * 0.5), type = "n", ann = FALSE, axes = FALSE)
+
+# Set the background plot to grey then add white grids
+u <- par("usr") # Get plot are coordinates
+rect(u[1], u[3], u[2], u[4], col = "#EEEEEE", border = NA)
+axis(1, lab = ((incr.v) / 1000), at = (incr.v), tck = 1, col = "#FFFFFF", lty = 1)
+axis(2, tck = 1, col = "#FFFFFF", lty = 1, labels = FALSE)
+
+# Add the theoretical "no autocorelation" line
+abline(h = -1 / (length(dfg$kuli_no2s_MPIAgg)), col = "grey20")
+
+# Add the plot to the canvas
+par(new = TRUE)
+plot(morI.mc ~ eval(incr.v - incr * 0.5),
+     type = "b", xaxt = "n", las = 1,
+     xlab = "Distance (km)", ylab = "Moran's I")
+points(morI.mc ~ eval(incr.v - incr * 0.5), 
+       col = ifelse(sign.mc < 0.01, "red", "grey"), 
+       pch = 16, cex = 2.0)
+
+# Add numeric values to points
+text(eval(incr.v - incr * 0.5), morI.mc, round(sign.mc,3), pos = 3, cex = 0.5)
+
 ##### LISA ####
+# Tutorial #
+local <- localmoran(x = dfg$kuli_no2s_MPIAgg, listw = g.lw)
+moran.map <- cbind(dfg, local)
+
+tm_shape(moran.map) +
+  tm_fill(col = "Ii",
+          style = "quantile",
+          title = "local moran statistic") 
+
+quadrant <- vector(mode="numeric",length=nrow(local))
+
+# centers the variable of interest around its mean
+m.qualification <- dfg$kuli_no2s_MPIAgg - mean(dfg$kuli_no2s_MPIAgg)     
+
+# centers the local Moran's around the mean
+m.local <- local[,1] - mean(local[,1])    
+
+# significance threshold
+signif <- 0.2
+
+# builds a data quadrant
+quadrant[m.qualification >0 & m.local>0] <- 4  
+quadrant[m.qualification <0 & m.local<0] <- 1      
+quadrant[m.qualification <0 & m.local>0] <- 2
+quadrant[m.qualification >0 & m.local<0] <- 3
+quadrant[local[,5]>signif] <- 0   
+
+# plot in r
+brks <- c(0,1,2,3,4)
+colors <- c("white","blue",rgb(0,0,1,alpha=0.4),rgb(1,0,0,alpha=0.4),"red")
+plot(dfg,border="lightgray",col=colors[findInterval(quadrant,brks,all.inside=FALSE)])
+box()
+legend("bottomleft", legend = c("insignificant","low-low","low-high","high-low","high-high"),
+       fill=colors,bty="n")
+
+### from LEEDS UNI ###
 # note how the result is assigned directly to gb
 dfg$lI <- localmoran(x = dfg$kuli_no2s_MPIAgg, listw = g.lw)[, 1] 
 # create the map
@@ -236,6 +311,28 @@ index  = dfg$localmoranpval <= 0.05
 p0 + tm_shape(dfg[index,]) + tm_borders(lwd=0.5)
 
 ##### Getis Ord ####
+# tutorial
+local_g <- localG(dfg$kuli_no2s_MPIAgg, g.lw)
+local_g <- cbind(dfg, as.matrix(local_g))
+names(local_g)[6] <- "gstat"
+tm_shape(local_g) + 
+  tm_fill("gstat", 
+          palette = "RdBu",
+          style = "pretty", lwd=0) +
+  tm_borders(alpha=.4)
+# other 
+fips <- order(dfg$kuli_no2s_MPIAgg)
+gi.fixed <- localG(dfg$kuli_no2s_MPIAgg, g.lw)
+hunan.gi <- cbind(dfg, as.matrix(gi.fixed))
+#names(hunan.gi)[16] <- "gstat"
+tm_shape(hunan.gi) +
+  tm_fill(col = "as.matrix.gi.fixed.", 
+          style = "pretty",
+          palette="-RdBu",
+          title = "local Gi", lwd=0) +
+  tm_borders(alpha = 0.5)
+
+#### LEEDS class ###
 g.nb2 <- dnearneigh(st_centroid(dfg), 0, 1000)
 g.nb2
 
@@ -274,6 +371,18 @@ tm_shape(dfg) +
   tm_polygons(col= 'gstat',title= "G Statistic", lwd = 0.01, 
               legend.format=list (flag= "+"), palette = "RdBu", midpoint = 0) + 
   tm_layout(frame = F)
+
+#### Clustering ####
+cents <- st_centroid(dfg[3:13])
+D0 <- distm(cents) # the socio-economic distances
+tree <- hclustgeo(D0)
+plot(tree,hang = -1, label = FALSE, 
+     xlab = "", sub = "",
+     main = "Ward dendrogram with D0 only")
+
+rect.hclust(tree ,k = 5, border = c(4,5,3,2,1))
+legend("topright", legend = paste("cluster",1:5), 
+       fill=1:5,bty= "n", border = "white")
 
 #### Spatial Econometric models ####
 #st_write(dfg, "data/geographic/sa1_analysis_kuli.gpkg")
