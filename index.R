@@ -104,6 +104,7 @@ a_gmean <- function(x, w = NULL){
     w[is.na(x)] <- NA
     # calculate geom mean
     gm <- exp( sum(w * log(x), na.rm = TRUE)/sum(w, na.rm = TRUE) )
+    #mygm <- prod(x)^1/39
   } else {
     gm <- NA
   }
@@ -111,22 +112,23 @@ a_gmean <- function(x, w = NULL){
 }
 
 # testing box cox transformation - no function
-b <- boxcox(lm(((dist_childcare+0.1)) ~ 1, data=sa1_all))
+b <- boxcox(lm(((dist_emergency+0.0001)) ~ 1, data=sa1_all))
 lambda <- b$x[which.max(b$y)]
 sa1_alltest <- sa1_all |> 
-  mutate(testvar = ((dist_childcare+0.1) ^ lambda - 1) / lambda)
+  mutate(testvar = ((dist_emergency+0.0001) ^ lambda - 1) / lambda)
 sa1_all |>
   ggplot() +
-  geom_histogram(aes(log(popdens)), bins=1000)
+  geom_histogram(aes(log(dist_emergency)), bins=400)
 sa1_alltest |>
   ggplot() +
-  geom_histogram(aes((testvar)), bins=400)
-sa1_all_index |>
+  geom_histogram(aes(Winsorize(testvar, minval = 0,maxval=90)), bins=400)
+
+sa1_all |>
   ggplot() +
-  geom_histogram(aes(Winsorize(log(popdens+0.0001), maxval = -2, minval = -10)), bins=100)
-sa1_all_index |>
+  geom_histogram(aes(dist_emergency), bins=100)
+sa1_all |>
   ggplot() +
-  geom_histogram(aes((log(popdens+0.0001))), bins=100)
+  geom_histogram(aes(log(dist_emergency)), bins=100)
 
 # optimised lambda values for chosen variables
 lambdaFlood <- -0.06060606
@@ -140,6 +142,7 @@ lambdaev <- 0.6262626
 lambdapubs <- 0.3434343
 lambdabike <- -2
 lambdarent <- 1.151515
+lambdaemergency <- 0.4646465
 ##### Custom Transformation of each variable ##### original no box-cox
 sa1_all_index <- sa1_all |> 
   mutate(househdens = no_households/area) |> 
@@ -154,6 +157,7 @@ sa1_all_index <- sa1_all |>
   mutate(secondaryBC = ((dist_secondary+0.1) ^ lambdasecond - 1) / lambdasecond) |> 
   mutate(primaryBC = ((dist_primary+0.1) ^ lambdaprimary - 1) / lambdaprimary) |> 
   mutate(bikeBC = ((bikeperarea+0.1) ^ lambdabike - 1) / lambdabike) |> 
+  mutate(emergencyBC = ((dist_emergency+0.1) ^ lambdaemergency - 1) / lambdaemergency) |> 
   mutate(petrol1 = minmaxNORM(-Winsorize(petrolBC, minval=1, maxval = 80))) |>
   mutate(evch1 = minmaxNORM(-(evchBC))) |> 
   mutate(housedens1 = minmaxNORM(Winsorize(log(househdens+0.0001), maxval = -4, minval = -10))) |> 
@@ -193,7 +197,8 @@ sa1_all_index <- sa1_all |>
   mutate(bikeability1 = minmaxNORM(Winsorize(bikeBC, minval=-50, maxval = -25))) |> 
   mutate(gym1 = minmaxNORM(-Winsorize(log(dist_gym+0.1), minval=4.5, maxval=10))) |> 
   mutate(beach1 = minmaxNORM(-Winsorize(dist_beach, minval=0, maxval=10000))) |> 
-  mutate(affordability1 = minmaxNORM(-Winsorize(rentBC, minval=0, maxval=2500)))
+  mutate(affordability1 = minmaxNORM(-Winsorize(rentBC, minval=0, maxval=2500))) |> 
+  mutate(emergency1 = minmaxNORM(-Winsorize(emergencyBC, minval=0, maxval=90)))
 
 # second level aggregation - geometric average method
 sa1_all_index$carInfra2_geom <- minmaxNORM(apply(sa1_all_index[,63:64], 1, FUN = a_gmean))
@@ -215,7 +220,7 @@ sa1_all_index <- sa1_all_index |>
   mutate(walkability2_add = minmaxNORM(popdens1 + housedens1 +convstor1 + supermarket1 + strconnectivity1)) |> 
   mutate(medical2_add = minmaxNORM(chemist1 + dentist1 + healthcr1 + hospital1)) |> 
   mutate(education2_add = minmaxNORM(secondary1 + primary1 + childcare1)) |> 
-  mutate(safety2_add = minmaxNORM(crime1 + crashes1 + flood1 + alcohol1)) |> 
+  mutate(safety2_add = minmaxNORM(crime1 + crashes1 + flood1 + alcohol1 + emergency1)) |> 
   mutate(transport2_add = minmaxNORM(station1 + bustop1 +freqbusstop1)) |> 
   mutate(culture2_add = minmaxNORM(diversity1+marae1)) |> 
   mutate(sport2_add = minmaxNORM(sport1 + gym1)) |> 
@@ -225,18 +230,18 @@ sa1_all_index <- sa1_all_index |>
   mutate(housing2_add = minmaxNORM(affordability1 + damp1)) |> 
   mutate(carInfrastructure2_add = minmaxNORM(evch1 + petrol1)) |> 
   # second level aggregation - arithmetic average method
-  mutate(walkability2_mean = (popdens1 + housedens1 +convstor1 + supermarket1 + strconnectivity1)/5) |> 
-  mutate(medical2_mean = (chemist1 + dentist1 + healthcr1 + hospital1)/4) |> 
-  mutate(education2_mean = (secondary1 + primary1 + childcare1)/3) |> 
-  mutate(safety2_mean = (crime1 + crashes1 + flood1 + alcohol1)/4) |> 
-  mutate(transport2_mean = (station1 + bustop1 +freqbusstop1)/3) |> 
-  mutate(culture2_mean = (diversity1+marae1)/2) |> 
-  mutate(sport2_mean = (sport1 + gym1)/2) |> 
-  mutate(leisure2_mean = (cinema1 + gallery1 +  library1 + museum1 + theatre1)/5) |> 
-  mutate(food2_mean = (cafe1 + restaurant1 +  pub1 + bbq1)/4) |> 
-  mutate(greenspace2_mean = (bigpark1 + smallpark1 + beach1)/3) |> 
-  mutate(housing2_mean = (affordability1 + damp1)/2) |> 
-  mutate(carInfrastructure2_mean = (evch1 + petrol1)/2) |> 
+  mutate(walkability2_mean = (popdens1 + housedens1 +convstor1 + supermarket1 + strconnectivity1)/45) |> 
+  mutate(medical2_mean = (chemist1 + dentist1 + healthcr1 + hospital1)/36) |> 
+  mutate(education2_mean = (secondary1 + primary1 + childcare1)/27) |> 
+  mutate(safety2_mean = (crime1 + crashes1 + flood1 + alcohol1 + emergency1)/45) |> 
+  mutate(transport2_mean = (station1 + bustop1 +freqbusstop1)/27) |> 
+  mutate(culture2_mean = (diversity1+marae1)/18) |> 
+  mutate(sport2_mean = (sport1 + gym1)/18) |> 
+  mutate(leisure2_mean = (cinema1 + gallery1 +  library1 + museum1 + theatre1)/45) |> 
+  mutate(food2_mean = (cafe1 + restaurant1 +  pub1 + bbq1)/20) |> 
+  mutate(greenspace2_mean = (bigpark1 + smallpark1 + beach1)/27) |> 
+  mutate(housing2_mean = (affordability1 + damp1)/18) |> 
+  mutate(carInfrastructure2_mean = (evch1 + petrol1)/18) |> 
   # KULI aggregation - with 2nd level agg - additive method
   mutate(kuli_add2s_addAgg = minmaxNORM01(carInfrastructure2_add+bikeability1+walkability2_add+
                                       medical2_add+education2_add+safety2_add +
@@ -253,24 +258,24 @@ sa1_all_index <- sa1_all_index |>
            cafe1 + restaurant1 +  pub1 + bbq1 +
            bigpark1 + smallpark1 + beach1 +
            affordability1 + damp1+
-           carInfrastructure2_add + bikeability1) |> 
+           carInfrastructure2_add + bikeability1 + emergency1) |> 
   # KULI aggregation - without 2nd level agg - arithmetic average method
-  mutate(kuli_no2s_arithAgg = minmaxNORM01(kuli_addAgg/39)) |> 
+  mutate(kuli_no2s_arithAgg = minmaxNORM01(kuli_addAgg/40)) |> 
   # KULI aggregation - without 2nd level agg - additive method
   mutate(kuli_no2s_addAgg = minmaxNORM01(kuli_addAgg))
 
 # KULI aggregation - without 2nd level agg - geometric average method
-sa1_all_index$kuli_no2s_geomAgg <- minmaxNORM01(apply(sa1_all_index[,c(65:102,126)], 1, FUN = a_gmean))
+sa1_all_index$kuli_no2s_geomAgg <- minmaxNORM01(apply(sa1_all_index[,c(67:105,117)], 1, FUN = a_gmean))
 # KULI aggregation - with 2nd level agg(geom) - geometric average method
-sa1_all_index$kuli_geom2s_geomAgg <- minmaxNORM01(apply(sa1_all_index[,103:114], 1, FUN = a_gmean))
+#sa1_all_index$kuli_geom2s_geomAgg <- minmaxNORM01(apply(sa1_all_index[,103:114], 1, FUN = a_gmean))
 # KULI aggregation - with 2nd level agg(add) - geometric average method
-sa1_all_index$kuli_add2s_geomAgg <- minmaxNORM01(apply(sa1_all_index[,c(115:126)], 1, FUN = a_gmean))
+#sa1_all_index$kuli_add2s_geomAgg <- minmaxNORM01(apply(sa1_all_index[,c(115:126)], 1, FUN = a_gmean))
 # KULI aggregation - with 2nd level agg(arith) - geometric average method
-sa1_all_index$kuli_arith2s_geomAgg <- minmaxNORM01(apply(sa1_all_index[,c(127:138)], 1, FUN = a_gmean))
+#sa1_all_index$kuli_arith2s_geomAgg <- minmaxNORM01(apply(sa1_all_index[,c(127:138)], 1, FUN = a_gmean))
 
 
 # KULI aggregation - without 2nd level agg - MPI aggregation method
-kuli_MPI <- ci_mpi(sa1_all_index,c(65:102,126),penalty="POS")
+kuli_MPI <- ci_mpi(sa1_all_index,c(67:105,117),penalty="POS")
 sa1_all_index$kuli_no2s_MPIAgg <- minmaxNORM01(kuli_MPI$ci_mpi_est)
 # Reward Points
 reward = 0.1

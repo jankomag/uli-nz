@@ -19,9 +19,9 @@ edges <- st_read("data/network_analysis/auckland_waiheke_network_walk.gpkg", lay
   st_transform(4326) |> 
   subset(select = -c(u,v,key,osmid, lanes, name, highway, oneway, reversed, from, to,ref, service, access, bridge,
                      width, junction, tunnel)) #area
-sa1 <- st_read("data/geographic/urban_sa1_landvalid.gpkg") |> 
-  st_transform(4326)
-
+sa1 <- st_read("data/geographic/sa1_kuli_all.gpkg") |> 
+  st_transform(4326) |> 
+  subset(select = c(SA12018_V1_00)) #area
 #get network
 network <- as_sfnetwork(edges, directed = FALSE) |> 
   st_transform(4326) |> 
@@ -157,6 +157,10 @@ network <- as_sfnetwork(edges, directed = FALSE) |>
   st_transform(4326) |> 
   activate("edges")
 
+emergency <- st_read("data/safety/emergency/emergencies_auck.gpkg") |>
+  st_transform(4326)# 27291
+sa1 <- get_distance(emergency)
+
 petrol <- st_read("data/transport/petrol_st_all.gpkg") |>
   st_transform(4326)# 27291
 sa1 <- get_distance(petrol)
@@ -171,7 +175,7 @@ sa1 <- get_distance(crash)
 
 #save
 #st_write(sa1, "data/kiwi/sa1_maraefinal.gpkg")
-st_write(sa1, "data/geographic/sa1_alldist_final.gpkg")
+st_write(sa1, "data/safety/emergency/emergency_dist.gpkg")
 
 sa1done <- st_read("data/geographic/sa1_alldist_final.gpkg")
 head(sa1done)

@@ -186,6 +186,10 @@ sa1_all <- left_join(sa1_all, sa1_restdistances, by = c("SA12018_V1_00"="SA12018
 sa1_bikeability <- st_read("data/transport/bikeability.gpkg")|> st_drop_geometry()
 sa1_all <- left_join(sa1_all, sa1_bikeability, by = c("SA12018_V1_00"="SA12018_V1_00"))
 
+#add emergency services
+sa1_emergency <- st_read("data/safety/emergency/emergency_dist.gpkg")|> st_drop_geometry()
+sa1_all <- left_join(sa1_all, sa1_emergency, by = c("SA12018_V1_00"="SA12018_V1_00"))
+
 #join with spatial
 sa1_allg <- left_join(sa1_polys, sa1_all, by=c("SA12018_V1_00"="SA12018_V1_00"))
 sa1_allg <- sa1_allg |> 
@@ -199,7 +203,7 @@ sa1_allg[which(is.infinite(sa1_allg$dist_gym),), "dist_gym"] <- 100000
 
 # plot
 tm_shape(sa1_allg) +
-  tm_polygons(col="dist_restaurants",style="kmeans", lwd=0)
+  tm_polygons(col="dist_emergency",style="kmeans", lwd=0)
 
 st_write(sa1_allg, "data/geographic/sa1_allvars.gpkg")
 

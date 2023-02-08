@@ -434,7 +434,7 @@ gwr <- gwr.basic(formula,
                    data = gb.sp,
                    bw = bw_adap)
 gwr
-save(gwr, file="outputs/models/gwr_adap.Rdata")
+save(gwr, file="outputs/models/gwr_adapnew.Rdata")
 load("outputs/models/gwr_adap.Rdata")
 
 # specify MGWR model
@@ -445,7 +445,7 @@ mgwr_1 <- gwr.multiscale(formula,
                         kernel = "bisquare",
                         bws0=rep(100, 10),
                         verbose = F, predictor.centered=rep(T, 9))
-save(mgwr_1, file="outputs/models/mgwr_1.Rdata")
+save(mgwr_1, file="outputs/models/mgwr_1.new.Rdata")
 load("outputs/models/mgwr_1.Rdata")
 
 # assign bandwidths 
