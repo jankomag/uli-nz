@@ -37,7 +37,7 @@ library(geosphere)
 # load the kuli data
 kuli = st_read('data/geographic/sa1_kuli_all.gpkg', quiet = T) # transform to OSGB projection
 kuli <- kuli |> 
-  subset(select = c(SA12018_V1_00, kuli_no2s_MPIAgg)) |> st_transform(27291)
+  subset(select = c(SA12018_V1_00, kuli_no2s_geomAgg)) |> st_transform(27291)
 
 sa1_polys <- kuli |>
   subset(select = c(SA12018_V1_00))
@@ -56,6 +56,12 @@ census <- census |>
   mutate(PrEuropeanDesc = as.numeric(PrEuropeanDesc)) |> 
   mutate(PrMaoriDesc = as.numeric(PrMaoriDesc))
 
+#load additional data
+deprivation <- read.csv('data/additionalData/deprivation_joined.csv')
+deprivation <- deprivation |>
+  mutate(SA12018_V1_00 = as.character(SA12018_V1_00))
+census <- left_join(census, deprivation, by = c("code"="SA12018_V1_00"))
+
 # Dealing with missing values #
 # find NAs
 md.pattern(census)
@@ -63,7 +69,7 @@ aggr_plot <- aggr(census, col=c('navyblue','orange'), numbers=TRUE, sortVars=TRU
 
 sa1_census <- left_join(sa1_polys, census, by = c("SA12018_V1_00"="code"))
 tmap_mode("plot")
-tm_shape(sa1_census) + tm_polygons(col="maoriDescent", lwd=0, style="kmeans")
+tm_shape(sa1_census) + tm_polygons(col="deprivation", lwd=0, style="kmeans")
 
 #### NN impute - impute NAs based on neighbouring values
 index <- st_touches(sa1_census, sa1_census)
@@ -107,6 +113,10 @@ sa1_imped <- sa1_imped %>%
   mutate(PrMaoriDesc = ifelse(is.na(PrMaoriDesc),
                                 apply(index, 1, function(i){mean(.$PrMaoriDesc[i], na.rm=T)}),
                               PrMaoriDesc))
+sa1_imped <- sa1_imped %>% 
+  mutate(deprivation = ifelse(is.na(deprivation),
+                              apply(index, 1, function(i){mean(.$deprivation[i], na.rm=T)}),
+                              deprivation))
 
 sa1_imped[which(is.na(sa1_imped$maoriDescent),), "maoriDescent"] <- mean(sa1_imped$maoriDescent, na.rm=T)
 sa1_imped[which(is.na(sa1_imped$PrMaoriDesc),), "PrMaoriDesc"] <- mean(sa1_imped$PrMaoriDesc, na.rm=T)
@@ -129,9 +139,9 @@ dfg <- left_join(sa1_imped, kulinong, by = c("SA12018_V1_00"="SA12018_V1_00"))
 df <- st_drop_geometry(dfg)
 summary(dfg)
 #### EDA ####
-cor <- cor(x = df[3:13], y = df[3:13], use="complete.obs")
+cor <- cor(x = df[3:14], y = df[3:14], use="complete.obs")
 corrplot(cor, tl.srt = 25)
-corr <- rcorr(as.matrix(df[3:13]))
+corr <- rcorr(as.matrix(df[3:14]))
 
 # function to make correlation matrix§-
 flattenCorrMatrix <- function(cormat, pmat) {
@@ -151,17 +161,17 @@ corrmatrix <- corrmatrix |>
   filter(row == 'income')
 
 # plot correlations
-df[3:13] |>
-  gather(-kuli_no2s_geomAgg_wrewards, key = "var", value = "value") |> 
-  ggplot(aes(x = kuli_no2s_geomAgg_wrewards, y = value)) +
+df[3:14] |>
+  gather(-kuli_no2s_geomAgg, key = "var", value = "value") |> 
+  ggplot(aes(x = kuli_no2s_geomAgg, y = value)) +
   facet_wrap(~ var, scales = "free") +
   geom_point(alpha=0.2) +
   theme_bw() +
   geom_smooth(method="lm")
 
 #### OLS model ####
-formula = as.formula(kuli_no2s_MPIAgg ~ medianIncome + bornOverseas + privateTransporTtoWork +
-                       PTtoWork + cycleToWork + noCar + carsPerPreson + PrEuropeanDesc + PrMaoriDesc) # construct the OLS model
+formula = as.formula(kuli_no2s_geomAgg ~ medianIncome + bornOverseas + privateTransporTtoWork +
+                       PTtoWork + cycleToWork + noCar + carsPerPreson + PrEuropeanDesc + PrMaoriDesc + deprivation) # construct the OLS model
 m = lm(formula, data = df)
 summary(m)
 #AICc(m)
@@ -171,30 +181,30 @@ summary(m)
 step.res = stepAIC(m, trace = 0)
 summary(step.res)
 
-stargazer(m, flip=F, type="latex", single.row = F, style="qje")
+stargazer(m, flip=F, type="latex", single.row = T, style="qje")
 #### Autocorrelation ####
 ##### Moran's I####
 g.nb <- poly2nb(dfg)
 
 g.lw = nb2listw(g.nb)
 #plot spatially lagged mean
-dfg$lagged.means <- lag.listw(g.lw, dfg$kuli_no2s_MPIAgg)
+dfg$lagged.means <- lag.listw(g.lw, dfg$kuli_no2s_geomAgg)
 tm_shape(dfg) + 
   tm_polygons(col='lagged.means', 
               title='KULI',
               palette = "YlGnBu", lwd=0, style="kmeans")
 
 # moran scatterplot
-ggplot(data = dfg, aes(x = kuli_no2s_MPIAgg, y = lagged.means)) +
+ggplot(data = dfg, aes(x = kuli_no2s_geomAgg, y = lagged.means)) +
   geom_point(shape = 1, alpha = 0.5) +
   geom_hline(yintercept = mean(dfg$lagged.means), lty = 2) +
-  geom_vline(xintercept = mean(dfg$kuli_no2s_MPIAgg), lty = 2) +
+  geom_vline(xintercept = mean(dfg$kuli_no2s_geomAgg), lty = 2) +
   geom_abline() +
   coord_equal()
 # create and assign the Moran plot - with more details
-moran.plot(x = dfg$kuli_no2s_MPIAgg, listw = g.lw)
+moran.plot(x = dfg$kuli_no2s_geomAgg, listw = g.lw)
 # get Moran's I statistic
-moran.test(x = dfg$kuli_no2s_MPIAgg, listw = g.lw) 
+moran.test(x = dfg$kuli_no2s_geomAgg, listw = g.lw) 
 # normlaise Moran's I to interpret
 moran.range <- function(lw) {
   wmat <- listw2mat(lw)
@@ -217,7 +227,7 @@ sign.mc <- vector()
 for (i in (2:length(incr.v))) {
   s.dist <- dnearneigh(s.coord, incr.v[i - 1], incr.v[i])
   s.lw <- nb2listw(s.dist, style = "W", zero.policy=T)
-  s.mor <- moran.mc(dfg$kuli_no2s_MPIAgg, s.lw, nsim=599, zero.policy = TRUE)
+  s.mor <- moran.mc(dfg$kuli_no2s_geomAgg, s.lw, nsim=599, zero.policy = TRUE)
   sign.mc[i] <- s.mor$p.value
   morI.mc[i] <- s.mor$statistic
 }
@@ -234,7 +244,7 @@ axis(1, lab = ((incr.v) / 1000), at = (incr.v), tck = 1, col = "#FFFFFF", lty = 
 axis(2, tck = 1, col = "#FFFFFF", lty = 1, labels = FALSE)
 
 # Add the theoretical "no autocorelation" line
-abline(h = -1 / (length(dfg$kuli_no2s_MPIAgg)), col = "grey20")
+abline(h = -1 / (length(dfg$kuli_no2s_geomAgg)), col = "grey20")
 
 # Add the plot to the canvas
 par(new = TRUE)
@@ -250,7 +260,7 @@ text(eval(incr.v - incr * 0.5), morI.mc, round(sign.mc,3), pos = 3, cex = 0.5)
 
 ##### LISA ####
 # Tutorial #
-local <- localmoran(x = dfg$kuli_no2s_MPIAgg, listw = g.lw)
+local <- localmoran(x = dfg$kuli_no2s_geomAgg, listw = g.lw)
 moran.map <- cbind(dfg, local)
 
 tm_shape(moran.map) +
@@ -261,7 +271,7 @@ tm_shape(moran.map) +
 quadrant <- vector(mode="numeric",length=nrow(local))
 
 # centers the variable of interest around its mean
-m.qualification <- dfg$kuli_no2s_MPIAgg - mean(dfg$kuli_no2s_MPIAgg)     
+m.qualification <- dfg$kuli_no2s_geomAgg - mean(dfg$kuli_no2s_geomAgg)     
 
 # centers the local Moran's around the mean
 m.local <- local[,1] - mean(local[,1])    
@@ -286,7 +296,7 @@ legend("bottomleft", legend = c("insignificant","low-low","low-high","high-low",
 
 ### from LEEDS UNI ###
 # note how the result is assigned directly to gb
-dfg$lI <- localmoran(x = dfg$kuli_no2s_MPIAgg, listw = g.lw)[, 1] 
+dfg$lI <- localmoran(x = dfg$kuli_no2s_geomAgg, listw = g.lw)[, 1] 
 # create the map
 p1 = tm_shape(dfg) +
   tm_polygons(col= 'lI',title= "Local Moran's I", lwd = 0,
@@ -294,7 +304,7 @@ p1 = tm_shape(dfg) +
   tm_style('col_blind') +
   tm_layout(legend.position = c("left", "top")) + tm_layout(frame = F)
 # print the map
-dfg$localmoranpval <- localmoran(dfg$kuli_no2s_MPIAgg,g.lw)[, 5]
+dfg$localmoranpval <- localmoran(dfg$kuli_no2s_geomAgg,g.lw)[, 5]
 # create the map
 mypalette = c("#31A354", "#A1D99B","#E5F5E0", "lightgrey")
 p2 = tm_shape(dfg) +
