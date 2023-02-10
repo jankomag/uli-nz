@@ -32,6 +32,16 @@ library(stargazer)
 library(spatialreg)
 library(rgeoda)
 library(geosphere)
+library(raster)
+library(rgbif)
+library(viridis)
+library(gridExtra)
+library(rasterVis)
+library(ggspatial)
+library(spdep)
+library(gstat)
+library(geodaData)
+library(spatmap)
 
 #### Loading data ####
 # load the kuli data
@@ -169,23 +179,45 @@ df[3:14] |>
   theme_bw() +
   geom_smooth(method="lm")
 
+### Hexagon binning ####
+gb.sp = as(dfg, "Spatial")
+hex_points <- spsample(gb.sp, type = "hexagonal", n = 1000)
+tz_sf <- HexPoints2SpatialPolygons(hex = hex_points)
+sz_sf = dfg[2:15]
+hexgrid <- st_interpolate_aw(sz_sf, tz_sf, extensive = F)
+tm_shape(hexgrid) + 
+  tm_polygons("kuli_no2s_geomAgg", palette = "YlGnBu", style="kmeans",
+              lwd=0) +
+  tm_layout(frame = F)
+
+# for contiguity matrix
+hexgrid.nb <- poly2nb(hexgrid)
+hexgrid.nb[[534]] = as.integer(c(560,477))
+hex.lw = nb2listw(hexgrid.nb)
+
+gg.net2 <- nb2lines(hexgrid.nb,coords=st_geometry(st_centroid(hexgrid)), as_sf = F) 
+tm_shape(hexgrid) + tm_borders(col='grey') + 
+  tm_shape(gg.net2) + tm_lines(col='red', alpha = 1)
+
 #### OLS model ####
+# SA1 geometry
 formula = as.formula(kuli_no2s_geomAgg ~ medianIncome + bornOverseas + privateTransporTtoWork +
                        PTtoWork + cycleToWork + noCar + carsPerPreson + PrEuropeanDesc + PrMaoriDesc + deprivation) # construct the OLS model
-m = lm(formula, data = df)
+lm = lm(formula, data = df)
 summary(m)
 #AICc(m)
 #deviance(m)
-
-# find optimal variables - same
 step.res = stepAIC(m, trace = 0)
 summary(step.res)
+
+# Hexagonal geometry
+hex.lm = lm(formula, data = hexgrid)
+summary(hex.lm)
 
 stargazer(m, flip=F, type="latex", single.row = T, style="qje")
 #### Autocorrelation ####
 ##### Moran's I####
 g.nb <- poly2nb(dfg)
-
 g.lw = nb2listw(g.nb)
 #plot spatially lagged mean
 dfg$lagged.means <- lag.listw(g.lw, dfg$kuli_no2s_geomAgg)
@@ -193,7 +225,6 @@ tm_shape(dfg) +
   tm_polygons(col='lagged.means', 
               title='KULI',
               palette = "YlGnBu", lwd=0, style="kmeans")
-
 # moran scatterplot
 ggplot(data = dfg, aes(x = kuli_no2s_geomAgg, y = lagged.means)) +
   geom_point(shape = 1, alpha = 0.5) +
@@ -259,66 +290,38 @@ points(morI.mc ~ eval(incr.v - incr * 0.5),
 text(eval(incr.v - incr * 0.5), morI.mc, round(sign.mc,3), pos = 3, cex = 0.5)
 
 ##### LISA ####
-# Tutorial #
-local <- localmoran(x = dfg$kuli_no2s_geomAgg, listw = g.lw)
-moran.map <- cbind(dfg, local)
-
-tm_shape(moran.map) +
-  tm_fill(col = "Ii",
-          style = "quantile",
-          title = "local moran statistic") 
-
-quadrant <- vector(mode="numeric",length=nrow(local))
-
-# centers the variable of interest around its mean
-m.qualification <- dfg$kuli_no2s_geomAgg - mean(dfg$kuli_no2s_geomAgg)     
-
-# centers the local Moran's around the mean
-m.local <- local[,1] - mean(local[,1])    
-
-# significance threshold
-signif <- 0.2
-
-# builds a data quadrant
-quadrant[m.qualification >0 & m.local>0] <- 4  
-quadrant[m.qualification <0 & m.local<0] <- 1      
-quadrant[m.qualification <0 & m.local>0] <- 2
-quadrant[m.qualification >0 & m.local<0] <- 3
-quadrant[local[,5]>signif] <- 0   
-
-# plot in r
-brks <- c(0,1,2,3,4)
-colors <- c("white","blue",rgb(0,0,1,alpha=0.4),rgb(1,0,0,alpha=0.4),"red")
-plot(dfg,border="lightgray",col=colors[findInterval(quadrant,brks,all.inside=FALSE)])
-box()
-legend("bottomleft", legend = c("insignificant","low-low","low-high","high-low","high-high"),
-       fill=colors,bty="n")
-
-### from LEEDS UNI ###
-# note how the result is assigned directly to gb
-dfg$lI <- localmoran(x = dfg$kuli_no2s_geomAgg, listw = g.lw)[, 1] 
-# create the map
-p1 = tm_shape(dfg) +
-  tm_polygons(col= 'lI',title= "Local Moran's I", lwd = 0,
-              legend.format=list (flag= "+")) +
-  tm_style('col_blind') +
-  tm_layout(legend.position = c("left", "top")) + tm_layout(frame = F)
-# print the map
+# Local Statistic #
+dfg$li <- localmoran(dfg$kuli_no2s_geomAgg, g.lw)[, 1] 
 dfg$localmoranpval <- localmoran(dfg$kuli_no2s_geomAgg,g.lw)[, 5]
-# create the map
-mypalette = c("#31A354", "#A1D99B","#E5F5E0", "lightgrey")
-p2 = tm_shape(dfg) +
-  tm_polygons(col= 'localmoranpval',title= "p-value",breaks= c(0, 0.01, 0.05, 0.10, 1), 
-              border.col = "black", lwd = 0,
-              palette = mypalette) +
-  tm_layout(legend.position = c("left", "top")) + tm_layout(frame = F) 
-#plot all 3
-p0 = tm_shape(dfg) + tm_fill("kuli_no2s_geomAgg") +
-  tm_layout(legend.position = c("left", "top")) 
-tmap_arrange(p0, p1, p2,ncol = 3)
-# outline significant pvals as borders
-index  = dfg$localmoranpval <= 0.05
-p0 + tm_shape(dfg[index,]) + tm_borders(lwd=0.5)
+index  = dfg$localmoranpval <= 0.05 # outline significant pvals as borders
+
+map1 <- tm_shape(dfg) +
+  tm_fill(col = "li", style = "quantile",title="Local Moran Statistic") +
+  tm_shape(dfg[index,]) + tm_borders(lwd=0.3, col="black") +
+  tm_layout(legend.position = c("left","bottom"), frame = T, legend.outside = F,
+            legend.title.fontfamily = "serif", main.title.position = "center",
+            legend.width=1, legend.height=1, legend.text.size=0.8, legend.title.size = 1.2,
+            legend.bg.color="grey100", legend.bg.alpha=.7, title.fontfamily="serif", legend.text.fontfamily = "serif")
+
+# Local Moran Cluster Map #
+queen_wts <- queen_weights(dfg)
+moran <- local_moran(queen_wts, dfg["kuli_no2s_geomAgg"])
+moran_lbls <- lisa_labels(moran)[1:5]
+moran_colors <- setNames(lisa_colors(moran)[1:5], moran_lbls)
+
+dfg_lmm <- dfg |>
+  mutate(cluster_num = lisa_clusters(moran) + 1, # add 1 bc clusters are zero-indexed
+         cluster = factor(moran_lbls[cluster_num], levels = moran_lbls))
+
+map2 <- tm_shape(dfg_lmm) +
+  tm_polygons("cluster", lwd=0, title="Moran Clusters",
+              palette = moran_colors) +
+  tm_layout(legend.position = c("left","bottom"), frame = T, legend.outside = F,
+            legend.title.fontfamily = "serif", main.title.position = "center",
+            legend.width=0.7, legend.height=1, legend.text.size=0.8, legend.title.size = 1.2,
+            legend.bg.color="grey100", legend.bg.alpha=.7, title.fontfamily="serif", legend.text.fontfamily = "serif")
+
+tmap_arrange(map1, map2,ncol = 2)
 
 ##### Getis Ord ####
 # tutorial
@@ -376,87 +379,39 @@ g.nb2[[6026]] = as.integer(6027)
 g.nb2[[6224]] = as.integer(6225)
 
 g.lw2 = nb2listw(g.nb2, style = 'B')
-dfg$gstat <- localG(dfg$kuli_no2s_geomAgg_wrewards, g.lw2)
+dfg$gstat <- localG(dfg$kuli_no2s_geomAgg, g.lw2)
 tm_shape(dfg) + 
   tm_polygons(col= 'gstat',title= "G Statistic", lwd = 0.01, 
               legend.format=list (flag= "+"), palette = "RdBu", midpoint = 0) + 
   tm_layout(frame = F)
 
-#### Clustering ####
-cents <- st_centroid(dfg[3:13])
-D0 <- distm(cents) # the socio-economic distances
-tree <- hclustgeo(D0)
-plot(tree,hang = -1, label = FALSE, 
-     xlab = "", sub = "",
-     main = "Ward dendrogram with D0 only")
-
-rect.hclust(tree ,k = 5, border = c(4,5,3,2,1))
-legend("topright", legend = paste("cluster",1:5), 
-       fill=1:5,bty= "n", border = "white")
-
-#### Spatial Econometric models ####
-#st_write(dfg, "data/geographic/sa1_analysis_kuli.gpkg")
-queen.nb <- read.gal("data/geographic/analysis/sa1_queenW.gal", region.id=dfg$SA12018_V1_00)
-summary(queen.nb)
-listw1 <- nb2listw(queen.nb)
-
-# Moran's I
-moran(dfg$kuli_no2s_geomAgg_wrewards, listw1, length(dfg$kuli_no2s_geomAgg_wrewards), Szero(listw1))
-moran.test(dfg$kuli_no2s_geomAgg_wrewards, listw1)
-#OLS
-summary(m)
-
-# Residual test
-lm.morantest(m,listw1) # H0 says no spatial correlation in the residuals
-
-# LaGrenge Multiplier Tests
-lm.LMtests(m, listw1, test='all') #error and Spatial Lag model (lag y)
-
-# Spatially Lagged X (lag X -SLX)
-reg2 <- lmSLX(formula, dfg, listw1)
-summary(reg2)
-
-# Spaitally Lagged y Model (Autoregressive)
-reg3 <- lagsarlm(formula, dfg, listw1)
-summary(reg3)
-save(reg3, file="outputs/models/spatiallyLaggedModel.Rdata")
-
-# Spatial error model
-reg4 <- errorsarlm(formula, dfg, listw1)
-save(reg4, file="outputs/models/spatialErrorModel.Rdata")
-summary(reg4)
-impacts(reg4, listw1)
-summary(impacts(reg4,listw1, R=500), zstat=TRUE)
-
 #### GWR ####
 # convert to sp
-gb.sp = as(dfg, "Spatial")
+hex.sp = as(hexgrid, "Spatial")
 # determine the kernel bandwidth
-bw_adap <- bw.gwr(data=gb.sp, formula=formula, approach = "AIC", kernel="bisquare",
-             adaptive = T) # adaptive in no of neighbors
-bw_fixed <- bw.gwr(data=gb.sp, formula=formula,approach = "AIC", kernel="bisquare",
+bw_adap <- bw.gwr(data=hex.sp, formula=formula, approach = "AIC", kernel="bisquare",
+             adaptive = T) # adaptive as no of neighbors
+bw_fixed <- bw.gwr(data=hex.sp, formula=formula,approach = "AIC", kernel="bisquare",
              adaptive = F) # fixed bandwidth (in m)
-summary(as.vector(st_distance(gb.sp)))
+summary(as.vector(st_distance(hexgrid)))
 
 # specify GWR model
 gwr <- gwr.basic(formula, 
                    adaptive = T,
-                   data = gb.sp,
+                   data = hex.sp,
                    bw = bw_adap)
 gwr
-save(gwr, file="outputs/models/gwr_adapnew.Rdata")
-load("outputs/models/gwr_adap.Rdata")
 
 # specify MGWR model
 mgwr_1 <- gwr.multiscale(formula,
-                        data = gb.sp,
+                        data = hex.sp,
                         adaptive = T, max.iterations = 10000,
                         criterion="CVR",
                         kernel = "bisquare",
-                        bws0=rep(100, 10),
-                        verbose = F, predictor.centered=rep(T, 9))
+                        bws0=rep(100, 13),
+                        verbose = F, predictor.centered=rep(T, 12))
 save(mgwr_1, file="outputs/models/mgwr_1_new.Rdata")
-2load("outputs/models/mgwr_1.Rdata")
+load("outputs/models/mgwr_1.Rdata")
 
 # assign bandwidths 
 mbwa <- mgwr_1[[2]]$bws
@@ -715,3 +670,32 @@ gwrresmap <- residual_map_func("gwr.resids","GWR Residuals")
 mgwrresmap <- residual_map_func("mgwr.resids","MGWR Residuals")
 
 tmap_arrange(polsresmap, gwrresmap, mgwrresmap, widths = c(.5,.5), ncol = 3)
+
+
+#### Spatial Econometric models ####
+# Moran's I
+moran(hexgrid$kuli_no2s_geomAgg, hex.lw, length(hexgrid$kuli_no2s_geomAgg), Szero(hex.lw))
+moran.test(hexgrid$kuli_no2s_geomAgg, hex.lw)
+
+# Residual test
+lm.morantest(hex.lm,hex.lw) # H0 says no spatial correlation in the residuals
+
+# LaGrenge Multiplier Tests
+lm.LMtests(hex.lm, hex.lw, test='all') #error and Spatial Lag model (lag y)
+
+# Spatially Lagged X (lag X -SLX)
+reg2 <- lmSLX(formula, hexgrid, hex.lw)
+summary(reg2)
+
+# Spaitally Lagged y Model (Autoregressive)
+reg3 <- lagsarlm(formula, hexgrid, hex.lw)
+summary(reg3)
+save(reg3, file="outputs/models/spatiallyLaggedModel.Rdata")
+auto <- spautolm(formula, hexgrid, hex.lw)
+
+# Spatial error model
+reg4 <- errorsarlm(formula, hexgrid, hex.lw)
+save(reg4, file="outputs/models/spatialErrorModel.Rdata")
+summary(reg4)
+impacts(reg4, hex.lw)
+summary(impacts(reg4,hex.lw, R=500), zstat=TRUE)
