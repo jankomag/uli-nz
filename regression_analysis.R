@@ -313,7 +313,7 @@ p2 = tm_shape(dfg) +
               palette = mypalette) +
   tm_layout(legend.position = c("left", "top")) + tm_layout(frame = F) 
 #plot all 3
-p0 = tm_shape(dfg) + tm_fill("kuli_no2s_MPIAgg") +
+p0 = tm_shape(dfg) + tm_fill("kuli_no2s_geomAgg") +
   tm_layout(legend.position = c("left", "top")) 
 tmap_arrange(p0, p1, p2,ncol = 3)
 # outline significant pvals as borders
@@ -322,7 +322,7 @@ p0 + tm_shape(dfg[index,]) + tm_borders(lwd=0.5)
 
 ##### Getis Ord ####
 # tutorial
-local_g <- localG(dfg$kuli_no2s_MPIAgg, g.lw)
+local_g <- localG(dfg$kuli_no2s_geomAgg, g.lw)
 local_g <- cbind(dfg, as.matrix(local_g))
 names(local_g)[6] <- "gstat"
 tm_shape(local_g) + 
@@ -331,8 +331,8 @@ tm_shape(local_g) +
           style = "pretty", lwd=0) +
   tm_borders(alpha=.4)
 # other 
-fips <- order(dfg$kuli_no2s_MPIAgg)
-gi.fixed <- localG(dfg$kuli_no2s_MPIAgg, g.lw)
+fips <- order(dfg$kuli_no2s_geomAgg)
+gi.fixed <- localG(dfg$kuli_no2s_geomAgg, g.lw)
 hunan.gi <- cbind(dfg, as.matrix(gi.fixed))
 #names(hunan.gi)[16] <- "gstat"
 tm_shape(hunan.gi) +
@@ -455,8 +455,8 @@ mgwr_1 <- gwr.multiscale(formula,
                         kernel = "bisquare",
                         bws0=rep(100, 10),
                         verbose = F, predictor.centered=rep(T, 9))
-save(mgwr_1, file="outputs/models/mgwr_1.new.Rdata")
-load("outputs/models/mgwr_1.Rdata")
+save(mgwr_1, file="outputs/models/mgwr_1_new.Rdata")
+2load("outputs/models/mgwr_1.Rdata")
 
 # assign bandwidths 
 mbwa <- mgwr_1[[2]]$bws
@@ -580,12 +580,12 @@ gwr_sf = st_as_sf(gwr$SDF)
 
 #plot coefficients for GWR
 tm_shape(gwr_sf) +
-  tm_fill(c("younger_adults", "white", "christian", "english_speaking", "single_ethnicity_household","not_good_health","degree_educated","private_transport_to_work","eu_born"), palette = "viridis", style = "kmeans") +
+  tm_fill(c("medianIncome", "bornOverseas", "privateTransporTtoWork", "PTtoWork", "cycleToWork","noCar","carsPerPreson","PrEuropeanDesc","PrMaoriDesc","deprivation"), palette = "viridis", style = "kmeans") +
   tm_layout(legend.position = c("right","top"), frame = F)
 
 # plot diverging coefs for GWR
 tm_shape(gwr_sf) +
-  tm_fill(c("younger_adults", "white", "christian", "english_speaking", "single_ethnicity_household","not_good_health","degree_educated","private_transport_to_work","eu_born"),midpoint = 0, style = "kmeans") +
+  tm_fill(c("medianIncome", "bornOverseas", "privateTransporTtoWork", "PTtoWork", "cycleToWork","noCar","carsPerPreson","PrEuropeanDesc","PrMaoriDesc","deprivation"),midpoint = 0, style = "kmeans") +
   tm_style("col_blind")+
   tm_layout(legend.position = c("right","top"), frame = F)
 

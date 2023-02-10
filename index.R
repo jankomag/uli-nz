@@ -265,7 +265,7 @@ sa1_all_index <- sa1_all_index |>
   mutate(kuli_no2s_addAgg = minmaxNORM01(kuli_addAgg))
 
 # KULI aggregation - without 2nd level agg - geometric average method
-sa1_all_index$kuli_no2s_geomAgg <- minmaxNORM01(apply(sa1_all_index[,c(67:105,117)], 1, FUN = a_gmean))
+sa1_all_index$kuli_no2s_geomAgg <- minmaxNORM01(apply(sa1_all_index[,c(67:105,129)], 1, FUN = a_gmean))
 # KULI aggregation - with 2nd level agg(geom) - geometric average method
 #sa1_all_index$kuli_geom2s_geomAgg <- minmaxNORM01(apply(sa1_all_index[,103:114], 1, FUN = a_gmean))
 # KULI aggregation - with 2nd level agg(add) - geometric average method
@@ -364,6 +364,8 @@ densityplot(bikeperarea, bikeability1, "Bikeability")
 densityplot(dist_gym, gym1, "Gym")
 densityplot(dist_beach, beach1, "Beach")
 densityplot(medianRent, affordability1, "Affordability")
+densityplot(carInfrastructure2_add, carInfrastructure2_add, "Car Infrastructure")
+densityplot(dist_emergency, emergency1, "Emergency")
 
 # rejoin with geometry
 index_sa1g <- left_join(sa1_allg, sa1_all_index, by = c("SA12018_V1_00"="SA12018_V1_00"))
