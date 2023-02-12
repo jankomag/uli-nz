@@ -192,7 +192,13 @@ tm_shape(hexgrid) +
 
 # for contiguity matrix
 hexgrid.nb <- poly2nb(hexgrid)
-hexgrid.nb[[534]] = as.integer(c(560,477))
+hexgrid$rn = rownames(hexgrid) 
+tmap_mode("view")
+tm_shape(hexgrid) + 
+  tm_borders() +
+  tm_text(text = "rn") +
+  tm_basemap("OpenStreetMap")
+#hexgrid.nb[[74]] = as.integer(85)
 hex.lw = nb2listw(hexgrid.nb)
 
 gg.net2 <- nb2lines(hexgrid.nb,coords=st_geometry(st_centroid(hexgrid)), as_sf = F) 
@@ -204,17 +210,17 @@ tm_shape(hexgrid) + tm_borders(col='grey') +
 formula = as.formula(kuli_no2s_geomAgg ~ medianIncome + bornOverseas + privateTransporTtoWork +
                        PTtoWork + cycleToWork + noCar + carsPerPreson + PrEuropeanDesc + PrMaoriDesc + deprivation) # construct the OLS model
 lm = lm(formula, data = df)
-summary(m)
+summary(lm)
 #AICc(m)
 #deviance(m)
-step.res = stepAIC(m, trace = 0)
+step.res = stepAIC(lm, trace = 0)
 summary(step.res)
 
 # Hexagonal geometry
 hex.lm = lm(formula, data = hexgrid)
 summary(hex.lm)
 
-stargazer(m, flip=F, type="latex", single.row = T, style="qje")
+stargazer(lm, hex.lm, flip=F, type="text", single.row = T, style="qje")
 #### Autocorrelation ####
 ##### Moran's I####
 g.nb <- poly2nb(dfg)
@@ -396,34 +402,34 @@ bw_fixed <- bw.gwr(data=hex.sp, formula=formula,approach = "AIC", kernel="bisqua
 summary(as.vector(st_distance(hexgrid)))
 
 # specify GWR model
-gwr <- gwr.basic(formula, 
+gwr_n1000 <- gwr.basic(formula, 
                    adaptive = T,
                    data = hex.sp,
                    bw = bw_adap)
-gwr
+gwr_n1000
 
 # specify MGWR model
-mgwr_1 <- gwr.multiscale(formula,
+mgwr_n1000 <- gwr.multiscale(formula,
                         data = hex.sp,
                         adaptive = T, max.iterations = 10000,
                         criterion="CVR",
                         kernel = "bisquare",
                         bws0=rep(100, 13),
                         verbose = F, predictor.centered=rep(T, 12))
-save(mgwr_1, file="outputs/models/mgwr_1_new.Rdata")
+save(mgwr_n1000, file="outputs/models/mgwr_1_n1000.Rdata")
 load("outputs/models/mgwr_1.Rdata")
 
 # assign bandwidths 
 mbwa <- mgwr_1[[2]]$bws
+mgwr_2 <- mgwr_1
 
-# Now re-run multiscale GWR with bandwidths found from above but with predictors NOT centered
-mgwr_2 <- gwr.multiscale(formula_opt, data = gb.sp, adaptive = T,
+mgwr_2 <- gwr.multiscale(formula, data = gb.sp, adaptive = T,
                           max.iterations = 10000,
                           criterion="CVR", kernel = "bisquare",
                           bws0=c(mbwa),
-                          bw.seled=rep(T, 10),
-                          verbose = F, predictor.centered=rep(F, 9))
-save(mgwr_2, file="outputs/models/mgwr_2.Rdata")
+                          bw.seled=rep(T, 13),
+                          verbose = F, predictor.centered=rep(F, 12))
+save(mgwr_2, file="outputs/models/mgwr_2_n500.Rdata")
 load("outputs/models/mgwr_2.Rdata")
 
 mgwr_2$GW.diagnostic
@@ -440,7 +446,7 @@ mgwr_coef_cols$id <- 1:nrow(mgwr_coef_cols)
 mgwr_coef_cols$Model <- "MGWR"
 mgwr_long <- melt(mgwr_coef_cols, id = c("id","Model"))
 
-olssum <- data.frame(ols_opt$coefficients)
+olssum <- data.frame(lm$coefficients)
 olssum <- cbind(variable = rownames(olssum), olssum)
 rownames(olssum) <- 1:nrow(olssum)
 colnames(olssum)[2] <- "value"
@@ -461,9 +467,9 @@ ggplot() +
         plot.title = element_text(hjust = 0.5),
         text=element_text(size=13,  family="serif")) +
   scale_color_manual(values=c("#6ECCAF","#344D67", "black")) +
-  ylab('Coefficient estimate') +xlab ('') +
+  ylab('Coefficient estimate') +xlab ('')
   #labs(title ="Boxplots of Coefficient estimates") +
-  coord_cartesian(ylim = c(-2.5, 6.1))
+  #coord_cartesian(ylim = c(-2.5, 8))
 
 ggplot(mgwr_long) +
   geom_boxplot(mapping = aes(x = variable, y = value), position="dodge2")
@@ -481,11 +487,11 @@ my_plots <- lapply(names(mgwr_coef_cols), function(var_x){
 plot_grid(plotlist = my_plots)
 
 # Examine Boxplots of SE distributions - not that useful - would need RMSE
-gwr_se <- gwr$SDF@data[, 16:25]
+gwr_se <- gwr$SDF@data[, 17:29]
 gwr_se$id <- 1:nrow(gwr_se)
 gwr_se$kind <- "GWR"
 gwr_se_long <- melt(gwr_se, id = c("id","kind"))
-mgwr_se <- mgwr_2$SDF@data[, 13:22]
+mgwr_se <- mgwr_2$SDF@data[, 14:24]
 mgwr_se$id <- 1:nrow(mgwr_se)
 mgwr_se$kind <- "MGWR"
 mgwr_se_long <- melt(mgwr_se, id = c("id","kind"))
@@ -495,18 +501,18 @@ ggplot(allses, aes(x = variable, y = value, col= kind)) +
 
 #####Summary tables #####
 # create a table with coefficient stats for GWR
-tab.gwr <- apply(gwr$SDF@data[, 1:10], 2, summary)
+tab.gwr <- apply(gwr$SDF@data[, 1:11], 2, summary)
 tab.gwr <- t(round(tab.gwr, 3))
 gwr_meancoef <- data.frame(tab.gwr[,4])
 stargazer(gwr_meancoef, summary=FALSE, digits=2, type="text")
 
 # create a table with coefficient stats for MGWR
-coefs_msgwr = apply(mgwr_2$SDF@data[, 1:10], 2, summary)
+coefs_msgwr = apply(mgwr_2$SDF@data[, 1:11], 2, summary)
 tab.mgwr = data.frame(Bandwidth = mbwa_2, t(round(coefs_msgwr,3)))
 names(tab.mgwr)[c(3,6)] = c("Q1", "Q3")
 tab.mgwr
 
-olssum <- data.frame(ols_opt$coefficients)
+olssum <- data.frame(lm$coefficients)
 olssum <- cbind(variable = rownames(olssum), olssum)
 rownames(olssum) <- 1:nrow(olssum)
 colnames(olssum)[2] <- "coef"
@@ -538,9 +544,13 @@ tm_shape(gwr_sf) +
   tm_fill(c("medianIncome", "bornOverseas", "privateTransporTtoWork", "PTtoWork", "cycleToWork","noCar","carsPerPreson","PrEuropeanDesc","PrMaoriDesc","deprivation"), palette = "viridis", style = "kmeans") +
   tm_layout(legend.position = c("right","top"), frame = F)
 
+tm_shape(mgwr2_sf) +
+  tm_fill(c("medianIncome", "bornOverseas", "privateTransporTtoWork", "PTtoWork", "cycleToWork","noCar","carsPerPreson","PrEuropeanDesc","PrMaoriDesc","deprivation"), palette = "viridis", style = "kmeans") +
+  tm_layout(legend.position = c("right","top"), frame = F)
+
 # plot diverging coefs for GWR
-tm_shape(gwr_sf) +
-  tm_fill(c("medianIncome", "bornOverseas", "privateTransporTtoWork", "PTtoWork", "cycleToWork","noCar","carsPerPreson","PrEuropeanDesc","PrMaoriDesc","deprivation"),midpoint = 0, style = "kmeans") +
+tm_shape(mgwr2_sf) +
+  tm_fill(c("privateTransporTtoWork", "PTtoWork", "cycleToWork","noCar","carsPerPreson","PrEuropeanDesc","PrMaoriDesc"),midpoint = 0, style = "kmeans") +
   tm_style("col_blind")+
   tm_layout(legend.position = c("right","top"), frame = F)
 
@@ -549,7 +559,7 @@ allmgwr_map_func = function(data, var_name, titl) {
   mapout = tm_shape(data) +
     tm_polygons(var_name, lwd=0.25,style = "kmeans", title = titl, title.fontfamily="serif") +
     tm_style("col_blind") +
-    tm_layout(main.title = "MGWR", legend.position = c("right","top"), frame = T, legend.outside = F,
+    tm_layout(main.title = "MGWR", legend.position = c("left","bottom"), frame = T, legend.outside = F,
               legend.title.fontfamily = "serif", main.title.size = 1, main.title.position = "center",
               #legend.width=.5, legend.height=1, legend.text.size=.8,legend.title.size=2,
               legend.bg.color="grey100", legend.bg.alpha=.7, main.title.fontfamily="serif")
@@ -588,7 +598,7 @@ my_map_signif_coefs_diverging_func = function(x, var_name, var_name_TV, method, 
                 style = "kmeans", title = varN, title.fontfamily="serif") +
     tm_style("col_blind") +
     # now add the tvalues layer
-    tm_shape(x[signif,]) + tm_borders(lwd = 0.25) +
+    tm_shape(x[signif,]) + tm_borders(lwd = 0.4) +
     tm_layout(main.title = "GWR", legend.position = c("right","top"), frame = T, legend.outside = F,
               legend.title.fontfamily = "serif", main.title.size = 1, main.title.position = "center",
               #legend.width=.5, legend.height=1, legend.text.size=.8,legend.title.size=2,
@@ -601,20 +611,19 @@ my_map_signif_coefs_diverging_func = function(x, var_name, var_name_TV, method, 
 }
 
 # significant MGWR maps
-esmap <- allmgwr_map_func(mgwr2_sf, "english_speaking", "English speaking")
-demap <- allmgwr_map_func(mgwr2_sf, "degree_educated", "Degree educated")
-eubmap <- allmgwr_map_func(mgwr2_sf, "eu_born", "EU born")
-pttwmap <- allmgwr_map_func(mgwr2_sf, "private_transport_to_work", "Private transport\nto work")
+esmap <- allmgwr_map_func(mgwr2_sf, "carsPerPreson", "CarsPerPerson")
+demap <- allmgwr_map_func(mgwr2_sf, "PTtoWork", "PTtoWork")
+eubmap <- allmgwr_map_func(mgwr2_sf, "cycleToWork", "Cycle to work")
+pttwmap <- allmgwr_map_func(mgwr2_sf, "privateTransporTtoWork", "Private transport\nto work")
+eubmap <- allmgwr_map_func(mgwr2_sf, "PrEuropeanDesc", "EU Desc")
+eubmap <- allmgwr_map_func(mgwr2_sf, "PrMaoriDesc", "Maori Desc")
+pttwmap <- allmgwr_map_func(mgwr2_sf, "noCar", "No Car")
 
-esmgwrmap <- my_map_signif_coefs_diverging_func(x = gwr_sf, "english_speaking", "english_speaking_TV", "GWR", "English speaking")
-demgwrmap <- my_map_signif_coefs_diverging_func(x = gwr_sf, "degree_educated", "degree_educated_TV", "GWR", "Degree educated")
-eubmgwrmap <- my_map_signif_coefs_diverging_func(x = gwr_sf, "eu_born", "eu_born_TV", "GWR", "EU born")
-pttmgwrmap <- my_map_signif_coefs_diverging_func(x = gwr_sf, "private_transport_to_work", "private_transport_to_work_TV", "GWR", "Private transport\nto work")
-
-tmap_arrange(esmap, demap, pttwmap, eubmap, esmgwrmap, demgwrmap, pttmgwrmap, eubmgwrmap)
+esmgwrmap <- my_map_signif_coefs_diverging_func(x = gwr_sf, "carsPerPreson", "carsPerPreson_TV", "GWR", "carsPerPreson")
+#tmap_arrange()
 
 # MGWR_2 Only significant coefficients - not_sinif: younger_adults, white, single_ethnicity_household, not_good_health
-ngh_MGWR <- allmgwr_map_func("not_good_health_SE", "not_good_health")
+ngh_MGWR <- allmgwr_map_func("noCar_SE", "noCar", "noCar")
 tmap_arrange(ngh_GWR, ngh_MGWR)
 
 my_map_signif_coefs_diverging_func(x = mgwr2_sf, "not_good_health", "eu_born_TV", "MGWR", "EU born")
@@ -672,8 +681,9 @@ mgwrresmap <- residual_map_func("mgwr.resids","MGWR Residuals")
 tmap_arrange(polsresmap, gwrresmap, mgwrresmap, widths = c(.5,.5), ncol = 3)
 
 
+
 #### Spatial Econometric models ####
-# Moran's I
+# first Moran's I
 moran(hexgrid$kuli_no2s_geomAgg, hex.lw, length(hexgrid$kuli_no2s_geomAgg), Szero(hex.lw))
 moran.test(hexgrid$kuli_no2s_geomAgg, hex.lw)
 
