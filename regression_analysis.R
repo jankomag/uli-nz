@@ -406,7 +406,7 @@ gwr_n1000 <- gwr.basic(formula,
                    adaptive = T,
                    data = hex.sp,
                    bw = bw_adap)
-gwr_n1000
+gwr <- gwr_n1000
 
 # specify MGWR model
 mgwr_n1000 <- gwr.multiscale(formula,
@@ -417,11 +417,11 @@ mgwr_n1000 <- gwr.multiscale(formula,
                         bws0=rep(100, 13),
                         verbose = F, predictor.centered=rep(T, 12))
 save(mgwr_n1000, file="outputs/models/mgwr_1_n1000.Rdata")
-load("outputs/models/mgwr_1.Rdata")
+#load("outputs/models/mgwr_1.Rdata")
 
 # assign bandwidths 
-mbwa <- mgwr_1[[2]]$bws
-mgwr_2 <- mgwr_1
+mbwa <- mgwr_n1000[[2]]$bws
+mgwr_2 <- mgwr_n1000
 
 mgwr_2 <- gwr.multiscale(formula, data = gb.sp, adaptive = T,
                           max.iterations = 10000,
@@ -540,12 +540,13 @@ mgwr2_sf = st_as_sf(mgwr_2$SDF)
 gwr_sf = st_as_sf(gwr$SDF)
 
 #plot coefficients for GWR
+tmap_mode("plot")
 tm_shape(gwr_sf) +
   tm_fill(c("medianIncome", "bornOverseas", "privateTransporTtoWork", "PTtoWork", "cycleToWork","noCar","carsPerPreson","PrEuropeanDesc","PrMaoriDesc","deprivation"), palette = "viridis", style = "kmeans") +
   tm_layout(legend.position = c("right","top"), frame = F)
 
 tm_shape(mgwr2_sf) +
-  tm_fill(c("medianIncome", "bornOverseas", "privateTransporTtoWork", "PTtoWork", "cycleToWork","noCar","carsPerPreson","PrEuropeanDesc","PrMaoriDesc","deprivation"), palette = "viridis", style = "kmeans") +
+  tm_fill(c("privateTransporTtoWork", "PTtoWork", "cycleToWork","noCar","carsPerPreson","PrEuropeanDesc","PrMaoriDesc"), palette = "viridis", style = "kmeans") +
   tm_layout(legend.position = c("right","top"), frame = F)
 
 # plot diverging coefs for GWR
@@ -619,7 +620,7 @@ eubmap <- allmgwr_map_func(mgwr2_sf, "PrEuropeanDesc", "EU Desc")
 eubmap <- allmgwr_map_func(mgwr2_sf, "PrMaoriDesc", "Maori Desc")
 pttwmap <- allmgwr_map_func(mgwr2_sf, "noCar", "No Car")
 
-esmgwrmap <- my_map_signif_coefs_diverging_func(x = gwr_sf, "carsPerPreson", "carsPerPreson_TV", "GWR", "carsPerPreson")
+my_map_signif_coefs_diverging_func(x = gwr_sf, "carsPerPreson", "carsPerPreson_TV", "GWR", "carsPerPreson")
 #tmap_arrange()
 
 # MGWR_2 Only significant coefficients - not_sinif: younger_adults, white, single_ethnicity_household, not_good_health
