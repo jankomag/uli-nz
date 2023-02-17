@@ -201,8 +201,8 @@ sa1_all_index <- sa1_all |>
   mutate(emergency1 = minmaxNORM(-Winsorize(emergencyBC, minval=0, maxval=90)))
 
 # second level aggregation - geometric average method
-sa1_all_index$carInfra2_geom <- minmaxNORM(apply(sa1_all_index[,63:64], 1, FUN = a_gmean))
-sa1_all_index$transport2_geom <- minmaxNORM(apply(sa1_all_index[,73:75], 1, FUN = a_gmean))
+sa1_all_index$carInfra2_geom <- minmaxNORM(apply(sa1_all_index[,65:66], 1, FUN = a_gmean))
+sa1_all_index$transport2_geom <- minmaxNORM(apply(sa1_all_index[,c(75:77,106)], 1, FUN = a_gmean))
 sa1_all_index$walkability2_geom <- minmaxNORM(apply(sa1_all_index[,c(65:66,88:89,92)], 1, FUN = a_gmean))
 sa1_all_index$medical2_geom <- minmaxNORM(apply(sa1_all_index[,82:85], 1, FUN = a_gmean))
 sa1_all_index$education2_geom <- minmaxNORM(apply(sa1_all_index[,c(86,90:91)], 1, FUN = a_gmean))
@@ -234,7 +234,7 @@ sa1_all_index <- sa1_all_index |>
   mutate(medical2_mean = (chemist1 + dentist1 + healthcr1 + hospital1)/36) |> 
   mutate(education2_mean = (secondary1 + primary1 + childcare1)/27) |> 
   mutate(safety2_mean = (crime1 + crashes1 + flood1 + alcohol1 + emergency1)/45) |> 
-  mutate(transport2_mean = (station1 + bustop1 +freqbusstop1)/27) |> 
+  mutate(transport2_mean = (station1 + bustop1 +freqbusstop1 + carInfra2_geom)/36) |> 
   mutate(culture2_mean = (diversity1+marae1)/18) |> 
   mutate(sport2_mean = (sport1 + gym1)/18) |> 
   mutate(leisure2_mean = (cinema1 + gallery1 +  library1 + museum1 + theatre1)/45) |> 
@@ -386,14 +386,26 @@ tm_shape(index_sa1g) +
               palette = "Reds", style = "kmeans", lwd=0)
 
 #### EDA2 ####
-df_indicators <- sa1_all_index[,c(65:102,126)]
+df_indicators <- sa1_all_index[,c(67:105,129,146)]
 # Cronbach Alpha #
 cronbach.alpha(df_indicators)
 # Correlations #
-cor <- cor(x = df_indicators, y = df_indicators, use="complete.obs")
+cor <- cor(x = df_indicators, y = df_indicators$kuli_no2s_geomAgg, use="complete.obs")
+latex()
 corrplot(cor, tl.srt = 25)
 corr <- rcorr(as.matrix(df_indicators))
 flattenCorrMatrix(corr$r, corr$P)
+
+##### Correlations #####
+cor <- cor(x = sa1_all[c(5:6,13:50)], y = sa1_all[c(5:6,13:50)], use="complete.obs")
+corrplot(cor, tl.srt = 25)
+corr <- rcorr(as.matrix(sa1_all))
+
+# Get correlation matrix with coefficients and p-values
+corrmatrix <- flattenCorrMatrix(corr$r, corr$P)
+corrmatrix <- corrmatrix |>
+  arrange(row) |>
+  filter(row == 'income')
 
 #### Other ####
 # lambdas
