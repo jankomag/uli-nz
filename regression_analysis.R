@@ -43,6 +43,7 @@ library(gstat)
 library(geodaData)
 library(spatmap)
 
+
 #### Loading data ####
 # load the kuli data
 kuli = st_read('data/geographic/sa1_kuli_all.gpkg', quiet = T) # transform to OSGB projection
@@ -181,7 +182,7 @@ df[3:14] |>
 
 ### Hexagon binning ####
 gb.sp = as(dfg, "Spatial")
-hex_points <- spsample(gb.sp, type = "hexagonal", n = 1200)
+hex_points <- spsample(gb.sp, type = "hexagonal", n = 4000)
 tz_sf <- HexPoints2SpatialPolygons(hex = hex_points)
 sz_sf = dfg[2:15]
 hexgrid <- st_interpolate_aw(sz_sf, tz_sf, extensive = F)
@@ -189,6 +190,7 @@ tm_shape(hexgrid) +
   tm_polygons("kuli_no2s_geomAgg", palette = "YlGnBu", style="kmeans",
               lwd=0) +
   tm_layout(frame = F)
+hexgrid <- st_transform(hexgrid, 4326)
 
 # for contiguity matrix
 hexgrid.nb <- poly2nb(hexgrid)
@@ -196,7 +198,7 @@ hexgrid$rn = rownames(hexgrid)
 tmap_mode("plot")
 tm_shape(hexgrid) + 
   tm_borders() +
-  tm_text(text = "rn") +
+  #tm_text(text = "rn") +
   tm_basemap("OpenStreetMap")
 hexgrid.nb[[1038]] = as.integer(c(1036,1037))
 hexgrid.nb[[913]] = as.integer(888)
