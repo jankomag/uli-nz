@@ -387,25 +387,28 @@ tm_shape(index_sa1g) +
 
 #### EDA2 ####
 df_indicators <- sa1_all_index[,c(67:105,129,146)]
+colnames(df_indicators) <- c("DwellingDensity", "PopDensity","Dampness","Diversity",
+                             "Crime","Crashes","Flood","Alcohol",
+                             "Station","BusStop","FrequentBusStop","Marae",
+                             "Cinema","Gallery", "Library","Museum",
+                             "Theatre","Chemist","Dentist","HealthCentre",
+                             "Hospital","Childcare","Sport","ConvenianceStore",
+                             "Supermarket","Secondary","Primary","StreetConnectivity",    
+                             "BigPark","SmallPark","Cafe","Restaurant",
+                             "Pub","BBQ","Bikeability","Gym",
+                             "Beach","Affordability","EmergencyServices","CarInfrastructure","KULI")
 # Cronbach Alpha #
 cronbach.alpha(df_indicators)
+
 # Correlations #
-cor <- cor(x = df_indicators, y = df_indicators$kuli_no2s_geomAgg, use="complete.obs")
-latex()
-corrplot(cor, tl.srt = 25)
+cor <- cor(x = df_indicators, y = df_indicators, use="complete.obs")
+stargazer(cor, type = "latex")
+corrplot(cor, tl.srt = 45, type = "lower", method = "ellipse",
+         order = "FPC", tl.cex = 0.8,
+        tl.col = "black", diag = T, cl.cex=0.7,cl.offset=0.3)
 corr <- rcorr(as.matrix(df_indicators))
 flattenCorrMatrix(corr$r, corr$P)
 
-##### Correlations #####
-cor <- cor(x = sa1_all[c(5:6,13:50)], y = sa1_all[c(5:6,13:50)], use="complete.obs")
-corrplot(cor, tl.srt = 25)
-corr <- rcorr(as.matrix(sa1_all))
-
-# Get correlation matrix with coefficients and p-values
-corrmatrix <- flattenCorrMatrix(corr$r, corr$P)
-corrmatrix <- corrmatrix |>
-  arrange(row) |>
-  filter(row == 'income')
 
 #### Other ####
 # lambdas

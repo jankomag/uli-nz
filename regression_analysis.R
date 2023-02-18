@@ -181,7 +181,7 @@ df[3:14] |>
 
 ### Hexagon binning ####
 gb.sp = as(dfg, "Spatial")
-hex_points <- spsample(gb.sp, type = "hexagonal", n = 1500)
+hex_points <- spsample(gb.sp, type = "hexagonal", n = 1200)
 tz_sf <- HexPoints2SpatialPolygons(hex = hex_points)
 sz_sf = dfg[2:15]
 hexgrid <- st_interpolate_aw(sz_sf, tz_sf, extensive = F)
@@ -198,8 +198,9 @@ tm_shape(hexgrid) +
   tm_borders() +
   tm_text(text = "rn") +
   tm_basemap("OpenStreetMap")
-hexgrid.nb[[920]] = as.integer(870)
-hexgrid.nb[[996]] = as.integer(1015)
+hexgrid.nb[[1038]] = as.integer(c(1036,1037))
+hexgrid.nb[[913]] = as.integer(888)
+
 hex.lw = nb2listw(hexgrid.nb)
 
 gg.net2 <- nb2lines(hexgrid.nb,coords=st_geometry(st_centroid(hexgrid)), as_sf = F) 
@@ -403,27 +404,27 @@ bw_fixed <- bw.gwr(data=hex.sp, formula=formula,approach = "AIC", kernel="bisqua
 summary(as.vector(st_distance(hexgrid)))
 
 # specify GWR model
-gwr_n1290 <- gwr.basic(formula, 
+gwr_n1041 <- gwr.basic(formula, 
                    adaptive = T,
                    data = hex.sp,
                    bw = bw_adap)
-gwr <- gwr_n1290
-save(gwr_n1290, file="outputs/models/mgwr_1_n1290.Rdata")
+gwr <- gwr_n1041
+save(gwr_n1041, file="outputs/models/gwr_1_n1041.Rdata")
 
 # specify MGWR model
-mgwr_n1290 <- gwr.multiscale(formula,
+mgwr_n1041 <- gwr.multiscale(formula,
                         data = hex.sp,
                         adaptive = T, max.iterations = 10000,
                         criterion="CVR",
                         kernel = "bisquare",
                         bws0=rep(100, 13),
                         verbose = F, predictor.centered=rep(T, 12))
-save(mgwr_n2902, file="outputs/models/mgwr_1_n1290.Rdata")
-#load("outputs/models/mgwr_1.Rdata")
+save(mgwr_n1041, file="outputs/models/mgwr_1_n1041.Rdata")
+load("outputs/models/mgwr_1_n1041.Rdata")
 
 # assign bandwidths 
-mbwa <- mgwr_n1000[[2]]$bws
-mgwr_2 <- mgwr_n3000
+mbwa <- mgwr_n1041[[2]]$bws
+mgwr_2 <- mgwr_n1041
 
 mgwr_2 <- gwr.multiscale(formula, data = gb.sp, adaptive = T,
                           max.iterations = 10000,
