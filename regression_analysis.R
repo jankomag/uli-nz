@@ -182,7 +182,7 @@ df[3:14] |>
 
 ### Hexagon binning ####
 gb.sp = as(dfg, "Spatial")
-hex_points <- spsample(gb.sp, type = "hexagonal", n = 4000)
+hex_points <- spsample(gb.sp, type = "hexagonal", n = 1330)
 tz_sf <- HexPoints2SpatialPolygons(hex = hex_points)
 sz_sf = dfg[2:15]
 hexgrid <- st_interpolate_aw(sz_sf, tz_sf, extensive = F)
@@ -198,10 +198,10 @@ hexgrid$rn = rownames(hexgrid)
 tmap_mode("plot")
 tm_shape(hexgrid) + 
   tm_borders() +
-  #tm_text(text = "rn") +
+  tm_text(text = "rn") +
   tm_basemap("OpenStreetMap")
-hexgrid.nb[[1038]] = as.integer(c(1036,1037))
-hexgrid.nb[[913]] = as.integer(888)
+#hexgrid.nb[[651]] = as.integer(c(1036,1037))
+hexgrid.nb[[820]] = as.integer(772)
 
 hex.lw = nb2listw(hexgrid.nb)
 
@@ -406,27 +406,27 @@ bw_fixed <- bw.gwr(data=hex.sp, formula=formula,approach = "AIC", kernel="bisqua
 summary(as.vector(st_distance(hexgrid)))
 
 # specify GWR model
-gwr_n1041 <- gwr.basic(formula, 
+gwr_n1151 <- gwr.basic(formula, 
                    adaptive = T,
                    data = hex.sp,
                    bw = bw_adap)
-gwr <- gwr_n1041
-save(gwr_n1041, file="outputs/models/gwr_1_n1041.Rdata")
+gwr <- gwr_n1151
+save(gwr, file="outputs/models/gwr_1_n1151.Rdata")
 
 # specify MGWR model
-mgwr_n1041 <- gwr.multiscale(formula,
+mgwr_n1151 <- gwr.multiscale(formula,
                         data = hex.sp,
                         adaptive = T, max.iterations = 10000,
                         criterion="CVR",
                         kernel = "bisquare",
                         bws0=rep(100, 13),
                         verbose = F, predictor.centered=rep(T, 12))
-save(mgwr_n1041, file="outputs/models/mgwr_1_n1041.Rdata")
-load("outputs/models/mgwr_1_n1041.Rdata")
+save(mgwr_n1151, file="outputs/models/mgwr_1_n1151.Rdata")
+#load("outputs/models/mgwr_1_n1041.Rdata")
 
 # assign bandwidths 
-mbwa <- mgwr_n1041[[2]]$bws
-mgwr_2 <- mgwr_n1041
+mbwa <- mgwr_n1151[[2]]$bws
+mgwr_2 <- mgwr_n1151
 
 mgwr_2 <- gwr.multiscale(formula, data = gb.sp, adaptive = T,
                           max.iterations = 10000,
@@ -434,7 +434,7 @@ mgwr_2 <- gwr.multiscale(formula, data = gb.sp, adaptive = T,
                           bws0=c(mbwa),
                           bw.seled=rep(T, 13),
                           verbose = F, predictor.centered=rep(F, 12))
-save(mgwr_2, file="outputs/models/mgwr_2_n500.Rdata")
+#save(mgwr_2, file="outputs/models/mgwr_2_n500.Rdata")
 load("outputs/models/mgwr_2.Rdata")
 
 mgwr_2$GW.diagnostic
@@ -617,9 +617,9 @@ my_map_signif_coefs_diverging_func = function(x, var_name, var_name_TV, method, 
 }
 
 # significant MGWR maps
-esmap <- allmgwr_map_func(mgwr2_sf, "carsPerPreson", "CarsPerPerson")
-demap <- allmgwr_map_func(mgwr2_sf, "PTtoWork", "PTtoWork")
-eubmap <- allmgwr_map_func(mgwr2_sf, "cycleToWork", "Cycle to work")
+allmgwr_map_func(mgwr2_sf, "carsPerPreson", "CarsPerPerson")
+allmgwr_map_func(mgwr2_sf, "PTtoWork", "PTtoWork")
+allmgwr_map_func(mgwr2_sf, "cycleToWork", "Cycle to work")
 pttwmap <- allmgwr_map_func(mgwr2_sf, "privateTransporTtoWork", "Private transport\nto work")
 eubmap <- allmgwr_map_func(mgwr2_sf, "PrEuropeanDesc", "EU Desc")
 eubmap <- allmgwr_map_func(mgwr2_sf, "PrMaoriDesc", "Maori Desc")
