@@ -410,7 +410,7 @@ gwr_n1408 <- gwr.basic(formula,
                    data = hex.sp,
                    bw = bw_adap)
 gwr <- gwr_n1408
-save(gwr, file="outputs/models/gwr_1_n1408.Rdata")
+save(gwr, file="outputs/models/gwr_1_n1408_2.Rdata")
 
 # specify MGWR model
 mgwr_n1408 <- gwr.multiscale(formula,
@@ -420,9 +420,9 @@ mgwr_n1408 <- gwr.multiscale(formula,
                         kernel = "bisquare",
                         bws0=rep(100, 11),
                         verbose = F, predictor.centered=rep(T, 10))
-save(mgwr_n1408, file="outputs/models/mgwr_1_n1408.Rdata")
-load("outputs/models/gwr_1_n1408.Rdata")
-load("outputs/models/mgwr_1_n1408.Rdata")
+save(mgwr_n1408, file="outputs/models/mgwr_1_n1408_2.Rdata")
+#load("outputs/models/gwr_1_n1408.Rdata")
+#load("outputs/models/mgwr_1_n1408.Rdata")
 
 # second MGWR model
 #mgwr_2 <- gwr.multiscale(formula, data = gb.sp, adaptive = T,max.iterations = 10000,criterion="CVR", kernel = "bisquare",bws0=c(mbwa),bw.seled=rep(T, 13),verbose = F, predictor.centered=rep(F, 12))
@@ -714,3 +714,4 @@ save(reg4, file="outputs/models/spatialErrorModel.Rdata")
 summary(reg4)
 impacts(reg4, hex.lw)
 summary(impacts(reg4,hex.lw, R=500), zstat=TRUE)
+
