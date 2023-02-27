@@ -89,6 +89,9 @@ minmaxNORM01 <- function(x) {
 minmaxNORM1max <- function(x) {
   return (((x - min(x))) / (max(x) - min(x))*(max(x)-0.0001)+0.0001)
 }
+minmaxNORM0_10 <- function(x) {
+  return (((x - min(x))) / (max(x) - min(x))*(10-0)+0)
+} #1-10
 #Geometric Mean
 a_gmean <- function(x, w = NULL){
   if(is.null(w)){
@@ -265,7 +268,7 @@ sa1_all_index <- sa1_all_index |>
   mutate(kuli_no2s_addAgg = minmaxNORM01(kuli_addAgg))
 
 # KULI aggregation - without 2nd level agg - geometric average method
-sa1_all_index$kuli_no2s_geomAgg <- minmaxNORM01(apply(sa1_all_index[,c(67:105,129)], 1, FUN = a_gmean))
+sa1_all_index$kuli_no2s_geomAgg <- minmaxNORM0_10(apply(sa1_all_index[,c(67:105,129)], 1, FUN = a_gmean))
 # KULI aggregation - with 2nd level agg(geom) - geometric average method
 #sa1_all_index$kuli_geom2s_geomAgg <- minmaxNORM01(apply(sa1_all_index[,103:114], 1, FUN = a_gmean))
 # KULI aggregation - with 2nd level agg(add) - geometric average method
@@ -372,7 +375,7 @@ index_sa1g <- left_join(sa1_allg, sa1_all_index, by = c("SA12018_V1_00"="SA12018
 #walkability1 other1 greenspace1 leisure1 medical1 culture1 education1pt1 safety1
 tmap_mode("plot")
 tm_shape(index_sa1g) +
-  tm_polygons(col = c("kuli_no2s_MPIAgg", "kuli_no2s_geomAgg", "kuli_no2s_geomAgg_wrewards", "kuli_no2s_MPIAgg_wrewards"),
+  tm_polygons(col = c("kuli_no2s_geomAgg"),
               palette = "Reds", style = "kmeans", lwd=0, )#,
           #breaks = c(0,.1,.3,.6,.7,.8,.95,1))#, title = str_glue('Penalty= {penalty}'))
 index_sa1g |> ggplot() + geom_histogram(aes(c(kuli_no2s_MPIAgg)),bins=300)

@@ -42,7 +42,8 @@ library(spdep)
 library(gstat)
 library(geodaData)
 library(spatmap)
-
+library(data.table)
+library(collapse)
 
 #### Loading data ####
 # load the kuli data
@@ -139,6 +140,7 @@ sa1_imped[which(is.na(sa1_imped$PTtoWork),), "PTtoWork"] <- mean(sa1_imped$PTtoW
 sa1_imped[which(is.na(sa1_imped$cycleToWork),), "cycleToWork"] <- mean(sa1_imped$cycleToWork, na.rm=T)
 sa1_imped[which(is.na(sa1_imped$noCar),), "noCar"] <- mean(sa1_imped$noCar, na.rm=T)
 sa1_imped[which(is.na(sa1_imped$carsPerPreson),), "carsPerPreson"] <- mean(sa1_imped$carsPerPreson, na.rm=T)
+sa1_imped[which(is.na(sa1_imped$popUsual),), "popUsual"] <- 0
 
 #sa1_census <- left_join(sa1_polys, census, by = c("SA12018_V1_00"="code"))
 tmap_mode("plot")
@@ -223,7 +225,7 @@ summary(step.res)
 hex.lm = lm(formula, data = hexgrid)
 summary(hex.lm)
 
-stargazer(lm, hex.lm, flip=F, type="text", single.row = T, style="qje")
+stargazer(lm, hex.lm, flip=F, type="latex", single.row = T, style="qje")
 #### Autocorrelation ####
 ##### Moran's I####
 g.nb <- poly2nb(dfg)
@@ -497,7 +499,7 @@ allses <- rbind(gwr_se_long, mgwr_se_long)
 ggplot(allses, aes(x = variable, y = value, col= kind)) +
   geom_boxplot()
 
-#####Summary tables #####
+##### Summary tables #####
 # create a table with coefficient stats for GWR
 tab.gwr <- apply(gwr$SDF@data[, 1:11], 2, summary)
 
@@ -685,7 +687,18 @@ mgwrresmap <- residual_map_func("mgwr.resids","MGWR Residuals")
 
 tmap_arrange(polsresmap, gwrresmap, mgwrresmap, widths = c(.5,.5), ncol = 3)
 
+#### Population percentage ####
+sum(dfg$popUsual)
+df1<-df[3:14]
+df1 <- within(df1, quartile <- as.integer(cut(kuli_no2s_geomAgg, quantile(kuli_no2s_geomAgg, seq(0,1,.1)), include.lowest=TRUE)))
+df2 <- df1 |>
+  subset(select = c(quartile, popUsual)) |> 
+  dplyr::group_by(quartile) |>
+  dplyr::summarise(value = sum(popUsual)) |>
+  mutate(csum = cumsum(value))
 
+ggplot(df2) +
+  geom_point(aes(quartile, csum))
 
 #### Spatial Econometric models ####
 # first Moran's I
