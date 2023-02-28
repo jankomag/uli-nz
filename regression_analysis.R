@@ -252,7 +252,7 @@ moran.range <- function(lw) {
   wmat <- listw2mat(lw)
   return(range(eigen((wmat + t(wmat))/ 2) $values))
 } 
-#moran.range(g.lw)
+#moran.range(g.lw) -0.7588095  1.0563377
 
 # Moran's I at different distances
 start <- 0 # Starting distance in meters (the From)
