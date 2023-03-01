@@ -203,7 +203,8 @@ tm_shape(hexgrid) +
   tm_text(text = "rn") +
   tm_basemap("OpenStreetMap")
 #hexgrid.nb[[651]] = as.integer(c(1036,1037))
-hexgrid.nb[[999]] = as.integer(943)
+#hexgrid.nb[[999]] = as.integer(943)
+hexgrid.nb[[1078]] = as.integer(1096)
 
 hex.lw = nb2listw(hexgrid.nb)
 
@@ -398,21 +399,22 @@ tm_shape(dfg) +
 
 #### GWR ####
 # convert to sp
+au.sp = as(dfg, "Spatial")
 hex.sp = as(hexgrid, "Spatial")
 # determine the kernel bandwidth
-bw_adap <- bw.gwr(data=hex.sp, formula=formula, approach = "AIC", kernel="bisquare",
+bw_adap <- bw.gwr(data=au.sp, formula=formula, approach = "AIC", kernel="bisquare",
              adaptive = T) # adaptive as no of neighbors
 bw_fixed <- bw.gwr(data=hex.sp, formula=formula,approach = "AIC", kernel="bisquare",
              adaptive = F) # fixed bandwidth (in m)
 summary(as.vector(st_distance(hexgrid)))
 
 # specify GWR model
-gwr_n1408 <- gwr.basic(formula, 
+gwr_full <- gwr.basic(formula, 
                    adaptive = T,
-                   data = hex.sp,
+                   data = au.sp,
                    bw = bw_adap)
-gwr <- gwr_n1408
-save(gwr, file="outputs/models/gwr_1_n1408_2.Rdata")
+gwr <- gwr_full
+#save(gwr, file="outputs/models/gwr_1_n1408_2.Rdata")
 
 # specify MGWR model
 mgwr_n1408 <- gwr.multiscale(formula,
@@ -423,16 +425,12 @@ mgwr_n1408 <- gwr.multiscale(formula,
                         bws0=rep(100, 11),
                         verbose = F, predictor.centered=rep(T, 10))
 save(mgwr_n1408, file="outputs/models/mgwr_1_n1408_2.Rdata")
-#load("outputs/models/gwr_1_n1408.Rdata")
-#load("outputs/models/mgwr_1_n1408.Rdata")
+load("outputs/models/gwr_1_n1408.Rdata")
+load("outputs/models/mgwr_1_n1408.Rdata")
 
 # second MGWR model
 #mgwr_2 <- gwr.multiscale(formula, data = gb.sp, adaptive = T,max.iterations = 10000,criterion="CVR", kernel = "bisquare",bws0=c(mbwa),bw.seled=rep(T, 13),verbose = F, predictor.centered=rep(F, 12))
-
-mbwa <- mgwr_n1408[[2]]$bws
 mgwr_2 <- mgwr_n1408
-gwr
-mgwr_2
 mgwr_2$GW.diagnostic
 mbwa_2 <- round(mgwr_2[[2]]$bws,1)
 
@@ -502,10 +500,9 @@ ggplot(allses, aes(x = variable, y = value, col= kind)) +
 ##### Summary tables #####
 # create a table with coefficient stats for GWR
 tab.gwr <- apply(gwr$SDF@data[, 1:11], 2, summary)
-
 tab.gwr <- t(round(tab.gwr, 3))
 gwr_meancoef <- data.frame(tab.gwr[,4])
-stargazer(gwr_meancoef, summary=FALSE, digits=2, type="text")
+stargazer(gwr_meancoef, summary=FALSE, digits=3, type="text")
 
 # create a table with coefficient stats for MGWR
 coefs_msgwr = apply(mgwr_2$SDF@data[, 1:11], 2, summary)
@@ -518,21 +515,11 @@ olssum <- cbind(variable = rownames(olssum), olssum)
 rownames(olssum) <- 1:nrow(olssum)
 colnames(olssum)[2] <- "coef"
 
-summary_table <- data.frame(olssum, tab.gwr)
+summary_table <- data.frame(olssum, tab.gwr[,4], tab.mgwr[,c(5,1)])
 summary_table
-##### Moran #####
-#test for residuals from MGWR
-moran.test(gwr$SDF$residual, listw=g.lw)
-moran.test(mgwr_2$SDF$residual, listw=g.lw)
-moran.test(gb$ols.resids, listw=g.lw)
-moran.test(gb$olsopt.resids, listw=g.lw)
-
-# show moran's I
-c(unlist(gwr.morani[3])[1],unlist(gwr.morani[2]))
 
 # show diagnostics
 c(gwr$GW.diagnostic$AICc, gwr$GW.diagnostic$gwR2.adj)
-c(mgwr_8_12$GW.diagnostic$AICc, mgwr_8_12$GW.diagnostic$R2.val)
 c(mgwr_2$GW.diagnostic$AICc, mgwr_2$GW.diagnostic$R2.val)
 
 ##### Plotting results #####
@@ -601,7 +588,7 @@ map_signif_coefs_diverging_func = function(x, var_name, var_name_TV, method, var
     tm_style("col_blind") +
     # now add the tvalues layer
     tm_shape(x[signif,]) + tm_borders(lwd = 0.4) +
-    tm_layout(main.title = "GWR", legend.position = c("left","bottom"), frame = T, legend.outside = F,
+    tm_layout(main.title = method, legend.position = c("left","bottom"), frame = T, legend.outside = F,
               legend.title.fontfamily = "serif", main.title.size = 1, main.title.position = "center",
               #legend.width=.5, legend.height=1, legend.text.size=.8,legend.title.size=2,
               legend.bg.color="grey100", legend.bg.alpha=.7, main.title.fontfamily="serif") #,, legend.height=.5, 
@@ -630,44 +617,40 @@ allmgwr_map_func(mgwr2_sf, "PrEuropeanDesc", "EU Desc")
 allmgwr_map_func(mgwr2_sf, "PrMaoriDesc", "Maori Desc")
 allmgwr_map_func(mgwr2_sf, "noCar", "No Car")
 
-# MGWR_2 Only significant coefficients
-map_signif_coefs_func(x = mgwr2_sf, "carsPerPreson", "carsPerPreson_TV", "MGWR", "PrMaoriDesc")
-map_signif_coefs_func(x = mgwr2_sf, "PTtoWork", "PTtoWork_TV", "MGWR", "PTtoWork") # insignificant
-map_signif_coefs_func(x = mgwr2_sf, "cycleToWork", "cycleToWork_TV", "MGWR", "cycleToWork") #insignificant
-map_signif_coefs_func(x = mgwr2_sf, "privateTransporTtoWork", "privateTransporTtoWork_TV", "MGWR", "privateTransporTtoWork")
-map_signif_coefs_func(x = mgwr2_sf, "PrEuropeanDesc", "PrEuropeanDesc_TV", "MGWR", "PrEuropeanDesc")
-map_signif_coefs_func(x = mgwr2_sf, "PrMaoriDesc", "PrMaoriDesc_TV", "MGWR", "PrMaoriDesc")# insignificant
-map_signif_coefs_func(x = mgwr2_sf, "noCar", "noCar_TV", "MGWR", "noCar") #insignificant
+# GWR Only significant coefficients
+gwr_cars <- map_signif_coefs_diverging_func(x = gwr_sf, "carsPerPreson", "carsPerPreson_TV", "GWR", "carsPerPreson")
+map_signif_coefs_diverging_func(x = gwr_sf, "PTtoWork", "PTtoWork_TV", "GWR", "PTtoWork")
+map_signif_coefs_diverging_func(x = gwr_sf, "cycleToWork", "cycleToWork_TV", "GWR", "cycleToWork")
+gwr_privtr <- map_signif_coefs_diverging_func(x = gwr_sf, "privateTransporTtoWork", "privateTransporTtoWork_TV", "GWR", "privateTransporTtoWork")
+map_signif_coefs_diverging_func(x = gwr_sf, "PrEuropeanDesc", "PrEuropeanDesc_TV", "GWR", "PrEuropeanDesc")
+map_signif_coefs_diverging_func(x = gwr_sf, "PrMaoriDesc", "PrMaoriDesc_TV", "GWR", "PrMaoriDesc")
+map_signif_coefs_diverging_func(x = gwr_sf, "noCar", "noCar_TV", "GWR", "noCar")
 
 # MGWR_2 Only significant coefficients
-map_signif_coefs_diverging_func(x = mgwr2_sf, "carsPerPreson", "carsPerPreson_TV", "MGWR", "PrMaoriDesc")
+mgwr_cars <- map_signif_coefs_diverging_func(x = mgwr2_sf, "carsPerPreson", "carsPerPreson_TV", "MGWR", "carsPerPreson")
+mgwr_privtr <- map_signif_coefs_diverging_func(x = mgwr2_sf, "privateTransporTtoWork", "privateTransporTtoWork_TV", "MGWR", "privateTransporTtoWork")
+map_signif_coefs_diverging_func(x = mgwr2_sf, "PrEuropeanDesc", "PrEuropeanDesc_TV", "MGWR", "PrEuropeanDesc")
 map_signif_coefs_diverging_func(x = mgwr2_sf, "PTtoWork", "PTtoWork_TV", "MGWR", "PTtoWork") # insignificant
 map_signif_coefs_diverging_func(x = mgwr2_sf, "cycleToWork", "cycleToWork_TV", "MGWR", "cycleToWork") #insignificant
-map_signif_coefs_diverging_func(x = mgwr2_sf, "privateTransporTtoWork", "privateTransporTtoWork_TV", "MGWR", "privateTransporTtoWork")
-map_signif_coefs_diverging_func(x = mgwr2_sf, "PrEuropeanDesc", "PrEuropeanDesc_TV", "MGWR", "PrEuropeanDesc")
 map_signif_coefs_diverging_func(x = mgwr2_sf, "PrMaoriDesc", "PrMaoriDesc_TV", "MGWR", "PrMaoriDesc")# insignificant
 map_signif_coefs_diverging_func(x = mgwr2_sf, "noCar", "noCar_TV", "MGWR", "noCar") #insignificant
 
-#tmap_arrange(, , widths = c(.5,.5))
+tmap_arrange(gwr_privtr, gwr_cars, mgwr_privtr, mgwr_cars, widths = c(.5,.5))
 
 ##### Residuals #####
-#minmaxNORM <- function(x) {return (((x - min(x))) / (max(x) - min(x))*(0.1166441+0.0992775)-0.0992775)}
 # determine studentised residuals and attach
-gb$ols.resids <- rstudent(m)
-#gb <- mutate(gb, ols.resids = minmaxNORM(ols.resids))
-gb$olsopt.resids <- rstudent(ols_opt)
-#gb <- mutate(gb, olsopt.resids = minmaxNORM(olsopt.resids))
-gb$gwr.resids <- gwr$SDF$residual
-gb$mgwr.resids <- mgwr_2$SDF$residual
+dfg$ols.resids <- rstudent(lm)
+dfg$gwr.resids <- gwr$SDF$residual
+#hexgrid$mgwr.resids <- mgwr_2$SDF$residual
 
 #scatterplots of residuals
-ggplot(gb) +
-  geom_point(aes(x = share_leave, y=mgwr.resids), col="black", alpha=0.5) +
-  geom_point(aes(x = share_leave, y=gwr.resids), col="blue", alpha=0.2)
+ggplot(dfg) +
+  geom_point(aes(x = kuli_no2s_geomAgg, y=ols.resids), col="black", alpha=0.5) +
+  geom_point(aes(x = kuli_no2s_geomAgg, y=gwr.resids), col="blue", alpha=0.2)
 
 # map residuals
 residual_map_func = function(var_name, resid) {
-  p_out = tm_shape(gb) +
+  p_out = tm_shape(dfg) +
   tm_polygons(var_name, midpoint = 0, legend.hist = TRUE, lwd=0.05, palette= "PuOr",
               frame = T, style = "kmeans", title = resid, title.fontfamily="serif") +
   tm_style("col_blind") +
@@ -681,25 +664,74 @@ residual_map_func = function(var_name, resid) {
   
   p_out
 }
-polsresmap <- residual_map_func("olsopt.resids","POLS Residuals") #
+polsresmap <- residual_map_func("ols.resids","OLS Residuals") #
 gwrresmap <- residual_map_func("gwr.resids","GWR Residuals")
-mgwrresmap <- residual_map_func("mgwr.resids","MGWR Residuals")
+#mgwrresmap <- residual_map_func("mgwr.resids","MGWR Residuals")
 
-tmap_arrange(polsresmap, gwrresmap, mgwrresmap, widths = c(.5,.5), ncol = 3)
+tmap_arrange(polsresmap, gwrresmap, widths = c(.5,.5), ncol = 2)
 
-#### Population percentage ####
-sum(dfg$popUsual)
-df1<-df[3:14]
-df1 <- within(df1, quartile <- as.integer(cut(kuli_no2s_geomAgg, quantile(kuli_no2s_geomAgg, seq(0,1,.1)), include.lowest=TRUE)))
-df2 <- df1 |>
-  subset(select = c(quartile, popUsual)) |> 
+#### Quantile - analysis ####
+#load data
+#load additional data
+population <- read.csv('data/additionalData/auckland_census_2.csv')
+population <- population |>
+  subset(select = c(code, European, Maori, Pacific, Asian, MiddleEasternLatinAmericanAfrican, OtherEthnicity, PacificNum, popUsual)) |> 
+  mutate(code = as.character(code)) |> 
+  mutate(European = as.numeric(European)) |> 
+  mutate(Maori = as.numeric(Maori)) |>
+  mutate(Pacific = as.numeric(Pacific)) |>
+  mutate(Asian = as.numeric(Asian)) |>
+  mutate(MiddleEasternLatinAmericanAfrican = as.numeric(MiddleEasternLatinAmericanAfrican)) |>
+  mutate(OtherEthnicity = as.numeric(OtherEthnicity)) |> 
+  mutate(popUsual = as.numeric(popUsual)) |> 
+  mutate(PacificNum = as.numeric(PacificNum))
+
+#impute
+sa1_pop <- left_join(sa1_polys, population, by = c("SA12018_V1_00"="code"))
+kulionly <- kulinong |> 
+  subset(select = c(SA12018_V1_00, kuli_no2s_geomAgg))
+popdf <- left_join(sa1_pop, kulionly, by = c("SA12018_V1_00"="SA12018_V1_00"))
+popdf <- st_drop_geometry(popdf)
+
+popdf[which(is.na(popdf$European),), "European"] <- 0
+popdf[which(is.na(popdf$Maori),), "Maori"] <- 0
+popdf[which(is.na(popdf$Pacific),), "Pacific"] <- 0
+popdf[which(is.na(popdf$Asian),), "Asian"] <- 0
+popdf[which(is.na(popdf$MiddleEasternLatinAmericanAfrican),), "MiddleEasternLatinAmericanAfrican"] <- 0
+popdf[which(is.na(popdf$OtherEthnicity),), "OtherEthnicity"] <- 0
+popdf[which(is.na(popdf$PacificNum),), "PacificNum"] <- 0
+
+popdf1 <- within(popdf, quartile <- as.integer(cut(kuli_no2s_geomAgg, quantile(kuli_no2s_geomAgg, seq(0,1,.1)), include.lowest=T)))
+popdf2 <- popdf1 |>
+  subset(select = -c(SA12018_V1_00)) |> 
   dplyr::group_by(quartile) |>
-  dplyr::summarise(value = sum(popUsual)) |>
-  mutate(csum = cumsum(value))
+  summarise(across(everything(), list(sum))) |> 
+  mutate(csum_popusual = cumsum(popUsual_1)) |> 
+  mutate(csum_maori = cumsum(Maori_1)) |> 
+  mutate(csum_pacific = cumsum(Pacific_1)) |> 
+  mutate(csum_pacificnum = cumsum(PacificNum_1)) |> 
+  mutate(csum_asian = cumsum(Asian_1)) |> 
+  mutate(csum_melaa = cumsum(MiddleEasternLatinAmericanAfrican_1)) |> 
+  mutate(csum_other = cumsum(OtherEthnicity_1)) |> 
+  mutate(csum_eur = cumsum(European_1))
 
-ggplot(df2) +
-  geom_point(aes(quartile, csum))
+  
+ggplot(popdf2) +
+  geom_line(aes(quartile, csum_popusual), col="red") +
+  geom_line(aes(quartile, csum_eur), col="") +
+  geom_line(aes(quartile, csum_pacific), col="") +
+  geom_line(aes(quartile, csum_asian), col="") +
+  geom_line(aes(quartile, csum_melaa), col="") +
+  geom_line(aes(quartile, csum_other), col="")
 
+#single variable
+df2 <- df1 |>
+  subset(select = c(quartile, PrMaoriDesc, PrEuropeanDesc)) |> 
+  dplyr::group_by(quartile) |>
+  dplyr::summarise(valuemaori = sum(PrMaoriDesc))
+dplyr::summarise(valueeur = sum(PrEuropeanDesc)) |>
+  mutate(csum_maori = cumsum(valuemaori)) |> 
+  mutate(csum_eur = cumsum(valueeur))
 #### Spatial Econometric models ####
 # first Moran's I
 moran(hexgrid$kuli_no2s_geomAgg, hex.lw, length(hexgrid$kuli_no2s_geomAgg), Szero(hex.lw))
