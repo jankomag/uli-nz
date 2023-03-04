@@ -126,9 +126,9 @@ sa1_alltest |>
   ggplot() +
   geom_histogram(aes(Winsorize(testvar, minval = 0,maxval=90)), bins=400)
 
-sa1_all |>
+sa1_all_index |>
   ggplot() +
-  geom_histogram(aes(dist_emergency), bins=100)
+  geom_histogram(aes(evch1 + petrol1), bins=100)
 sa1_all |>
   ggplot() +
   geom_histogram(aes(log(dist_emergency)), bins=100)
@@ -164,7 +164,7 @@ sa1_all_index <- sa1_all |>
   mutate(petrol1 = minmaxNORM(-Winsorize(petrolBC, minval=1, maxval = 80))) |>
   mutate(evch1 = minmaxNORM(-(evchBC))) |> 
   mutate(housedens1 = minmaxNORM(Winsorize(log(househdens+0.0001), maxval = -4, minval = -10))) |> 
-  mutate(popdens1 = minmaxNORM(Winsorize(log(popdens+0.0001), maxval = -2, minval = -10))) |>
+  #mutate(popdens1 = minmaxNORM(Winsorize(log(popdens+0.0001), maxval = -2, minval = -10))) |>
   mutate(damp1 = minmaxNORM(-Winsorize(dampness, maxval = 0.5, minval = 0))) |>
   mutate(diversity1 = minmaxNORM(shannon)) |>
   mutate(crime1 = minmaxNORM(-Winsorize(log(crime_perarea), minval=-11, maxval=-5))) |> 
@@ -201,7 +201,8 @@ sa1_all_index <- sa1_all |>
   mutate(gym1 = minmaxNORM(-Winsorize(log(dist_gym+0.1), minval=4.5, maxval=10))) |> 
   mutate(beach1 = minmaxNORM(-Winsorize(dist_beach, minval=0, maxval=10000))) |> 
   mutate(affordability1 = minmaxNORM(-Winsorize(rentBC, minval=0, maxval=2500))) |> 
-  mutate(emergency1 = minmaxNORM(-Winsorize(emergencyBC, minval=0, maxval=90)))
+  mutate(emergency1 = minmaxNORM(-Winsorize(emergencyBC, minval=0, maxval=90))) |> 
+  mutate(carInfrastructure1 = minmaxNORM((evch1 + petrol1)/18))
 
 # second level aggregation - geometric average method
 sa1_all_index$carInfra2_geom <- minmaxNORM(apply(sa1_all_index[,65:66], 1, FUN = a_gmean))
@@ -268,6 +269,7 @@ sa1_all_index <- sa1_all_index |>
   mutate(kuli_no2s_addAgg = minmaxNORM01(kuli_addAgg))
 
 # KULI aggregation - without 2nd level agg - geometric average method
+sa1_all_index$kuli_no2s_geomAgg_nopopdens <- minmaxNORM0_10(apply(sa1_all_index[,67:105], 1, FUN = a_gmean))
 sa1_all_index$kuli_no2s_geomAgg <- minmaxNORM0_10(apply(sa1_all_index[,c(67:105,129)], 1, FUN = a_gmean))
 # KULI aggregation - with 2nd level agg(geom) - geometric average method
 #sa1_all_index$kuli_geom2s_geomAgg <- minmaxNORM01(apply(sa1_all_index[,103:114], 1, FUN = a_gmean))
@@ -375,13 +377,13 @@ index_sa1g <- left_join(sa1_allg, sa1_all_index, by = c("SA12018_V1_00"="SA12018
 #walkability1 other1 greenspace1 leisure1 medical1 culture1 education1pt1 safety1
 tmap_mode("plot")
 tm_shape(index_sa1g) +
-  tm_polygons(col = c("kuli_no2s_geomAgg"),
+  tm_polygons(col = c("kuli_no2s_geomAgg_nopopdens"),
               palette = "Reds", style = "kmeans", lwd=0, )#,
           #breaks = c(0,.1,.3,.6,.7,.8,.95,1))#, title = str_glue('Penalty= {penalty}'))
 index_sa1g |> ggplot() + geom_histogram(aes(c(kuli_no2s_MPIAgg)),bins=300)
 index_sa1g |> ggplot() + geom_histogram(aes(c(kuli_no2s_geomAgg)),bins=300)
 index_sa1g |> ggplot() + geom_histogram(aes(c(kuli_no2s_geomAgg_wrewards)),bins=300)
-st_write(index_sa1g, "data/geographic/sa1_kuli_all.gpkg")
+st_write(index_sa1g, "data/geographic/sa1_kuli_all_nopop.gpkg")
 
 # "walkability2", "carInfrastructure1","bikeability1","greenspace2","leisure2","medical2","culture2","education2","transport2", "safety2", "food2", "housing2"
 tm_shape(index_sa1g) +

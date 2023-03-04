@@ -81,7 +81,7 @@ aggr_plot <- aggr(census, col=c('navyblue','orange'), numbers=TRUE, sortVars=TRU
 
 sa1_census <- left_join(sa1_polys, census, by = c("SA12018_V1_00"="code"))
 tmap_mode("plot")
-tm_shape(sa1_census) + tm_polygons(col="deprivation", lwd=0, style="kmeans")
+tm_shape(sa1_census) + tm_polygons(col="PrMaoriDesc", lwd=0, style="kmeans")
 
 #### NN impute - impute NAs based on neighbouring values
 index <- st_touches(sa1_census, sa1_census)
@@ -203,14 +203,38 @@ tm_shape(hexgrid) +
   tm_text(text = "rn") +
   tm_basemap("OpenStreetMap")
 #hexgrid.nb[[651]] = as.integer(c(1036,1037))
-#hexgrid.nb[[999]] = as.integer(943)
-hexgrid.nb[[1078]] = as.integer(1096)
+hexgrid.nb[[999]] = as.integer(943)
+#hexgrid.nb[[1078]] = as.integer(1096)
 
 hex.lw = nb2listw(hexgrid.nb)
 
 gg.net2 <- nb2lines(hexgrid.nb,coords=st_geometry(st_centroid(hexgrid)), as_sf = F) 
 tm_shape(hexgrid) + tm_borders(col='grey') + 
   tm_shape(gg.net2) + tm_lines(col='red', alpha = 1)
+
+#### KULI Map ####
+bckgd <- st_read('outputs/data/land.gpkg', quiet = T) # transform to OSGB projection
+tm_shape(dfg) +tm_polygons("kuli_no2s_geomAgg",  lwd=0) +
+tm_shape(bckgd) + tm_polygons(col="#DCDACB", lwd=0) +
+tm_shape(dfg) +
+  tm_polygons("kuli_no2s_geomAgg", midpoint = 6, legend.hist = T, lwd=0.01, n=14,
+              style = "kmeans", title = "KULI in Auckland", title.fontfamily="serif") +
+  tm_style("col_blind") +
+  tm_layout(legend.position = c("left","bottom"), frame = F, legend.outside = F,
+            legend.title.fontfamily = "serif", bg.color="#CCEAE5") +
+            #legend.width=1, legend.height=1, legend.text.size=1,legend.title.size=1,
+            #legend.bg.color="grey100", legend.bg.alpha=.7,
+            #legend.hist.height=.2, legend.hist.width=.3, legend.hist.bg.color="grey90", legend.hist.bg.alpha=.4) +
+  tm_scale_bar(breaks = c(0, 100, 200), text.size = 0.6) +
+  tm_compass(type = "4star", size = 2, position = c("left", "top"))
+  
+  ggplot(dfg)+
+    geom_histogram(aes(kuli_no2s_geomAgg)) +
+    theme_minimal() +
+    theme(legend.position="right",
+          text=element_text(size=13,  family="serif")) +
+    ylab(" ") + xlab (" ")
+    #labs(title ="Boxplots of Coefficient estimates")
 
 #### OLS model ####
 # SA1 geometry
@@ -414,13 +438,13 @@ gwr_full <- gwr.basic(formula,
                    data = au.sp,
                    bw = bw_adap)
 gwr <- gwr_full
-#save(gwr, file="outputs/models/gwr_1_n1408_2.Rdata")
+save(hexgrid, file="outputs/models/hexgrid_n1408_notnb.Rdata")
 
 # specify MGWR model
 mgwr_n1408 <- gwr.multiscale(formula,
                         data = hex.sp,
                         adaptive = T, max.iterations = 10000,
-                        criterion="CVR",
+                        criterion="dCVR",
                         kernel = "bisquare",
                         bws0=rep(100, 11),
                         verbose = F, predictor.centered=rep(T, 10))
@@ -502,7 +526,8 @@ ggplot(allses, aes(x = variable, y = value, col= kind)) +
 tab.gwr <- apply(gwr$SDF@data[, 1:11], 2, summary)
 tab.gwr <- t(round(tab.gwr, 3))
 gwr_meancoef <- data.frame(tab.gwr[,4])
-stargazer(gwr_meancoef, summary=FALSE, digits=3, type="text")
+#stargazer(gwr_meancoef, summary=FALSE, digits=3, type="text")
+stargazer(lm, lm, lm, flip=F, type="latex", single.row = T, style="qje", digits=2)
 
 # create a table with coefficient stats for MGWR
 coefs_msgwr = apply(mgwr_2$SDF@data[, 1:11], 2, summary)
@@ -583,12 +608,12 @@ map_signif_coefs_diverging_func = function(x, var_name, var_name_TV, method, var
   signif = tval < -1.96 | tval > 1.96
   # map the counties
   p_out = tm_shape(x) +
-    tm_polygons(var_name, midpoint = 0, legend.hist = F, lwd=0.05,
-                style = "kmeans", title = varN, title.fontfamily="serif") +
+    tm_polygons(var_name, midpoint = 0, legend.hist = F, lwd=0.04,
+                style = "kmeans", title = varN, title.fontfamily="serif", n=8) +
     tm_style("col_blind") +
     # now add the tvalues layer
-    tm_shape(x[signif,]) + tm_borders(lwd = 0.4) +
-    tm_layout(main.title = method, legend.position = c("left","bottom"), frame = T, legend.outside = F,
+    tm_shape(x[signif,]) + tm_borders(lwd = 0.3) +
+    tm_layout(main.title = method, legend.position = c("left","bottom"), frame = F, legend.outside = F,
               legend.title.fontfamily = "serif", main.title.size = 1, main.title.position = "center",
               #legend.width=.5, legend.height=1, legend.text.size=.8,legend.title.size=2,
               legend.bg.color="grey100", legend.bg.alpha=.7, main.title.fontfamily="serif") #,, legend.height=.5, 
@@ -619,12 +644,13 @@ allmgwr_map_func(mgwr2_sf, "noCar", "No Car")
 
 # GWR Only significant coefficients
 gwr_cars <- map_signif_coefs_diverging_func(x = gwr_sf, "carsPerPreson", "carsPerPreson_TV", "GWR", "carsPerPreson")
-map_signif_coefs_diverging_func(x = gwr_sf, "PTtoWork", "PTtoWork_TV", "GWR", "PTtoWork")
-map_signif_coefs_diverging_func(x = gwr_sf, "cycleToWork", "cycleToWork_TV", "GWR", "cycleToWork")
+ger_pt <- map_signif_coefs_diverging_func(x = gwr_sf, "PTtoWork", "PTtoWork_TV", "GWR", "PTtoWork")
+ger_cycle <- map_signif_coefs_diverging_func(x = gwr_sf, "cycleToWork", "cycleToWork_TV", "GWR", "cycleToWork")
 gwr_privtr <- map_signif_coefs_diverging_func(x = gwr_sf, "privateTransporTtoWork", "privateTransporTtoWork_TV", "GWR", "privateTransporTtoWork")
-map_signif_coefs_diverging_func(x = gwr_sf, "PrEuropeanDesc", "PrEuropeanDesc_TV", "GWR", "PrEuropeanDesc")
-map_signif_coefs_diverging_func(x = gwr_sf, "PrMaoriDesc", "PrMaoriDesc_TV", "GWR", "PrMaoriDesc")
-map_signif_coefs_diverging_func(x = gwr_sf, "noCar", "noCar_TV", "GWR", "noCar")
+gwr_eu <- map_signif_coefs_diverging_func(x = gwr_sf, "PrEuropeanDesc", "PrEuropeanDesc_TV", "GWR", "PrEuropeanDesc")
+gwr_maori <- map_signif_coefs_diverging_func(x = gwr_sf, "PrMaoriDesc", "PrMaoriDesc_TV", "GWR", "PrMaoriDesc")
+gwr_nocar <- map_signif_coefs_diverging_func(x = gwr_sf, "noCar", "noCar_TV", "GWR", "noCar")
+tmap_arrange(gwr_cars, ger_pt, ger_cycle, gwr_privtr, gwr_eu, gwr_maori, gwr_nocar)
 
 # MGWR_2 Only significant coefficients
 mgwr_cars <- map_signif_coefs_diverging_func(x = mgwr2_sf, "carsPerPreson", "carsPerPreson_TV", "MGWR", "carsPerPreson")
@@ -637,6 +663,11 @@ map_signif_coefs_diverging_func(x = mgwr2_sf, "noCar", "noCar_TV", "MGWR", "noCa
 
 tmap_arrange(gwr_privtr, gwr_cars, mgwr_privtr, mgwr_cars, widths = c(.5,.5))
 
+#Maori pop
+maorimap <- tm_shape(dfg) + tm_polygons("PrMaoriDesc",lwd=0, style="kmeans")+
+  tm_style("col_blind") +
+  tm_layout(frame=F) 
+tmap_arrange(gwr_maori, maorimap, widths = c(.5,.5))
 ##### Residuals #####
 # determine studentised residuals and attach
 dfg$ols.resids <- rstudent(lm)
@@ -701,28 +732,32 @@ popdf[which(is.na(popdf$MiddleEasternLatinAmericanAfrican),), "MiddleEasternLati
 popdf[which(is.na(popdf$OtherEthnicity),), "OtherEthnicity"] <- 0
 popdf[which(is.na(popdf$PacificNum),), "PacificNum"] <- 0
 
-popdf1 <- within(popdf, quartile <- as.integer(cut(kuli_no2s_geomAgg, quantile(kuli_no2s_geomAgg, seq(0,1,.1)), include.lowest=T)))
+popdf1 <- within(popdf, quartile <- as.integer(cut(kuli_no2s_geomAgg, quantile(kuli_no2s_geomAgg, seq(0,1,.01)), include.lowest=T)))
 popdf2 <- popdf1 |>
   subset(select = -c(SA12018_V1_00)) |> 
   dplyr::group_by(quartile) |>
   summarise(across(everything(), list(sum))) |> 
-  mutate(csum_popusual = cumsum(popUsual_1)) |> 
-  mutate(csum_maori = cumsum(Maori_1)) |> 
-  mutate(csum_pacific = cumsum(Pacific_1)) |> 
-  mutate(csum_pacificnum = cumsum(PacificNum_1)) |> 
-  mutate(csum_asian = cumsum(Asian_1)) |> 
-  mutate(csum_melaa = cumsum(MiddleEasternLatinAmericanAfrican_1)) |> 
-  mutate(csum_other = cumsum(OtherEthnicity_1)) |> 
-  mutate(csum_eur = cumsum(European_1))
+  mutate(csum_popusual = cumsum(popUsual_1)/1354329) |> 
+  mutate(csum_maori = cumsum(Maori_1)/155307) |> 
+  mutate(csum_pacific = cumsum(Pacific_1)/235359) |> 
+  mutate(csum_asian = cumsum(Asian_1)/425376) |> 
+  mutate(csum_melaa = cumsum(MiddleEasternLatinAmericanAfrican_1)/34209) |> 
+  mutate(csum_other = cumsum(OtherEthnicity_1)/13878) |> 
+  mutate(csum_eur = cumsum(European_1)/654951)
 
-  
+colors <- c("European" = "blue", "Pasifika" = "green", "Asian" = "red", "Maori"="purple")
 ggplot(popdf2) +
-  geom_line(aes(quartile, csum_popusual), col="red") +
-  geom_line(aes(quartile, csum_eur), col="") +
-  geom_line(aes(quartile, csum_pacific), col="") +
-  geom_line(aes(quartile, csum_asian), col="") +
-  geom_line(aes(quartile, csum_melaa), col="") +
-  geom_line(aes(quartile, csum_other), col="")
+  geom_step(aes(quartile, csum_eur, color = "European")) +
+  geom_step(aes(quartile, csum_pacific, color="Pasifika")) +
+  geom_step(aes(quartile, csum_asian, color="Asian")) +
+  geom_step(aes(quartile, csum_maori, color="Maori")) +
+  theme_minimal() +
+  ylab('Share of Population') +xlab ('KULI Percentile') +
+  labs(title="Percentage of Population at Liveability Percentiles") +
+  scale_color_manual(values = colors) +
+  labs(color = "Legend")
+
+
 
 #single variable
 df2 <- df1 |>
