@@ -464,21 +464,21 @@ gwr_coef_cols <- data.frame(gwr$SDF@data[, 1:11])
 gwr_coef_cols$id <- 1:nrow(gwr_coef_cols)
 gwr_coef_cols$Model <- "GWR"
 gwr_long <- melt(gwr_coef_cols, id = c("id","Model"))
-mgwr_coef_cols <- data.frame(mgwr_2$SDF@data[, 1:11])
-mgwr_coef_cols$id <- 1:nrow(mgwr_coef_cols)
-mgwr_coef_cols$Model <- "MGWR"
-mgwr_long <- melt(mgwr_coef_cols, id = c("id","Model"))
+#mgwr_coef_cols <- data.frame(mgwr_2$SDF@data[, 1:11])
+#mgwr_coef_cols$id <- 1:nrow(mgwr_coef_cols)
+#mgwr_coef_cols$Model <- "MGWR"
+#mgwr_long <- melt(mgwr_coef_cols, id = c("id","Model"))
 olssum <- data.frame(lm$coefficients)
 olssum <- cbind(variable = rownames(olssum), olssum)
 rownames(olssum) <- 1:nrow(olssum)
 colnames(olssum)[2] <- "value"
-olssum$Model <- "POLS"
+olssum$Model <- "OLS"
 olssum$id <- 1:nrow(olssum)
 olssum$variable[olssum$variable == '(Intercept)'] <- 'Intercept'
 olssum <- olssum[,c(4,3,1,2)]
 
-allcoefs <- rbind(gwr_long, mgwr_long)
-allcoefs <- rbind(allcoefs, olssum)
+#allcoefs <- rbind(gwr_long, mgwr_long)
+allcoefs <- rbind(gwr_long, olssum)
 
 ggplot() +
   geom_boxplot(allcoefs, mapping = aes(x = variable, y = value, col= Model), position="dodge2") +
@@ -745,28 +745,19 @@ popdf2 <- popdf1 |>
   mutate(csum_other = cumsum(OtherEthnicity_1)/13878) |> 
   mutate(csum_eur = cumsum(European_1)/654951)
 
-colors <- c("European" = "blue", "Pasifika" = "green", "Asian" = "red", "Maori"="purple")
+colors <- c("Pakeha" = "blue", "Pasifika" = "red", "Asian" = "black", "Maori"="purple")
 ggplot(popdf2) +
-  geom_step(aes(quartile, csum_eur, color = "European")) +
+  geom_step(aes(quartile, csum_eur, color = "Pakeha")) +
   geom_step(aes(quartile, csum_pacific, color="Pasifika")) +
   geom_step(aes(quartile, csum_asian, color="Asian")) +
   geom_step(aes(quartile, csum_maori, color="Maori")) +
   theme_minimal() +
   ylab('Share of Population') +xlab ('KULI Percentile') +
-  labs(title="Percentage of Population at Liveability Percentiles") +
+  #labs(title="Percentage of Population at Liveability Percentiles") +
   scale_color_manual(values = colors) +
-  labs(color = "Legend")
+  labs(color = "Legend") +
+  theme(text=element_text(family="serif", size=12))
 
-
-
-#single variable
-df2 <- df1 |>
-  subset(select = c(quartile, PrMaoriDesc, PrEuropeanDesc)) |> 
-  dplyr::group_by(quartile) |>
-  dplyr::summarise(valuemaori = sum(PrMaoriDesc))
-dplyr::summarise(valueeur = sum(PrEuropeanDesc)) |>
-  mutate(csum_maori = cumsum(valuemaori)) |> 
-  mutate(csum_eur = cumsum(valueeur))
 #### Spatial Econometric models ####
 # first Moran's I
 moran(hexgrid$kuli_no2s_geomAgg, hex.lw, length(hexgrid$kuli_no2s_geomAgg), Szero(hex.lw))
