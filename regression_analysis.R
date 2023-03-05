@@ -143,12 +143,12 @@ sa1_imped[which(is.na(sa1_imped$carsPerPreson),), "carsPerPreson"] <- mean(sa1_i
 sa1_imped[which(is.na(sa1_imped$popUsual),), "popUsual"] <- 0
 
 #sa1_census <- left_join(sa1_polys, census, by = c("SA12018_V1_00"="code"))
-tmap_mode("plot")
-tm_shape(sa1_imped) + tm_polygons(col=c("PrEuropeanDesc","carsPerPreson","noCar",
-                                        "cycleToWork","PTtoWork","privateTransporTtoWork",
-                                        "bornOverseas","medianIncome","PrMaoriDesc","maoriDescent"), lwd=0, style="kmeans")
 kulinong <- st_drop_geometry(kuli)
 dfg <- left_join(sa1_imped, kulinong, by = c("SA12018_V1_00"="SA12018_V1_00"))
+tmap_mode("plot")
+tm_shape(dfg) + tm_polygons(col=c("PrEuropeanDesc","carsPerPreson","noCar",
+                                  "cycleToWork","PTtoWork","privateTransporTtoWork",
+                                  "bornOverseas","medianIncome","PrMaoriDesc","maoriDescent"), lwd=0, style="kmeans")
 df <- st_drop_geometry(dfg)
 summary(dfg)
 #### EDA ####
@@ -441,14 +441,14 @@ gwr <- gwr_full
 save(hexgrid, file="outputs/models/hexgrid_n1408_notnb.Rdata")
 
 # specify MGWR model
-mgwr_n1408 <- gwr.multiscale(formula,
-                        data = hex.sp,
+mgwr_full <- gwr.multiscale(formula,
+                        data = au.sp,
                         adaptive = T, max.iterations = 10000,
                         criterion="dCVR",
                         kernel = "bisquare",
                         bws0=rep(100, 11),
                         verbose = F, predictor.centered=rep(T, 10))
-save(mgwr_n1408, file="outputs/models/mgwr_1_n1408_2.Rdata")
+save(mgwr_full, file="outputs/models/mgwr_full.Rdata")
 load("outputs/models/gwr_1_n1408.Rdata")
 load("outputs/models/mgwr_1_n1408.Rdata")
 
@@ -464,10 +464,10 @@ gwr_coef_cols <- data.frame(gwr$SDF@data[, 1:11])
 gwr_coef_cols$id <- 1:nrow(gwr_coef_cols)
 gwr_coef_cols$Model <- "GWR"
 gwr_long <- melt(gwr_coef_cols, id = c("id","Model"))
-#mgwr_coef_cols <- data.frame(mgwr_2$SDF@data[, 1:11])
-#mgwr_coef_cols$id <- 1:nrow(mgwr_coef_cols)
-#mgwr_coef_cols$Model <- "MGWR"
-#mgwr_long <- melt(mgwr_coef_cols, id = c("id","Model"))
+mgwr_coef_cols <- data.frame(mgwr_2$SDF@data[, 1:11])
+mgwr_coef_cols$id <- 1:nrow(mgwr_coef_cols)
+mgwr_coef_cols$Model <- "MGWR"
+mgwr_long <- melt(mgwr_coef_cols, id = c("id","Model"))
 olssum <- data.frame(lm$coefficients)
 olssum <- cbind(variable = rownames(olssum), olssum)
 rownames(olssum) <- 1:nrow(olssum)
@@ -477,8 +477,8 @@ olssum$id <- 1:nrow(olssum)
 olssum$variable[olssum$variable == '(Intercept)'] <- 'Intercept'
 olssum <- olssum[,c(4,3,1,2)]
 
-#allcoefs <- rbind(gwr_long, mgwr_long)
-allcoefs <- rbind(gwr_long, olssum)
+allcoefs <- rbind(gwr_long, mgwr_long)
+allcoefs <- rbind(allcoefs, olssum)
 
 ggplot() +
   geom_boxplot(allcoefs, mapping = aes(x = variable, y = value, col= Model), position="dodge2") +
@@ -490,8 +490,9 @@ ggplot() +
         text=element_text(size=13,  family="serif")) +
   scale_color_manual(values=c("#6ECCAF","#344D67", "black")) +
   ylab('Coefficient estimate') +xlab ('')+
+  #scale_y_continuous(trans='log10')
   #labs(title ="Boxplots of Coefficient estimates") +
-  coord_cartesian(ylim = c(-11, 15))
+  coord_cartesian(ylim = c(-18, 18))
 
 ggplot(mgwr_long) +
   geom_boxplot(mapping = aes(x = variable, y = value), position="dodge2")
@@ -609,18 +610,18 @@ map_signif_coefs_diverging_func = function(x, var_name, var_name_TV, method, var
   # map the counties
   p_out = tm_shape(x) +
     tm_polygons(var_name, midpoint = 0, legend.hist = F, lwd=0.04,
-                style = "kmeans", title = varN, title.fontfamily="serif", n=8) +
-    tm_style("col_blind") +
+                style = "kmeans", title = varN, title.fontfamily="serif", n=8, palette = "seq") +
+    #tm_style("col_blind") +
     # now add the tvalues layer
-    tm_shape(x[signif,]) + tm_borders(lwd = 0.3) +
-    tm_layout(main.title = method, legend.position = c("left","bottom"), frame = F, legend.outside = F,
+    tm_shape(x[signif,]) + tm_borders(lwd = 0.25) +
+    tm_layout(main.title = method, legend.position = c("left","bottom"), frame = T, legend.outside = F,
               legend.title.fontfamily = "serif", main.title.size = 1, main.title.position = "center",
-              #legend.width=.5, legend.height=1, legend.text.size=.8,legend.title.size=2,
-              legend.bg.color="grey100", legend.bg.alpha=.7, main.title.fontfamily="serif") #,, legend.height=.5, 
+              legend.width=.3, legend.height=.4, legend.text.size=.4,legend.title.size=.8,
+              legend.bg.color="grey100", legend.bg.alpha=.7, main.title.fontfamily="serif",
+              aes.palette = list(seq = "-RdBu"))
   #legend.hist.height=.2, legend.hist.width=.3, legend.hist.bg.color="grey90", legend.hist.bg.alpha=.4)
   #tm_scale_bar(breaks = c(0, 100, 200), text.size = 0.6) +
   #tm_compass(type = "4star", size = 2, position = c("left", "top"))
-  # return the output
   p_out
 }
 
@@ -643,30 +644,31 @@ allmgwr_map_func(mgwr2_sf, "PrMaoriDesc", "Maori Desc")
 allmgwr_map_func(mgwr2_sf, "noCar", "No Car")
 
 # GWR Only significant coefficients
-gwr_cars <- map_signif_coefs_diverging_func(x = gwr_sf, "carsPerPreson", "carsPerPreson_TV", "GWR", "carsPerPreson")
-ger_pt <- map_signif_coefs_diverging_func(x = gwr_sf, "PTtoWork", "PTtoWork_TV", "GWR", "PTtoWork")
-ger_cycle <- map_signif_coefs_diverging_func(x = gwr_sf, "cycleToWork", "cycleToWork_TV", "GWR", "cycleToWork")
-gwr_privtr <- map_signif_coefs_diverging_func(x = gwr_sf, "privateTransporTtoWork", "privateTransporTtoWork_TV", "GWR", "privateTransporTtoWork")
+gwr_cars <- map_signif_coefs_diverging_func(x = gwr_sf, "carsPerPreson", "carsPerPreson_TV", "Cars per Person", "GWR Coefficient")
+gwr_pt <- map_signif_coefs_diverging_func(x = gwr_sf, "PTtoWork", "PTtoWork_TV", "GWR", "PTtoWork")
+gwr_cycle <- map_signif_coefs_diverging_func(x = gwr_sf, "cycleToWork", "cycleToWork_TV", "GWR", "cycleToWork")
+gwr_privtr <- map_signif_coefs_diverging_func(x = gwr_sf, "privateTransporTtoWork", "privateTransporTtoWork_TV", "% Private Transport", "GWR Coefficient")
 gwr_eu <- map_signif_coefs_diverging_func(x = gwr_sf, "PrEuropeanDesc", "PrEuropeanDesc_TV", "GWR", "PrEuropeanDesc")
-gwr_maori <- map_signif_coefs_diverging_func(x = gwr_sf, "PrMaoriDesc", "PrMaoriDesc_TV", "GWR", "PrMaoriDesc")
+gwr_maori <- map_signif_coefs_diverging_func(x = gwr_sf, "PrMaoriDesc", "PrMaoriDesc_TV", "Effect of %Maori Descent on KULI", "Coefficient")
 gwr_nocar <- map_signif_coefs_diverging_func(x = gwr_sf, "noCar", "noCar_TV", "GWR", "noCar")
-tmap_arrange(gwr_cars, ger_pt, ger_cycle, gwr_privtr, gwr_eu, gwr_maori, gwr_nocar)
+tmap_arrange(gwr_cars, gwr_pt, gwr_cycle, gwr_privtr, gwr_eu, gwr_maori, gwr_nocar)
 
 # MGWR_2 Only significant coefficients
-mgwr_cars <- map_signif_coefs_diverging_func(x = mgwr2_sf, "carsPerPreson", "carsPerPreson_TV", "MGWR", "carsPerPreson")
-mgwr_privtr <- map_signif_coefs_diverging_func(x = mgwr2_sf, "privateTransporTtoWork", "privateTransporTtoWork_TV", "MGWR", "privateTransporTtoWork")
+mgwr_cars <- map_signif_coefs_diverging_func(x = mgwr2_sf, "carsPerPreson", "carsPerPreson_TV", "", "MGWR Coefficient")
+mgwr_privtr <- map_signif_coefs_diverging_func(x = mgwr2_sf, "privateTransporTtoWork", "privateTransporTtoWork_TV", "", "MGWR Coefficient")
 map_signif_coefs_diverging_func(x = mgwr2_sf, "PrEuropeanDesc", "PrEuropeanDesc_TV", "MGWR", "PrEuropeanDesc")
 map_signif_coefs_diverging_func(x = mgwr2_sf, "PTtoWork", "PTtoWork_TV", "MGWR", "PTtoWork") # insignificant
 map_signif_coefs_diverging_func(x = mgwr2_sf, "cycleToWork", "cycleToWork_TV", "MGWR", "cycleToWork") #insignificant
 map_signif_coefs_diverging_func(x = mgwr2_sf, "PrMaoriDesc", "PrMaoriDesc_TV", "MGWR", "PrMaoriDesc")# insignificant
 map_signif_coefs_diverging_func(x = mgwr2_sf, "noCar", "noCar_TV", "MGWR", "noCar") #insignificant
 
-tmap_arrange(gwr_privtr, gwr_cars, mgwr_privtr, mgwr_cars, widths = c(.5,.5))
+tmap_arrange(gwr_privtr, gwr_cars, mgwr_privtr, mgwr_cars)#, widths = c(.5,.5))
 
 #Maori pop
-maorimap <- tm_shape(dfg) + tm_polygons("PrMaoriDesc",lwd=0, style="kmeans")+
-  tm_style("col_blind") +
-  tm_layout(frame=F) 
+maorimap <- tm_shape(dfg) + tm_polygons("PrMaoriDesc",lwd=0, style="kmeans", title="%Maori Descent") +
+  tm_layout(frame=T, main.title = "Percentage Maori Descent",
+            legend.title.fontfamily = "serif", main.title.fontfamily = "serif",
+            main.title.size = 1, title.size = .5, main.title.position = "center") 
 tmap_arrange(gwr_maori, maorimap, widths = c(.5,.5))
 ##### Residuals #####
 # determine studentised residuals and attach
