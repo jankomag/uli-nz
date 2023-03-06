@@ -164,7 +164,7 @@ sa1_all_index <- sa1_all |>
   mutate(petrol1 = minmaxNORM(-Winsorize(petrolBC, minval=1, maxval = 80))) |>
   mutate(evch1 = minmaxNORM(-(evchBC))) |> 
   mutate(housedens1 = minmaxNORM(Winsorize(log(househdens+0.0001), maxval = -4, minval = -10))) |> 
-  #mutate(popdens1 = minmaxNORM(Winsorize(log(popdens+0.0001), maxval = -2, minval = -10))) |>
+  mutate(popdens1 = minmaxNORM(Winsorize(log(popdens+0.0001), maxval = -2, minval = -10))) |>
   mutate(damp1 = minmaxNORM(-Winsorize(dampness, maxval = 0.5, minval = 0))) |>
   mutate(diversity1 = minmaxNORM(shannon)) |>
   mutate(crime1 = minmaxNORM(-Winsorize(log(crime_perarea), minval=-11, maxval=-5))) |> 
@@ -414,7 +414,71 @@ corrplot(cor, tl.srt = 45, type = "lower", method = "ellipse",
 corr <- rcorr(as.matrix(df_indicators))
 flattenCorrMatrix(corr$r, corr$P)
 
+#### Mapping indicators ####
+indicators_sa1g <- left_join(sa1_allg, sa1_all_index, by = c("SA12018_V1_00"="SA12018_V1_00"))
+indic_map_func = function(var_name, titl) {
+  mapout = tm_shape(indicators_sa1g) +
+    tm_polygons(var_name, lwd=0,style = "kmeans", title = "Indicator",
+                title.fontfamily="serif", palette="Greys", legend.show = FALSE) +
+    #tm_style("col_blind") +
+    tm_layout(main.title = titl, frame = T,# legend.outside = F,
+              main.title.size = .5, main.title.position = "center",
+              main.title.fontfamily="serif")
+  mapout
+}
+station = indic_map_func("station1", "Train Station")
+busstop = indic_map_func("bustop1", "Bus Stop")
+freqb = indic_map_func("freqbusstop1", "Frequent Bus Stop")
+popden = indic_map_func("popdens1", "Pop Density")
+hous=indic_map_func("housedens1", "House Density")
+damp = indic_map_func("damp1", "Dampness")
+diver = indic_map_func("diversity1", "Diversity")
+crime = indic_map_func("crime1", "Crime")
+crash = indic_map_func("crashes1", "Crashes")
+flood = indic_map_func("flood1", "Floods")
+alco = indic_map_func("alcohol1", "Alcohol Prohibited")
+marae = indic_map_func("marae1", "Marae")
+cinem=indic_map_func("cinema1", "Cinema")
+gall = indic_map_func("gallery1","Gallery")
+libr = indic_map_func("library1", "Library")
+museum = indic_map_func("museum1", "Museum")
+theat = indic_map_func("theatre1", "Theatre")
+chemi = indic_map_func("chemist1", "Chemist")
+denti = indic_map_func("dentist1", "Dentist")
+health = indic_map_func("healthcr1", "Healthcentre")
+hospi = indic_map_func("hospital1", "Hospital")
+childc = indic_map_func("childcare1", "Childcare")
+sport = indic_map_func("sport1", "Sport Facilities")
+convs = indic_map_func("convstor1", "Convenience Store")
+superm = indic_map_func("supermarket1", "Supermarket")
+secon = indic_map_func("secondary1", "Secondary School")
+prim = indic_map_func("primary1" , "Primary School")
+stcon = indic_map_func("strconnectivity1", "Street Connectivity")
+bigp <- indic_map_func("bigpark1", "Big Park")
+smolp <- indic_map_func("smallpark1", "Small Park")
+cafe <- indic_map_func("cafe1", "Cafe")
+resta <- indic_map_func("restaurant1", "Restaurant")
+pub <- indic_map_func("pub1", "Pub")
+bbq <- indic_map_func("bbq1", "BBQ")
+bikeab <- indic_map_func("bikeability1", "Bikeability")
+gym <- indic_map_func("gym1", "Gym")
+beach <- indic_map_func("beach1", "Beach")
+afford <- indic_map_func("affordability1", "Affordability")
+carinf <- indic_map_func("carInfrastructure1", "Car Infrastructure")
+emer <- indic_map_func("emergency1", "Emergency")
 
+tmap_arrange(bigp, smolp, cafe, resta, widths = c(0.25,0.25,0.25,0.25))
+tmap_arrange(station,busstop,freqb,bikeab,carinf,
+             convs,superm,popden,hous,stcon,
+             cinem,gym,theat,libr,museum,gall,sport,
+             afford,damp,
+             alco,crime,crash,flood,emer,
+             marae,diver,
+             chemi,denti,health,hospi,
+             childc,prim,secon,
+             cafe, resta, pub, bbq,
+             bigp,smolp,beach,
+             nrow=8, ncol=5)
 #### Other ####
 # lambdas
 #Common maximum value for tranformations
