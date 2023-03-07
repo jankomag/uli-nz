@@ -415,21 +415,24 @@ corr <- rcorr(as.matrix(df_indicators))
 flattenCorrMatrix(corr$r, corr$P)
 
 #### Mapping indicators ####
+border <- st_read("data/geographic/sa1_auckland_waiheke_urban_new_final.gpkg") |> st_transform(27291)
+
 indicators_sa1g <- left_join(sa1_allg, sa1_all_index, by = c("SA12018_V1_00"="SA12018_V1_00"))
 indic_map_func = function(var_name, titl) {
-  mapout = tm_shape(indicators_sa1g) +
+  mapout = tm_shape(border) + tm_polygons(col="black", lwd=1)+
+    tm_shape(indicators_sa1g) +
     tm_polygons(var_name, lwd=0,style = "kmeans", title = "Indicator",
                 title.fontfamily="serif", palette="Greys", legend.show = FALSE) +
-    #tm_style("col_blind") +
+    tm_style("col_blind") +
     tm_layout(main.title = titl, frame = T,# legend.outside = F,
-              main.title.size = .5, main.title.position = "center",
+              main.title.size = 4, main.title.position = "center",
               main.title.fontfamily="serif")
   mapout
 }
 station = indic_map_func("station1", "Train Station")
 busstop = indic_map_func("bustop1", "Bus Stop")
 freqb = indic_map_func("freqbusstop1", "Frequent Bus Stop")
-popden = indic_map_func("popdens1", "Pop Density")
+popden = indic_map_func("popdens1", "Population Density")
 hous=indic_map_func("housedens1", "House Density")
 damp = indic_map_func("damp1", "Dampness")
 diver = indic_map_func("diversity1", "Diversity")
@@ -465,20 +468,23 @@ gym <- indic_map_func("gym1", "Gym")
 beach <- indic_map_func("beach1", "Beach")
 afford <- indic_map_func("affordability1", "Affordability")
 carinf <- indic_map_func("carInfrastructure1", "Car Infrastructure")
-emer <- indic_map_func("emergency1", "Emergency")
+emer <- indic_map_func("emergency1", "Emergency Service")
 
-tmap_arrange(bigp, smolp, cafe, resta, widths = c(0.25,0.25,0.25,0.25))
+#png(file="outputs/mapsindics2.png",width=4000, height=6400)
+png(file="outputs/mapsindics_full.png",width=4000, height=6400)
+
 tmap_arrange(station,busstop,freqb,bikeab,carinf,
-             convs,superm,popden,hous,stcon,
-             cinem,gym,theat,libr,museum,gall,sport,
+             convs,superm,popden,hous,stcon,cinem,gym,theat,libr,museum,gall,sport,
              afford,damp,
              alco,crime,crash,flood,emer,
              marae,diver,
-             chemi,denti,health,hospi,
-             childc,prim,secon,
+             chemi,denti,health,hospi,childc,prim,secon,
              cafe, resta, pub, bbq,
              bigp,smolp,beach,
              nrow=8, ncol=5)
+dev.off()
+
+
 #### Other ####
 # lambdas
 #Common maximum value for tranformations
