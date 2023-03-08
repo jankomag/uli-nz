@@ -118,7 +118,8 @@ a_gmean <- function(x, w = NULL){
 b <- boxcox(lm(((dist_emergency+0.0001)) ~ 1, data=sa1_all))
 lambda <- b$x[which.max(b$y)]
 sa1_alltest <- sa1_all |> 
-  mutate(testvar = ((dist_emergency+0.0001) ^ lambda - 1) / lambda)
+  mutate(testvar = ((dist_emergency+0.0001) ^ lambda - 1) / lambda) |> 
+  mutate(testvar2 = )
 sa1_all |>
   ggplot() +
   geom_histogram(aes(log(dist_emergency)), bins=400)
@@ -126,15 +127,22 @@ sa1_alltest |>
   ggplot() +
   geom_histogram(aes(Winsorize(testvar, minval = 0,maxval=90)), bins=400)
 
-sa1_all_index |>
+# Choosing indicator transformations
+sa1_alltest <- sa1_allg |> 
+  mutate(househdens = no_households/area) |> 
+  mutate(raw = no_households) |> 
+  mutate(testvar2 = minmaxNORM(Winsorize(no_households, minval=0, maxval=50)))
+
+tm_shape(sa1_alltest) +
+  tm_polygons(c("raw", "testvar2"),lwd=0, style="kmeans", palette="Reds")
+
+sa1_alltest |>
   ggplot() +
-  geom_histogram(aes(evch1 + petrol1), bins=100)
-sa1_all |>
-  ggplot() +
-  geom_histogram(aes(log(dist_emergency)), bins=100)
+  geom_histogram(aes(no_households), bins=100)
+
+
 
 # optimised lambda values for chosen variables
-lambdaFlood <- -0.06060606
 lambdahealth <- 0.3434343
 lambdachildcare <- 0.06060606
 lambdasport <- 0.3838384
@@ -150,7 +158,6 @@ lambdaemergency <- 0.4646465
 sa1_all_index <- sa1_all |> 
   mutate(househdens = no_households/area) |> 
   mutate(rentBC = ((medianRent+0.1) ^ lambdarent - 1) / lambdarent) |> 
-  mutate(floodBC = ((floodprone_prc+1) ^ lambdaFlood - 1) / lambdaFlood) |> 
   mutate(healthcBC = ((dist_healthcentre+0.1) ^ lambdahealth - 1) / lambdahealth) |> 
   mutate(childcareBC = ((dist_childcare+0.1) ^ lambdachildcare - 1) / lambdachildcare) |> 
   mutate(petrolBC = ((dist_petrol+0.1) ^ lambdapetrol - 1) / lambdapetrol) |> 
@@ -169,7 +176,7 @@ sa1_all_index <- sa1_all |>
   mutate(diversity1 = minmaxNORM(shannon)) |>
   mutate(crime1 = minmaxNORM(-Winsorize(log(crime_perarea), minval=-11, maxval=-5))) |> 
   mutate(crashes1 = minmaxNORM(Winsorize(log(dist_crash), minval=4, maxval=10))) |> 
-  mutate(flood1 = minmaxNORM(-Winsorize(floodBC, minval=-6, maxval=1))) |> 
+  mutate(flood1 = minmaxNORM(-Winsorize(floodprone_prc, minval=0, maxval=.125))) |> 
   mutate(alcohol1 = minmaxNORM(alcoprohibited)) |> 
   mutate(station1 = minmaxNORM(-Winsorize(log(dist_stations), minval=5, maxval=11))) |> 
   mutate(bustop1 = minmaxNORM(-Winsorize(dist_busstops, minval=0, maxval = 1000))) |> 

@@ -609,49 +609,38 @@ map_signif_coefs_diverging_func = function(x, var_name, var_name_TV, method, var
   signif = tval < -1.96 | tval > 1.96
   # map the counties
   p_out = tm_shape(x) +
-    tm_polygons(var_name, midpoint = 0, legend.hist = F, lwd=0.04,
-                style = "kmeans", title = varN, title.fontfamily="serif", n=8, palette = "seq") +
+    tm_polygons(var_name, midpoint = 0, legend.hist = F, legend.show=T, lwd=0.04,
+                style = "kmeans", title = varN, title.fontfamily="serif",
+                n=8, palette = "seq") +
     #tm_style("col_blind") +
     # now add the tvalues layer
-    tm_shape(x[signif,]) + tm_borders(lwd = 0.25) +
-    tm_layout(main.title = method, legend.position = c("left","bottom"), frame = T, legend.outside = F,
-              legend.title.fontfamily = "serif", main.title.size = 1, main.title.position = "center",
-              legend.width=.3, legend.height=.4, legend.text.size=.4,legend.title.size=.8,
+    tm_shape(x[signif,]) + tm_borders(lwd = 0.2, col="black") +
+    tm_layout(main.title = method, legend.position = c("left","bottom"),
+              frame = T, legend.outside = F,
+              legend.format = list(fun = function(x) formatC(x, digits = 1, format = "f")),
+              legend.title.fontfamily = "serif", main.title.size = 4, main.title.position = "center",
+              legend.width=2, legend.height=2, legend.text.size=2,legend.title.size=3,
               legend.bg.color="grey100", legend.bg.alpha=.7, main.title.fontfamily="serif",
               aes.palette = list(seq = "-RdBu"))
+             # legend.hist.width = 1,legend.hist.height = 0.5)
   #legend.hist.height=.2, legend.hist.width=.3, legend.hist.bg.color="grey90", legend.hist.bg.alpha=.4)
   #tm_scale_bar(breaks = c(0, 100, 200), text.size = 0.6) +
   #tm_compass(type = "4star", size = 2, position = c("left", "top"))
   p_out
 }
 
-# significant GWR maps
-allmgwr_map_func(gwr_sf, "carsPerPreson", "CarsPerPerson")
-allmgwr_map_func(gwr_sf, "PTtoWork", "PTtoWork")
-allmgwr_map_func(gwr_sf, "cycleToWork", "Cycle to work")
-allmgwr_map_func(gwr_sf, "privateTransporTtoWork", "Private transport\nto work")
-allmgwr_map_func(gwr_sf, "PrEuropeanDesc", "EU Desc")
-allmgwr_map_func(gwr_sf, "PrMaoriDesc", "Maori Desc")
-allmgwr_map_func(gwr_sf, "noCar", "No Car")
+# GWR all coefficients
+gwr_cars <- map_signif_coefs_diverging_func(x = gwr_sf, "carsPerPreson", "carsPerPreson_TV", "Cars per Person", "Coefficient")
+gwr_pt <- map_signif_coefs_diverging_func(x = gwr_sf, "PTtoWork", "PTtoWork_TV", "% Public Transport to Work", "Coefficient")
+gwr_cycle <- map_signif_coefs_diverging_func(x = gwr_sf, "cycleToWork", "cycleToWork_TV", "% Cycle to Work", "Coefficient")
+gwr_privtr <- map_signif_coefs_diverging_func(x = gwr_sf, "privateTransporTtoWork", "privateTransporTtoWork_TV", "% Private Transport", "Coefficient")
+gwr_eu <- map_signif_coefs_diverging_func(x = gwr_sf, "PrEuropeanDesc", "PrEuropeanDesc_TV", "% European Descent", "Coefficient")
+gwr_maori <- map_signif_coefs_diverging_func(x = gwr_sf, "PrMaoriDesc", "PrMaoriDesc_TV", "% Maori Descent", "Coefficient")
+gwr_nocar <- map_signif_coefs_diverging_func(x = gwr_sf, "noCar", "noCar_TV", "% No Car", "Coefficient")
 
-# significant MGWR maps
-allmgwr_map_func(mgwr2_sf, "carsPerPreson", "CarsPerPerson")
-allmgwr_map_func(mgwr2_sf, "PTtoWork", "PTtoWork")
-allmgwr_map_func(mgwr2_sf, "cycleToWork", "Cycle to work")
-allmgwr_map_func(mgwr2_sf, "privateTransporTtoWork", "Private transport\nto work")
-allmgwr_map_func(mgwr2_sf, "PrEuropeanDesc", "EU Desc")
-allmgwr_map_func(mgwr2_sf, "PrMaoriDesc", "Maori Desc")
-allmgwr_map_func(mgwr2_sf, "noCar", "No Car")
-
-# GWR Only significant coefficients
-gwr_cars <- map_signif_coefs_diverging_func(x = gwr_sf, "carsPerPreson", "carsPerPreson_TV", "Cars per Person", "GWR Coefficient")
-gwr_pt <- map_signif_coefs_diverging_func(x = gwr_sf, "PTtoWork", "PTtoWork_TV", "GWR", "PTtoWork")
-gwr_cycle <- map_signif_coefs_diverging_func(x = gwr_sf, "cycleToWork", "cycleToWork_TV", "GWR", "cycleToWork")
-gwr_privtr <- map_signif_coefs_diverging_func(x = gwr_sf, "privateTransporTtoWork", "privateTransporTtoWork_TV", "% Private Transport", "GWR Coefficient")
-gwr_eu <- map_signif_coefs_diverging_func(x = gwr_sf, "PrEuropeanDesc", "PrEuropeanDesc_TV", "GWR", "PrEuropeanDesc")
-gwr_maori <- map_signif_coefs_diverging_func(x = gwr_sf, "PrMaoriDesc", "PrMaoriDesc_TV", "Effect of %Maori Descent on KULI", "Coefficient")
-gwr_nocar <- map_signif_coefs_diverging_func(x = gwr_sf, "noCar", "noCar_TV", "GWR", "noCar")
+png(file="outputs/allgwr.png",width=3000, height=2000)
 tmap_arrange(gwr_cars, gwr_pt, gwr_cycle, gwr_privtr, gwr_eu, gwr_maori, gwr_nocar)
+dev.off()
 
 # MGWR_2 Only significant coefficients
 mgwr_cars <- map_signif_coefs_diverging_func(x = mgwr2_sf, "carsPerPreson", "carsPerPreson_TV", "", "MGWR Coefficient")
@@ -670,38 +659,6 @@ maorimap <- tm_shape(dfg) + tm_polygons("PrMaoriDesc",lwd=0, style="kmeans", tit
             legend.title.fontfamily = "serif", main.title.fontfamily = "serif",
             main.title.size = 1, title.size = .5, main.title.position = "center") 
 tmap_arrange(gwr_maori, maorimap, widths = c(.5,.5))
-##### Residuals #####
-# determine studentised residuals and attach
-dfg$ols.resids <- rstudent(lm)
-dfg$gwr.resids <- gwr$SDF$residual
-#hexgrid$mgwr.resids <- mgwr_2$SDF$residual
-
-#scatterplots of residuals
-ggplot(dfg) +
-  geom_point(aes(x = kuli_no2s_geomAgg, y=ols.resids), col="black", alpha=0.5) +
-  geom_point(aes(x = kuli_no2s_geomAgg, y=gwr.resids), col="blue", alpha=0.2)
-
-# map residuals
-residual_map_func = function(var_name, resid) {
-  p_out = tm_shape(dfg) +
-  tm_polygons(var_name, midpoint = 0, legend.hist = TRUE, lwd=0.05, palette= "PuOr",
-              frame = T, style = "kmeans", title = resid, title.fontfamily="serif") +
-  tm_style("col_blind") +
-  tm_layout(legend.position = c("right","top"), frame = T, legend.outside = F,
-            legend.title.fontfamily = "serif", legend.just="right",
-            legend.width=.5, legend.height=1, legend.text.size=.8,legend.title.size=2,
-            legend.bg.color="grey100", legend.bg.alpha=.7,
-            legend.hist.height=.1, legend.hist.width =.5, legend.hist.bg.color="grey90", legend.hist.bg.alpha=.5)+
-  tm_scale_bar(breaks = c(0, 100, 200), text.size = 0.4) +
-  tm_compass(type = "4star", size = 1, position = c("left", "top"))
-  
-  p_out
-}
-polsresmap <- residual_map_func("ols.resids","OLS Residuals") #
-gwrresmap <- residual_map_func("gwr.resids","GWR Residuals")
-#mgwrresmap <- residual_map_func("mgwr.resids","MGWR Residuals")
-
-tmap_arrange(polsresmap, gwrresmap, widths = c(.5,.5), ncol = 2)
 
 #### Quantile - analysis ####
 #load data
