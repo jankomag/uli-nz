@@ -129,17 +129,16 @@ sa1_alltest |>
 
 # Choosing indicator transformations
 sa1_alltest <- sa1_allg |> 
-  mutate(househdens = no_households/area) |> 
-  mutate(raw = no_households) |> 
-  mutate(testvar2 = minmaxNORM(Winsorize(no_households, minval=0, maxval=50)))
+  mutate(crime1 = minmaxNORM(-Winsorize(log(crime_perarea), minval=-11, maxval=-5))) |> 
+  mutate(raw = crime_perarea) |> 
+  mutate(testvar2 = minmaxNORM(-Winsorize(raw, minval=0, maxval=.0015)))
 
 tm_shape(sa1_alltest) +
-  tm_polygons(c("raw", "testvar2"),lwd=0, style="kmeans", palette="Reds")
+  tm_polygons(c("raw", "testvar2", "crime1"),lwd=0, style="kmeans", palette="Reds")
 
 sa1_alltest |>
   ggplot() +
-  geom_histogram(aes(no_households), bins=100)
-
+  geom_histogram(aes(crime_perarea), bins=100)
 
 
 # optimised lambda values for chosen variables
@@ -172,10 +171,9 @@ sa1_all_index <- sa1_all |>
   mutate(evch1 = minmaxNORM(-(evchBC))) |> 
   mutate(housedens1 = minmaxNORM(Winsorize(log(househdens+0.0001), maxval = -4, minval = -10))) |> 
   mutate(popdens1 = minmaxNORM(Winsorize(log(popdens+0.0001), maxval = -2, minval = -10))) |>
-  mutate(damp1 = minmaxNORM(-Winsorize(dampness, maxval = 0.5, minval = 0))) |>
+  mutate(damp1 = minmaxNORM(-Winsorize(dampness, maxval = 0.4, minval = 0))) |>
   mutate(diversity1 = minmaxNORM(shannon)) |>
-  mutate(crime1 = minmaxNORM(-Winsorize(log(crime_perarea), minval=-11, maxval=-5))) |> 
-  mutate(crashes1 = minmaxNORM(Winsorize(log(dist_crash), minval=4, maxval=10))) |> 
+  mutate(crime1 = minmaxNORM(-Winsorize(raw, minval=0, maxval=.0015)))  mutate(crashes1 = minmaxNORM(Winsorize(log(dist_crash), minval=4, maxval=10))) |> 
   mutate(flood1 = minmaxNORM(-Winsorize(floodprone_prc, minval=0, maxval=.125))) |> 
   mutate(alcohol1 = minmaxNORM(alcoprohibited)) |> 
   mutate(station1 = minmaxNORM(-Winsorize(log(dist_stations), minval=5, maxval=11))) |> 
