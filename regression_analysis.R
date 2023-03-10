@@ -47,9 +47,9 @@ library(collapse)
 
 #### Loading data ####
 # load the kuli data
-kuli = st_read('data/geographic/sa1_kuli_all.gpkg', quiet = T) # transform to OSGB projection
+kuli = st_read('data/geographic/sa1_kuli_all_cleaned.gpkg', quiet = T) # transform to OSGB projection
 kuli <- kuli |> 
-  subset(select = c(SA12018_V1_00, kuli_no2s_geomAgg)) |> st_transform(27291)
+  subset(select = c(SA12018_V1_00, kuli_geomAgg)) |> st_transform(27291)
 
 sa1_polys <- kuli |>
   subset(select = c(SA12018_V1_00))
@@ -175,8 +175,8 @@ corrmatrix <- corrmatrix |>
 
 # plot correlations
 df[3:14] |>
-  gather(-kuli_no2s_geomAgg, key = "var", value = "value") |> 
-  ggplot(aes(x = kuli_no2s_geomAgg, y = value)) +
+  gather(-kuli_geomAgg, key = "var", value = "value") |> 
+  ggplot(aes(x = kuli_geomAgg, y = value)) +
   facet_wrap(~ var, scales = "free") +
   geom_point(alpha=0.2) +
   theme_bw() +
@@ -214,10 +214,10 @@ tm_shape(hexgrid) + tm_borders(col='grey') +
 
 #### KULI Map ####
 bckgd <- st_read('outputs/data/land.gpkg', quiet = T) # transform to OSGB projection
-tm_shape(dfg) +tm_polygons("kuli_no2s_geomAgg",  lwd=0) +
+tm_shape(dfg) +tm_polygons("grey",  lwd=0) +
 tm_shape(bckgd) + tm_polygons(col="#DCDACB", lwd=0) +
 tm_shape(dfg) +
-  tm_polygons("kuli_no2s_geomAgg", midpoint = 6, legend.hist = T, lwd=0.01, n=14,
+  tm_polygons("kuli_geomAgg", midpoint = 6, legend.hist = T, lwd=0.01, n=14,
               style = "kmeans", title = "KULI in Auckland", title.fontfamily="serif") +
   tm_style("col_blind") +
   tm_layout(legend.position = c("left","bottom"), frame = F, legend.outside = F,
@@ -229,7 +229,7 @@ tm_shape(dfg) +
   tm_compass(type = "4star", size = 2, position = c("left", "top"))
   
   ggplot(dfg)+
-    geom_histogram(aes(kuli_no2s_geomAgg)) +
+    geom_histogram(aes(kuli_geomAgg)) +
     theme_minimal() +
     theme(legend.position="right",
           text=element_text(size=13,  family="serif")) +
@@ -238,7 +238,7 @@ tm_shape(dfg) +
 
 #### OLS model ####
 # SA1 geometry
-formula = as.formula(kuli_no2s_geomAgg ~ medianIncome + bornOverseas + privateTransporTtoWork +
+formula = as.formula(kuli_geomAgg ~ medianIncome + bornOverseas + privateTransporTtoWork +
                        PTtoWork + cycleToWork + noCar + carsPerPreson + PrEuropeanDesc + PrMaoriDesc + deprivation) # construct the OLS model
 lm = lm(formula, data = df)
 summary(lm)
@@ -250,28 +250,28 @@ summary(step.res)
 hex.lm = lm(formula, data = hexgrid)
 summary(hex.lm)
 
-stargazer(lm, hex.lm, flip=F, type="latex", single.row = T, style="qje")
+stargazer(lm, flip=F, type="text", single.row = T, style="qje")
 #### Autocorrelation ####
 ##### Moran's I####
 g.nb <- poly2nb(dfg)
 g.lw = nb2listw(g.nb)
 #plot spatially lagged mean
-dfg$lagged.means <- lag.listw(g.lw, dfg$kuli_no2s_geomAgg)
+dfg$lagged.means <- lag.listw(g.lw, dfg$kuli_geomAgg)
 tm_shape(dfg) + 
   tm_polygons(col='lagged.means', 
               title='KULI',
               palette = "YlGnBu", lwd=0, style="kmeans")
 # moran scatterplot
-ggplot(data = dfg, aes(x = kuli_no2s_geomAgg, y = lagged.means)) +
+ggplot(data = dfg, aes(x = kuli_geomAgg, y = lagged.means)) +
   geom_point(shape = 1, alpha = 0.5) +
   geom_hline(yintercept = mean(dfg$lagged.means), lty = 2) +
-  geom_vline(xintercept = mean(dfg$kuli_no2s_geomAgg), lty = 2) +
+  geom_vline(xintercept = mean(dfg$kuli_geomAgg), lty = 2) +
   geom_abline() +
   coord_equal()
 # create and assign the Moran plot - with more details
-moran.plot(x = dfg$kuli_no2s_geomAgg, listw = g.lw)
+moran.plot(x = dfg$kuli_geomAgg, listw = g.lw)
 # get Moran's I statistic
-moran.test(x = dfg$kuli_no2s_geomAgg, listw = g.lw) 
+moran.test(x = dfg$kuli_geomAgg, listw = g.lw) 
 # normlaise Moran's I to interpret
 moran.range <- function(lw) {
   wmat <- listw2mat(lw)
@@ -294,7 +294,7 @@ sign.mc <- vector()
 for (i in (2:length(incr.v))) {
   s.dist <- dnearneigh(s.coord, incr.v[i - 1], incr.v[i])
   s.lw <- nb2listw(s.dist, style = "W", zero.policy=T)
-  s.mor <- moran.mc(dfg$kuli_no2s_geomAgg, s.lw, nsim=599, zero.policy = TRUE)
+  s.mor <- moran.mc(dfg$kuli_geomAgg, s.lw, nsim=599, zero.policy = TRUE)
   sign.mc[i] <- s.mor$p.value
   morI.mc[i] <- s.mor$statistic
 }
@@ -327,8 +327,8 @@ text(eval(incr.v - incr * 0.5), morI.mc, round(sign.mc,3), pos = 3, cex = 0.5)
 
 ##### LISA ####
 # Local Statistic #
-dfg$li <- localmoran(dfg$kuli_no2s_geomAgg, g.lw)[, 1] 
-dfg$localmoranpval <- localmoran(dfg$kuli_no2s_geomAgg,g.lw)[, 5]
+dfg$li <- localmoran(dfg$kuli_geomAgg, g.lw)[, 1] 
+dfg$localmoranpval <- localmoran(dfg$kuli_geomAgg,g.lw)[, 5]
 index  = dfg$localmoranpval <= 0.05 # outline significant pvals as borders
 
 map1 <- tm_shape(dfg) +
@@ -341,7 +341,7 @@ map1 <- tm_shape(dfg) +
 
 # Local Moran Cluster Map #
 queen_wts <- queen_weights(dfg)
-moran <- local_moran(queen_wts, dfg["kuli_no2s_geomAgg"])
+moran <- local_moran(queen_wts, dfg["kuli_geomAgg"])
 moran_lbls <- lisa_labels(moran)[1:5]
 moran_colors <- setNames(lisa_colors(moran)[1:5], moran_lbls)
 
