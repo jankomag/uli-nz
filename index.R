@@ -129,16 +129,16 @@ sa1_alltest |>
 
 # Choosing indicator transformations
 sa1_alltest <- sa1_allg |> 
-  mutate(crime1 = minmaxNORM(-Winsorize(log(crime_perarea), minval=-11, maxval=-5))) |> 
-  mutate(raw = crime_perarea) |> 
-  mutate(testvar2 = minmaxNORM(-Winsorize(raw, minval=0, maxval=.0015)))
+  mutate(museum1 = minmaxNORM(Winsorize(dist_museums, minval=0, maxval=18000))) |> 
+  mutate(raw = dist_museums) |> 
+  mutate(testvar2 = minmaxNORM(Winsorize(dist_museums, minval=0, maxval=15000)))
 
 tm_shape(sa1_alltest) +
-  tm_polygons(c("raw", "testvar2", "crime1"),lwd=0, style="kmeans", palette="Reds")
+  tm_polygons(c("raw","testvar2", "museum1"),lwd=0, style="kmeans", palette="Reds")
 
 sa1_alltest |>
   ggplot() +
-  geom_histogram(aes(crime_perarea), bins=100)
+  geom_histogram(aes(testvar2), bins=100)
 
 
 # optimised lambda values for chosen variables
@@ -171,18 +171,19 @@ sa1_all_index <- sa1_all |>
   mutate(evch1 = minmaxNORM(-(evchBC))) |> 
   mutate(housedens1 = minmaxNORM(Winsorize(log(househdens+0.0001), maxval = -4, minval = -10))) |> 
   mutate(popdens1 = minmaxNORM(Winsorize(log(popdens+0.0001), maxval = -2, minval = -10))) |>
-  mutate(damp1 = minmaxNORM(-Winsorize(dampness, maxval = 0.4, minval = 0))) |>
-  mutate(diversity1 = minmaxNORM(shannon)) |>
-  mutate(crime1 = minmaxNORM(-Winsorize(raw, minval=0, maxval=.0015)))  mutate(crashes1 = minmaxNORM(Winsorize(log(dist_crash), minval=4, maxval=10))) |> 
-  mutate(flood1 = minmaxNORM(-Winsorize(floodprone_prc, minval=0, maxval=.125))) |> 
-  mutate(alcohol1 = minmaxNORM(alcoprohibited)) |> 
-  mutate(station1 = minmaxNORM(-Winsorize(log(dist_stations), minval=5, maxval=11))) |> 
-  mutate(bustop1 = minmaxNORM(-Winsorize(dist_busstops, minval=0, maxval = 1000))) |> 
-  mutate(freqbusstop1 = minmaxNORM(-Winsorize(dist_busstopsfreq, minval=0, maxval= 3500))) |> 
-  mutate(marae1 = minmaxNORM(-dist_marae)) |> 
-  mutate(cinema1 = minmaxNORM(-Winsorize(log(dist_cinema), minval=6, maxval=max(log(dist_cinema))))) |> 
-  mutate(gallery1 = minmaxNORM(-Winsorize(log(dist_galleries), minval=6, maxval=max(log(dist_galleries))))) |> 
-  mutate(library1 = minmaxNORM(-Winsorize(log(dist_libraries), minval=5.3, maxval=max(log(dist_libraries))))) |> 
+  mutate(damp1 = minmaxNORM(-Winsorize(dampness, maxval = 0.4, minval = 0))) |>#checked
+  mutate(diversity1 = minmaxNORM(shannon)) |>#checked
+  mutate(crime1 = minmaxNORM(-Winsorize(raw, minval=0, maxval=.0015))) |> 
+  mutate(crashes1 = minmaxNORM(Winsorize(log(dist_crash), minval=4, maxval=10))) |> 
+  mutate(flood1 = minmaxNORM(-Winsorize(floodprone_prc, minval=0, maxval=.125))) |> #checked
+  mutate(alcohol1 = minmaxNORM(alcoprohibited)) |> #checked
+  mutate(station1 = minmaxNORM(-Winsorize(log(dist_stations), minval=5, maxval=11))) |> #checked
+  mutate(bustop1 = minmaxNORM(-Winsorize(dist_busstops, minval=0, maxval = 700))) |> #checked
+  mutate(freqbusstop1 = minmaxNORM(-Winsorize(dist_busstopsfreq, minval=0, maxval= 2000))) |> #checked
+  mutate(marae1 = minmaxNORM(Winsorize(dist_marae, minval=0, maxval=10000))) |> #checked
+  mutate(cinema1 = minmaxNORM(-Winsorize(log(dist_cinema), minval=6, maxval=max(log(dist_cinema))))) |> #checked
+  mutate(gallery1 = minmaxNORM(-Winsorize(log(dist_galleries), minval=6, maxval=max(log(dist_galleries))))) |> #checked
+  mutate(library1 = minmaxNORM(-Winsorize(log(dist_libraries), minval=5.3, maxval=max(log(dist_libraries))))) |> #checked 
   mutate(museum1 = minmaxNORM(-Winsorize(dist_museums, minval=0, maxval=18000))) |> 
   mutate(theatre1 = minmaxNORM(-Winsorize(dist_theatre, minval=0, maxval=11000))) |> 
   mutate(chemist1 = minmaxNORM(-Winsorize(log(Winsorize(dist_chemist, minval=0, maxval=20000)),minval=6.2, maxval=10))) |> 
