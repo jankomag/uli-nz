@@ -78,20 +78,14 @@ my_plots <- lapply(names(sa1_all), function(var_x){
 })
 plot_grid(plotlist = my_plots)
 
-#### Index Construcion ####
+#### Index Construction ####
 # min-max normalise function 
 minmaxNORM <- function(x) {
   return (((x - min(x))) / (max(x) - min(x))*(10-1)+1)
 } #1-10
-minmaxNORM01 <- function(x) {
-  return (((x - min(x))) / (max(x) - min(x))*(1-0)+0)
-}
-minmaxNORM1max <- function(x) {
-  return (((x - min(x))) / (max(x) - min(x))*(max(x)-0.0001)+0.0001)
-}
 minmaxNORM0_10 <- function(x) {
   return (((x - min(x))) / (max(x) - min(x))*(10-0)+0)
-} #1-10
+} #0-10
 #Geometric Mean
 a_gmean <- function(x, w = NULL){
   if(is.null(w)){
@@ -107,25 +101,18 @@ a_gmean <- function(x, w = NULL){
     w[is.na(x)] <- NA
     # calculate geom mean
     gm <- exp( sum(w * log(x), na.rm = TRUE)/sum(w, na.rm = TRUE) )
-    #mygm <- prod(x)^1/39
   } else {
     gm <- NA
   }
   gm
 }
 
-# testing box cox transformation - no function
+# testing box cox transformation
 b <- boxcox(lm(((dist_emergency+0.0001)) ~ 1, data=sa1_all))
 lambda <- b$x[which.max(b$y)]
 sa1_alltest <- sa1_all |> 
   mutate(testvar = ((dist_emergency+0.0001) ^ lambda - 1) / lambda) |> 
   mutate(testvar2 = )
-sa1_all |>
-  ggplot() +
-  geom_histogram(aes(log(dist_emergency)), bins=400)
-sa1_alltest |>
-  ggplot() +
-  geom_histogram(aes(Winsorize(testvar, minval = 0,maxval=90)), bins=400)
 
 # Choosing indicator transformations
 sa1_alltest <- sa1_allg |> 
@@ -250,7 +237,19 @@ sa1_all_index <- sa1_all_index |>
   mutate(kuli_addAgg = minmaxNORM01(kuli_addAgg))
   # KULI aggregation - geometric average method
 sa1_all_index$kuli_geomAgg <- minmaxNORM0_10(apply(sa1_all_index[,64:101], 1, FUN = a_gmean))
+sa1_all_index$kuli_MPIAgg <- minmaxNORM0_10(ci_mpi(sa1_all_index,c(64:101),penalty="POS")$ci_mpi_est)
 
+# rejoin with geometry
+index_sa1g <- left_join(sa1_allg, sa1_all_index, by = c("SA12018_V1_00"="SA12018_V1_00"))
+
+tm_shape(index_sa1g) +
+  tm_polygons(col = c("kuli_geomAgg","kuli_MPIAgg"),
+              palette = "-RdBu", style = "kmeans", lwd=0, n=12)
+
+index_sa1g |> ggplot() + geom_histogram(aes(c(kuli_geomAgg)),bins=100)
+st_write(index_sa1g, "data/geographic/sa1_kuli_all_cleaned.gpkg")
+
+#### EDA2 ####
 # Evaluate the transformation method of each indicator
 densityplot = function(xpre, xpost, varN) {
   xpre <- deparse(substitute(xpre))
@@ -334,17 +333,6 @@ densityplot(dist_emergency, emergency1, "Emergency")
 #densityplot(popdens, popdens1, "Pop Density")
 #densityplot(househdens, housedens1, "House Density")
 
-# rejoin with geometry
-index_sa1g <- left_join(sa1_allg, sa1_all_index, by = c("SA12018_V1_00"="SA12018_V1_00"))
-
-tm_shape(index_sa1g) +
-  tm_polygons(col = c("kuli_geomAgg"),
-              palette = "-RdBu", style = "kmeans", lwd=0, n=12)
-
-index_sa1g |> ggplot() + geom_histogram(aes(c(kuli_geomAgg)),bins=100)
-st_write(index_sa1g, "data/geographic/sa1_kuli_all_cleaned.gpkg")
-
-#### EDA2 ####
 df_indicators <- sa1_all_index[,64:102]
 colnames(df_indicators) <- c("Station","BusStop","FrequentBusStop","Bikeability","CarInfrastructure",
                              "ConvenienceStore","Supermarket","StreetConnectivity",

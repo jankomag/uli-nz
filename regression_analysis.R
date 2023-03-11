@@ -49,7 +49,7 @@ library(collapse)
 # load the kuli data
 kuli = st_read('data/geographic/sa1_kuli_all_cleaned.gpkg', quiet = T) # transform to OSGB projection
 kuli <- kuli |> 
-  subset(select = c(SA12018_V1_00, kuli_geomAgg)) |> st_transform(27291)
+  subset(select = c(SA12018_V1_00, kuli_geomAgg, kuli_MPIAgg)) |> st_transform(27291)
 
 sa1_polys <- kuli |>
   subset(select = c(SA12018_V1_00))
@@ -66,7 +66,9 @@ census <- census |>
   mutate(noCar = as.numeric(noCar)) |>
   mutate(carsPerPreson = as.numeric(carsPerPreson)) |> 
   mutate(PrEuropeanDesc = as.numeric(PrEuropeanDesc)) |> 
-  mutate(PrMaoriDesc = as.numeric(PrMaoriDesc))
+  mutate(PrMaoriDesc = as.numeric(PrMaoriDesc)) |> 
+  mutate(Degree = as.numeric(Degree))
+
 
 #load additional data
 deprivation <- read.csv('data/additionalData/deprivation_joined.csv')
@@ -81,7 +83,7 @@ aggr_plot <- aggr(census, col=c('navyblue','orange'), numbers=TRUE, sortVars=TRU
 
 sa1_census <- left_join(sa1_polys, census, by = c("SA12018_V1_00"="code"))
 tmap_mode("plot")
-tm_shape(sa1_census) + tm_polygons(col="PrMaoriDesc", lwd=0, style="kmeans")
+tm_shape(sa1_census) + tm_polygons(col="Degree", lwd=0, style="kmeans")
 
 #### NN impute - impute NAs based on neighbouring values
 index <- st_touches(sa1_census, sa1_census)
@@ -129,6 +131,9 @@ sa1_imped <- sa1_imped %>%
   mutate(deprivation = ifelse(is.na(deprivation),
                               apply(index, 1, function(i){mean(.$deprivation[i], na.rm=T)}),
                               deprivation))
+sa1_imped <- sa1_imped %>% 
+  mutate(Degree = ifelse(is.na(Degree),
+                              apply(index, 1, function(i){mean(.$Degree[i], na.rm=T)}),Degree))
 
 sa1_imped[which(is.na(sa1_imped$maoriDescent),), "maoriDescent"] <- mean(sa1_imped$maoriDescent, na.rm=T)
 sa1_imped[which(is.na(sa1_imped$PrMaoriDesc),), "PrMaoriDesc"] <- mean(sa1_imped$PrMaoriDesc, na.rm=T)
@@ -140,19 +145,20 @@ sa1_imped[which(is.na(sa1_imped$PTtoWork),), "PTtoWork"] <- mean(sa1_imped$PTtoW
 sa1_imped[which(is.na(sa1_imped$cycleToWork),), "cycleToWork"] <- mean(sa1_imped$cycleToWork, na.rm=T)
 sa1_imped[which(is.na(sa1_imped$noCar),), "noCar"] <- mean(sa1_imped$noCar, na.rm=T)
 sa1_imped[which(is.na(sa1_imped$carsPerPreson),), "carsPerPreson"] <- mean(sa1_imped$carsPerPreson, na.rm=T)
+sa1_imped[which(is.na(sa1_imped$Degree),), "Degree"] <- mean(sa1_imped$Degree, na.rm=T)
 sa1_imped[which(is.na(sa1_imped$popUsual),), "popUsual"] <- 0
+summary(sa1_imped)
 
 #sa1_census <- left_join(sa1_polys, census, by = c("SA12018_V1_00"="code"))
 kulinong <- st_drop_geometry(kuli)
 dfg <- left_join(sa1_imped, kulinong, by = c("SA12018_V1_00"="SA12018_V1_00"))
-tmap_mode("plot")
 tm_shape(dfg) + tm_polygons(col=c("PrEuropeanDesc","carsPerPreson","noCar",
                                   "cycleToWork","PTtoWork","privateTransporTtoWork",
                                   "bornOverseas","medianIncome","PrMaoriDesc","maoriDescent"), lwd=0, style="kmeans")
 df <- st_drop_geometry(dfg)
 summary(dfg)
 #### EDA ####
-cor <- cor(x = df[3:14], y = df[3:14], use="complete.obs")
+cor <- cor(x = df[3:16], y = df[3:16], use="complete.obs")
 corrplot(cor, tl.srt = 25)
 corr <- rcorr(as.matrix(df[3:14]))
 
@@ -174,7 +180,7 @@ corrmatrix <- corrmatrix |>
   filter(row == 'income')
 
 # plot correlations
-df[3:14] |>
+df[3:16] |>
   gather(-kuli_geomAgg, key = "var", value = "value") |> 
   ggplot(aes(x = kuli_geomAgg, y = value)) +
   facet_wrap(~ var, scales = "free") +
@@ -238,8 +244,8 @@ tm_shape(dfg) +
 
 #### OLS model ####
 # SA1 geometry
-formula = as.formula(kuli_geomAgg ~ medianIncome + bornOverseas + privateTransporTtoWork +
-                       PTtoWork + cycleToWork + noCar + carsPerPreson + PrEuropeanDesc + PrMaoriDesc + deprivation) # construct the OLS model
+formula = as.formula(kuli_MPIAgg ~ medianIncome + privateTransporTtoWork +
+                       PTtoWork + cycleToWork + noCar + carsPerPreson + PrEuropeanDesc + PrMaoriDesc + deprivation + Degree) # construct the OLS model
 lm = lm(formula, data = df)
 summary(lm)
 
@@ -250,7 +256,7 @@ summary(step.res)
 hex.lm = lm(formula, data = hexgrid)
 summary(hex.lm)
 
-stargazer(lm, flip=F, type="text", single.row = T, style="qje")
+stargazer(lm, flip=F, type="text", single.row = T)# style="qje")
 #### Autocorrelation ####
 ##### Moran's I####
 g.nb <- poly2nb(dfg)
@@ -665,7 +671,7 @@ tmap_arrange(gwr_maori, maorimap, widths = c(.5,.5))
 #load additional data
 population <- read.csv('data/additionalData/auckland_census_2.csv')
 population <- population |>
-  subset(select = c(code, European, Maori, Pacific, Asian, MiddleEasternLatinAmericanAfrican, OtherEthnicity, PacificNum, popUsual)) |> 
+  subset(select = c(code, European, Maori, Pacific, Asian, MiddleEasternLatinAmericanAfrican, OtherEthnicity, PacificNum, popUsual, medianIncome)) |> 
   mutate(code = as.character(code)) |> 
   mutate(European = as.numeric(European)) |> 
   mutate(Maori = as.numeric(Maori)) |>
@@ -674,12 +680,13 @@ population <- population |>
   mutate(MiddleEasternLatinAmericanAfrican = as.numeric(MiddleEasternLatinAmericanAfrican)) |>
   mutate(OtherEthnicity = as.numeric(OtherEthnicity)) |> 
   mutate(popUsual = as.numeric(popUsual)) |> 
-  mutate(PacificNum = as.numeric(PacificNum))
+  mutate(PacificNum = as.numeric(PacificNum)) |> 
+  mutate(medianIncome = as.numeric(medianIncome))
 
 #impute
 sa1_pop <- left_join(sa1_polys, population, by = c("SA12018_V1_00"="code"))
 kulionly <- kulinong |> 
-  subset(select = c(SA12018_V1_00, kuli_no2s_geomAgg))
+  subset(select = c(SA12018_V1_00, kuli_geomAgg))
 popdf <- left_join(sa1_pop, kulionly, by = c("SA12018_V1_00"="SA12018_V1_00"))
 popdf <- st_drop_geometry(popdf)
 
@@ -690,8 +697,9 @@ popdf[which(is.na(popdf$Asian),), "Asian"] <- 0
 popdf[which(is.na(popdf$MiddleEasternLatinAmericanAfrican),), "MiddleEasternLatinAmericanAfrican"] <- 0
 popdf[which(is.na(popdf$OtherEthnicity),), "OtherEthnicity"] <- 0
 popdf[which(is.na(popdf$PacificNum),), "PacificNum"] <- 0
+#popdf[which(is.na(popdf$medianIncome),), "medianIncome"] <- mean(popdf$medianIncome, na.rm=T)
 
-popdf1 <- within(popdf, quartile <- as.integer(cut(kuli_no2s_geomAgg, quantile(kuli_no2s_geomAgg, seq(0,1,.01)), include.lowest=T)))
+popdf1 <- within(popdf, quartile <- as.integer(cut(kuli_geomAgg, quantile(kuli_geomAgg, seq(0,1,.01)), include.lowest=T)))
 popdf2 <- popdf1 |>
   subset(select = -c(SA12018_V1_00)) |> 
   dplyr::group_by(quartile) |>
