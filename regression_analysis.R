@@ -47,7 +47,7 @@ library(collapse)
 
 #### Loading data ####
 # load the kuli data
-kuli = st_read('data/geographic/sa1_kuli_all_cleaned.gpkg', quiet = T) # transform to OSGB projection
+kuli = st_read('data/geographic/sa1_kuli_all_cleanednopark.gpkg', quiet = T) # transform to OSGB projection
 kuli <- kuli |> 
   subset(select = c(SA12018_V1_00, kuli_geomAgg, kuli_MPIAgg)) |> st_transform(27291)
 
@@ -188,7 +188,8 @@ df[3:16] |>
   theme_bw() +
   geom_smooth(method="lm")
 
-### Hexagon binning ####
+#### Aggregation binning ####
+##### Hexagonal #####
 gb.sp = as(dfg, "Spatial")
 hex_points <- spsample(gb.sp, type = "hexagonal", n = 1630)
 tz_sf <- HexPoints2SpatialPolygons(hex = hex_points)
@@ -196,8 +197,7 @@ sz_sf = dfg[2:15]
 hexgrid <- st_interpolate_aw(sz_sf, tz_sf, extensive = F)
 tm_shape(hexgrid) + 
   tm_polygons("kuli_no2s_geomAgg", palette = "YlGnBu", style="kmeans",
-              lwd=0) +
-  tm_layout(frame = F)
+              lwd=0) + tm_layout(frame = F)
 hexgrid <- st_transform(hexgrid, 4326)
 
 # for contiguity matrix
@@ -210,13 +210,24 @@ tm_shape(hexgrid) +
   tm_basemap("OpenStreetMap")
 #hexgrid.nb[[651]] = as.integer(c(1036,1037))
 hexgrid.nb[[999]] = as.integer(943)
-#hexgrid.nb[[1078]] = as.integer(1096)
-
 hex.lw = nb2listw(hexgrid.nb)
 
 gg.net2 <- nb2lines(hexgrid.nb,coords=st_geometry(st_centroid(hexgrid)), as_sf = F) 
 tm_shape(hexgrid) + tm_borders(col='grey') + 
   tm_shape(gg.net2) + tm_lines(col='red', alpha = 1)
+
+##### SA2 #####
+sa2 = st_read('data/geographic/sa2.gpkg', quiet = T) # transform to OSGB projection
+sz_sf = dfg[3:15]
+tz_sf <- sa2 |> 
+  subset(select = c(SA22023_V1_00)) |> st_transform(27291)
+sa2agg <- st_interpolate_aw(sz_sf, tz_sf, extensive = F)
+summary(sa2agg)
+tm_shape(sa2agg) + 
+  tm_polygons("kuli_geomAgg", palette = "YlGnBu", style="kmeans",
+              lwd=.1) + tm_layout(frame = F)
+st_write(sa2agg, "data/geographic/sa2agg.gpkg")
+
 
 #### KULI Map ####
 bckgd <- st_read('outputs/data/land.gpkg', quiet = T) # transform to OSGB projection
@@ -244,8 +255,9 @@ tm_shape(dfg) +
 
 #### OLS model ####
 # SA1 geometry
-formula = as.formula(kuli_MPIAgg ~ medianIncome + privateTransporTtoWork +
-                       PTtoWork + cycleToWork + noCar + carsPerPreson + PrEuropeanDesc + PrMaoriDesc + deprivation + Degree) # construct the OLS model
+formula = as.formula(kuli_geomAgg ~ medianIncome + privateTransporTtoWork +
+                       PTtoWork + cycleToWork + noCar + carsPerPreson + PrEuropeanDesc +
+                       PrMaoriDesc + deprivation + Degree)
 lm = lm(formula, data = df)
 summary(lm)
 
@@ -430,9 +442,10 @@ tm_shape(dfg) +
 #### GWR ####
 # convert to sp
 au.sp = as(dfg, "Spatial")
+sa2.sp = as(sa2agg, "Spatial")
 hex.sp = as(hexgrid, "Spatial")
 # determine the kernel bandwidth
-bw_adap <- bw.gwr(data=au.sp, formula=formula, approach = "AIC", kernel="bisquare",
+bw_adap <- bw.gwr(data=sa2.sp, formula=formula, approach = "AIC", kernel="bisquare",
              adaptive = T) # adaptive as no of neighbors
 bw_fixed <- bw.gwr(data=hex.sp, formula=formula,approach = "AIC", kernel="bisquare",
              adaptive = F) # fixed bandwidth (in m)
@@ -441,14 +454,14 @@ summary(as.vector(st_distance(hexgrid)))
 # specify GWR model
 gwr_full <- gwr.basic(formula, 
                    adaptive = T,
-                   data = au.sp,
+                   data = sa2.sp,
                    bw = bw_adap)
 gwr <- gwr_full
 save(hexgrid, file="outputs/models/hexgrid_n1408_notnb.Rdata")
 
 # specify MGWR model
 mgwr_full <- gwr.multiscale(formula,
-                        data = au.sp,
+                        data = sa2.sp,
                         adaptive = T, max.iterations = 10000,
                         criterion="dCVR",
                         kernel = "bisquare",

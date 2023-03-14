@@ -29,7 +29,7 @@ library(Compind)
 #### Data imports ####
 # geographic data
 sa1_allold <- st_read("data/geographic/sa1_allvars.gpkg") |> st_transform(27291) |> st_drop_geometry() #transforming to the same coordinate system
-sa1_boundry <- st_read("data/geographic/sa1_auckland_waiheke_urban_new_final.gpkg") |> st_transform(27291) |> subset(select = c(SA12018_V1_00, area.x.x)) #transforming to the same coordinate system
+sa1_boundry <- st_read("data/geographic/sa1_auckland_waiheke_urban_new_final.gpkg") |> st_transform(27291) |> subset(select = c(SA12018_V1_00)) #transforming to the same coordinate system
 sa1_allg <- left_join(sa1_boundry, sa1_allold, by = c("SA12018_V1_00"="SA12018_V1_00"))
 
 summary(sa1_allg)
@@ -86,6 +86,9 @@ minmaxNORM <- function(x) {
 minmaxNORM0_10 <- function(x) {
   return (((x - min(x))) / (max(x) - min(x))*(10-0)+0)
 } #0-10
+minmaxNORM0_1 <- function(x) {
+  return (((x - min(x))) / (max(x) - min(x))*(1-0)+0)
+} #0-1
 #Geometric Mean
 a_gmean <- function(x, w = NULL){
   if(is.null(w)){
@@ -116,16 +119,15 @@ sa1_alltest <- sa1_all |>
 
 # Choosing indicator transformations
 sa1_alltest <- sa1_allg |> 
-  mutate(crime1 = minmaxNORM(Winsorize(crime_perarea, minval=0, maxval=.0015))) |> 
-  mutate(raw = crime_perarea) |> 
-  mutate(testvar2 = minmaxNORM(Winsorize(crime_perarea, minval=80, maxval=6000)))
+  mutate(raw = dwelldensity_buff200_NUMPOINTS) |> 
+  mutate(testvar2 = minmaxNORM(Winsorize(dwelldensity_buff200_NUMPOINTS, minval=0, maxval=250)))
 
 tm_shape(sa1_alltest) +
-  tm_polygons(c("raw","crime1"),lwd=0, style="kmeans", palette="Reds")
+  tm_polygons(c("raw","testvar2"),lwd=0, style="kmeans", palette="Reds")
 
 sa1_alltest |>
   ggplot() +
-  geom_histogram(aes(gym1), bins=100)
+  geom_histogram(aes(testvar2), bins=200)
 
 # optimised lambda values for chosen variables
 lambdahealth <- 0.3434343
@@ -166,6 +168,7 @@ sa1_all_index <- sa1_all |>
   mutate(convstor1 = minmaxNORM(-Winsorize(log(dist_conveniencestore+0.1), minval=3, maxval=10))) |>#checked 
   mutate(supermarket1 = minmaxNORM(-Winsorize(log(dist_supermarket+0.1), minval=4.5, maxval=10))) |> #checked 
   mutate(strconnectivity1 = minmaxNORM(Winsorize(log(str_connectivity+0.1), minval=-3, maxval=-2.297))) |> #checked
+  mutate(housedens1 = minmaxNORM(dwelldensity_buff200_NUMPOINTS)) |> #checked
   
   # LEISURE
   mutate(cinema1 = minmaxNORM(-Winsorize(log(dist_cinema), minval=6, maxval=max(log(dist_cinema))))) |> #checked
@@ -181,7 +184,7 @@ sa1_all_index <- sa1_all |>
   mutate(damp1 = minmaxNORM(-Winsorize(dampness, maxval = 0.4, minval = 0))) |> #checked
   
   #SAFETY
-  mutate(alcohol1 = minmaxNORM(alcoprohibited)) |> #checked
+  mutate(alcohol1 = minmaxNORM(-alcoprohibited)) |> #checked
   mutate(crime1 = minmaxNORM(-Winsorize(crime_perarea, minval=0, maxval=.0015))) |> #checked
   mutate(crashes1 = minmaxNORM(Winsorize(log(dist_crash), minval=4, maxval=10))) |> 
   mutate(flood1 = minmaxNORM(-Winsorize(floodprone_prc, minval=0, maxval=.125))) |> #checked
@@ -210,18 +213,16 @@ sa1_all_index <- sa1_all |>
   
   # GREEN SPACE
   mutate(bigpark1 = minmaxNORM(-Winsorize(dist_bigpark, minval=0, maxval=1700))) |> #checked
-  mutate(smallpark1 = minmaxNORM(-Winsorize(dist_smallpark, minval=0, maxval=1500))) |> #checked
+  #mutate(smallpark1 = minmaxNORM(-Winsorize(dist_smallpark, minval=0, maxval=1500))) |> #checked
   mutate(beach1 = minmaxNORM(-Winsorize(dist_beach, minval=0, maxval=10000))) #checked
   
   # Other Indicators
-  #mutate(housedens1 = minmaxNORM(Winsorize(log(househdens+0.0001), maxval = -4, minval = -10))) |> 
   #mutate(popdens1 = minmaxNORM(Winsorize(log(popdens+0.0001), maxval = -2, minval = -10))) |>
-  #mutate(househdens = no_households/area) 
 
 ##### Final Index Construction ####
 sa1_all_index <- sa1_all_index |> 
   # KULI aggregation - without subindicators
-  mutate(kuli_addAgg = convstor1 + supermarket1 + strconnectivity1 +
+  mutate(kuli_addAgg = convstor1 + supermarket1 + strconnectivity1 + housedens1 +
            chemist1 + dentist1 + healthcr1 + hospital1 +
            secondary1 + primary1 + childcare1 +
            crime1 + crashes1 + flood1 + alcohol1 + emergency1 +
@@ -229,15 +230,15 @@ sa1_all_index <- sa1_all_index |>
            diversity1+marae1 +
            cinema1 + gallery1 + library1 + museum1 + theatre1 + sport1 + gym1 +
            cafe1 + restaurant1 +  pub1 + bbq1 +
-           bigpark1 + smallpark1 + beach1 +
+           bigpark1 + beach1 +
            affordability1 + damp1) |> 
   # KULI aggregation - arithmetic average method
-  mutate(kuli_arithAgg = minmaxNORM01(kuli_addAgg/342)) |> # 38*9=342 
+  mutate(kuli_arithAgg = minmaxNORM0_1(kuli_addAgg/38)) |>
   # KULI aggregation - additive method
-  mutate(kuli_addAgg = minmaxNORM01(kuli_addAgg))
+  mutate(kuli_addAgg = minmaxNORM0_1(kuli_addAgg))
   # KULI aggregation - geometric average method
-sa1_all_index$kuli_geomAgg <- minmaxNORM0_10(apply(sa1_all_index[,64:101], 1, FUN = a_gmean))
-sa1_all_index$kuli_MPIAgg <- minmaxNORM0_10(ci_mpi(sa1_all_index,c(64:101),penalty="POS")$ci_mpi_est)
+sa1_all_index$kuli_geomAgg <- minmaxNORM0_1(apply(sa1_all_index[,64:101], 1, FUN = a_gmean))
+sa1_all_index$kuli_MPIAgg <- minmaxNORM0_1(ci_mpi(sa1_all_index,c(64:101),penalty="POS")$ci_mpi_est)
 
 # rejoin with geometry
 index_sa1g <- left_join(sa1_allg, sa1_all_index, by = c("SA12018_V1_00"="SA12018_V1_00"))
@@ -246,8 +247,20 @@ tm_shape(index_sa1g) +
   tm_polygons(col = c("kuli_geomAgg","kuli_MPIAgg"),
               palette = "-RdBu", style = "kmeans", lwd=0, n=12)
 
-index_sa1g |> ggplot() + geom_histogram(aes(c(kuli_geomAgg)),bins=100)
-st_write(index_sa1g, "data/geographic/sa1_kuli_all_cleaned.gpkg")
+index_sa1g |> ggplot() + geom_histogram(aes(c(kuli_arithAgg)),bins=100)
+st_write(index_sa1g, "data/geographic/sa1_kuli_all_cleanednopark.gpkg")
+
+sa2 = st_read('data/geographic/sa2.gpkg', quiet = T) # transform to OSGB projection
+sz_sf = index_sa1g[,c(113:151,154)]
+tz_sf <- sa2 |> 
+  subset(select = c(SA22023_V1_00)) |> st_transform(27291)
+sa2agg <- st_interpolate_aw(sz_sf, tz_sf, extensive = F)
+summary(sa2agg)
+tm_shape(sa2agg) + 
+  tm_polygons("kuli_geomAgg", palette = "YlGnBu", style="kmeans",
+              lwd=.1) + tm_layout(frame = F)
+sa2agg <- st_transform(sa2agg, 4326)
+st_write(sa2agg, "data/geographic/sa2agg.geojson")
 
 #### EDA2 ####
 # Evaluate the transformation method of each indicator
@@ -319,7 +332,6 @@ densityplot(dist_petrol, petrol1, "Petrol")
 densityplot(dist_evs, evch1, "EVs")
 densityplot(str_connectivity, strconnectivity1, "Street Connectivity")
 densityplot(dist_bigpark, bigpark1, "Big Park")
-densityplot(dist_smallpark, smallpark1, "Small Park")
 densityplot(dist_cafe, cafe1, "Cafe")
 densityplot(dist_restaurants, restaurant1, "Restaurant")
 densityplot(dist_pubs, pub1, "Pub")
@@ -332,8 +344,9 @@ densityplot(carInfrastructure2_add, carInfrastructure2_add, "Car Infrastructure"
 densityplot(dist_emergency, emergency1, "Emergency")
 #densityplot(popdens, popdens1, "Pop Density")
 #densityplot(househdens, housedens1, "House Density")
+#densityplot(dist_smallpark, smallpark1, "Small Park")
 
-df_indicators <- sa1_all_index[,64:102]
+df_indicators <- sa1_all_index[,64:100]
 colnames(df_indicators) <- c("Station","BusStop","FrequentBusStop","Bikeability","CarInfrastructure",
                              "ConvenienceStore","Supermarket","StreetConnectivity",
                              "Cinema","Gym","Theatre","Library",
@@ -343,7 +356,7 @@ colnames(df_indicators) <- c("Station","BusStop","FrequentBusStop","Bikeability"
                              "Chemist","Dentist","HealthCentre","Hospital",
                              "Childcare","Primary","Secondary","Cafe",
                              "Restaurant","Pub","BBQ","BigPark",
-                             "SmallPark","Beach","KULI")
+                             "Beach")
 # Cronbach Alpha #
 cronbach.alpha(df_indicators)
 
@@ -373,7 +386,6 @@ indic_map_func = function(var_name, titl) {
 station = indic_map_func("station1", "Train Station")
 busstop = indic_map_func("bustop1", "Bus Stop")
 freqb = indic_map_func("freqbusstop1", "Frequent Bus Stop")
-popden = indic_map_func("popdens1", "Population Density")
 hous=indic_map_func("housedens1", "House Density")
 damp = indic_map_func("damp1", "Dampness")
 diver = indic_map_func("diversity1", "Diversity")
@@ -399,7 +411,6 @@ secon = indic_map_func("secondary1", "Secondary School")
 prim = indic_map_func("primary1" , "Primary School")
 stcon = indic_map_func("strconnectivity1", "Street Connectivity")
 bigp <- indic_map_func("bigpark1", "Big Park")
-smolp <- indic_map_func("smallpark1", "Small Park")
 cafe <- indic_map_func("cafe1", "Cafe")
 resta <- indic_map_func("restaurant1", "Restaurant")
 pub <- indic_map_func("pub1", "Pub")
@@ -410,18 +421,21 @@ beach <- indic_map_func("beach1", "Beach")
 afford <- indic_map_func("affordability1", "Affordability")
 carinf <- indic_map_func("carInfrastructure1", "Car Infrastructure")
 emer <- indic_map_func("emergency1", "Emergency Service")
+#smolp <- indic_map_func("smallpark1", "Small Park")
+#popden = indic_map_func("popdens1", "Population Density")
 
 #png(file="outputs/mapsindics2.png",width=4000, height=6400)
 png(file="outputs/mapsindics_full.png",width=4000, height=6400)
 
 tmap_arrange(station,busstop,freqb,bikeab,carinf,
-             convs,superm,stcon,cinem,gym,theat,libr,museum,gall,sport,#popden,hous,
+             convs,superm,stcon,
+             cinem,gym,theat,libr,museum,gall,sport,#popden,hous,
              afford,damp,
              alco,crime,crash,flood,emer,
              marae,diver,
              chemi,denti,health,hospi,childc,prim,secon,
              cafe, resta, pub, bbq,
-             bigp,smolp,beach,
+             bigp,beach,
              nrow=8, ncol=5)
 dev.off()
 
@@ -562,3 +576,11 @@ SmallPark <- c("Small Park", skewness(sa1_all_index$dist_smallpark), skewness(sa
 BigPark <- c("Big Park", skewness(sa1_all_index$dist_bigpark), skewness(sa1_all_index$bigpark1))
 table <- rbind(colname, SmallPark, BigPark)
 stargazer(table, type="text")
+
+# testing that the geometric mean function actually does what I think it does
+x <- c(1,3,6,1,10,3)
+mean(x)
+product <- prod(x)
+product^(1/6)
+exp(sum(log(x), na.rm = TRUE)/6)
+

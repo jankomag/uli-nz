@@ -17,7 +17,7 @@ library(nngeo)
 # geographic data
 sa1_polys <- st_read("data/geographic/sa1_auckland_waiheke_urban_new_final.gpkg")
 sa1_polys <- sa1_polys |>
-  subset(select = c(SA12018_V1_00, area.x.x))
+  subset(select = c(SA12018_V1_00))
 #transforming to the same coordinate system
 sa1_base <- st_transform(sa1_polys, 27291) |> st_drop_geometry()
 
@@ -92,7 +92,7 @@ sa1_imped <- sa1_imped %>%
 sa1_imped[which(is.na(sa1_imped$dampness),), "dampness"] <- mean(sa1_imped$dampness, na.rm=T)
 sa1_imped[which(is.na(sa1_imped$medianRent),), "medianRent"] <- mean(sa1_imped$medianRent, na.rm=T)
 census <- st_drop_geometry(sa1_imped) |> 
-  subset(select = -c(na.rm, area.x.x, European,Maori, Pacific, Asian, MiddleEasternLatinAmericanAfrican, OtherEthnicity))
+  subset(select = -c(na.rm, European,Maori, Pacific, Asian, MiddleEasternLatinAmericanAfrican, OtherEthnicity))
 ##### Diversity ####
 # Compute Diversity Index #
 shannon <- function(p){
@@ -104,7 +104,7 @@ shannon <- function(p){
   H = -sum(p*log(p))
   return (H)
 }
-census$shannon <- apply(census[,6:11], 1, shannon)
+census$shannon <- apply(census[,7:12], 1, shannon)
 sa1_all <- left_join(sa1_base, census, by = c("SA12018_V1_00"="SA12018_V1_00"))
 ##### Crimes ####
 # Compute crime measure
@@ -190,10 +190,14 @@ sa1_all <- left_join(sa1_all, sa1_bikeability, by = c("SA12018_V1_00"="SA12018_V
 sa1_emergency <- st_read("data/safety/emergency/emergency_dist.gpkg")|> st_drop_geometry()
 sa1_all <- left_join(sa1_all, sa1_emergency, by = c("SA12018_V1_00"="SA12018_V1_00"))
 
+#add housingdensity new
+sa1_dwelldens <- st_read("data/walkability/dwellingdens/newdwellingdensity.gpkg")|> st_drop_geometry()
+sa1_all <- left_join(sa1_all, sa1_dwelldens, by = c("SA12018_V1_00"="SA12018_V1_00"))
+
 #join with spatial
 sa1_allg <- left_join(sa1_polys, sa1_all, by=c("SA12018_V1_00"="SA12018_V1_00"))
 sa1_allg <- sa1_allg |> 
-  subset(select = -c(area.x.x.x,area.x.x.y))
+  subset(select = -c(no_households))
 
 sa1_allg[which(is.infinite(sa1_allg$dist_stations),), "dist_stations"] <- 100000
 sa1_allg[which(is.infinite(sa1_allg$dist_childcare),), "dist_childcare"] <- 100000
@@ -203,6 +207,6 @@ sa1_allg[which(is.infinite(sa1_allg$dist_gym),), "dist_gym"] <- 100000
 
 # plot
 tm_shape(sa1_allg) +
-  tm_polygons(col="dist_emergency",style="kmeans", lwd=0)
+  tm_polygons(col="dwelldensity_buff200_NUMPOINTS",style="kmeans", lwd=0)
 
 st_write(sa1_allg, "data/geographic/sa1_allvars.gpkg")

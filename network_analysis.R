@@ -148,6 +148,11 @@ beach <- st_read("data/social infrastructure/sport/beaches_all.geojson") |>
   st_transform(4326)# 27291
 sa1 <- get_distance(beach)
 
+#calulate distances to train stations
+bigpark_vert <- st_read("data/greeninfrastructure/bigpark_vertex.gpkg") |>
+  st_transform(4326)# 27291
+sa1 <- get_distance(bigpark_vert)
+
 edges <- st_read("data/network_analysis/auckland_waiheke_network_drive.gpkg", layer='edges') |> 
   st_transform(4326) |> 
   subset(select = -c(u,v,key,osmid, lanes, name, highway, oneway, reversed, from, to,ref, service, access, bridge,
