@@ -476,9 +476,9 @@ sa1_all_index$food2_geom <- minmaxNORM(apply(sa1_all_index[,95:98], 1, FUN = a_g
 sa1_all_index$greenspace2_geom <- minmaxNORM(apply(sa1_all_index[,c(93,94)], 1, FUN = a_gmean))
 sa1_all_index$housing2_geom <- minmaxNORM(apply(sa1_all_index[,c(67,102)], 1, FUN = a_gmean))
 
-sa1_all_index <- sa1_all_index |> 
+sa1_all_index_2level <- sa1_all_index |> 
   # second level aggregation - additive method
-  mutate(walkability2_add = minmaxNORM(popdens1 + housedens1 +convstor1 + supermarket1 + strconnectivity1)) |> 
+  mutate(walkability2_add = minmaxNORM(housedens1+convstor1 + supermarket1 + strconnectivity1)) |> 
   mutate(medical2_add = minmaxNORM(chemist1 + dentist1 + healthcr1 + hospital1)) |> 
   mutate(education2_add = minmaxNORM(secondary1 + primary1 + childcare1)) |> 
   mutate(safety2_add = minmaxNORM(crime1 + crashes1 + flood1 + alcohol1 + emergency1)) |> 

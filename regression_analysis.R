@@ -445,7 +445,7 @@ au.sp = as(dfg, "Spatial")
 sa2.sp = as(sa2agg, "Spatial")
 hex.sp = as(hexgrid, "Spatial")
 # determine the kernel bandwidth
-bw_adap <- bw.gwr(data=sa2.sp, formula=formula, approach = "AIC", kernel="bisquare",
+bw_adap <- bw.gwr(data=au.sp, formula=formula, approach = "AIC", kernel="bisquare",
              adaptive = T) # adaptive as no of neighbors
 bw_fixed <- bw.gwr(data=hex.sp, formula=formula,approach = "AIC", kernel="bisquare",
              adaptive = F) # fixed bandwidth (in m)
@@ -454,7 +454,7 @@ summary(as.vector(st_distance(hexgrid)))
 # specify GWR model
 gwr_full <- gwr.basic(formula, 
                    adaptive = T,
-                   data = sa2.sp,
+                   data = au.sp,
                    bw = bw_adap)
 gwr <- gwr_full
 save(hexgrid, file="outputs/models/hexgrid_n1408_notnb.Rdata")
@@ -467,17 +467,19 @@ mgwr_full <- gwr.multiscale(formula,
                         kernel = "bisquare",
                         bws0=rep(100, 11),
                         verbose = F, predictor.centered=rep(T, 10))
-save(mgwr_full, file="outputs/models/mgwr_full.Rdata")
-load("outputs/models/gwr_1_n1408.Rdata")
-load("outputs/models/mgwr_1_n1408.Rdata")
-
+save(mgwr_full, file="outputs/models/mgwr_sa2.Rdata")
+#load("outputs/models/gwr_1_n1408.Rdata")
+#load("outputs/models/mgwr_1_n1408.Rdata")
+mbwa <- round(mgwr_full[[2]]$bws,1)
 # second MGWR model
-#mgwr_2 <- gwr.multiscale(formula, data = gb.sp, adaptive = T,max.iterations = 10000,criterion="CVR", kernel = "bisquare",bws0=c(mbwa),bw.seled=rep(T, 13),verbose = F, predictor.centered=rep(F, 12))
-mgwr_2 <- mgwr_n1408
+mgwr_2 <- gwr.multiscale(formula, data = sa2.sp, adaptive = T,
+                         max.iterations = 10000,criterion="CVR",
+                         kernel = "bisquare",bws0=c(mbwa),
+                         bw.seled=rep(T, 11),verbose = F,predictor.centered=rep(F, 10))
+save(mgwr_2, file="outputs/models/mgwr_sa2_2.Rdata")
+mgwr_2
 mgwr_2$GW.diagnostic
-mbwa_2 <- round(mgwr_2[[2]]$bws,1)
 
-# take out coefficients
 # Examine Boxplots of coef distributions
 gwr_coef_cols <- data.frame(gwr$SDF@data[, 1:11])
 gwr_coef_cols$id <- 1:nrow(gwr_coef_cols)
@@ -508,11 +510,10 @@ ggplot() +
         plot.title = element_text(hjust = 0.5),
         text=element_text(size=13,  family="serif")) +
   scale_color_manual(values=c("#6ECCAF","#344D67", "black")) +
-  ylab('Coefficient estimate') +xlab ('')+
+  ylab('Coefficient estimate') +xlab ('')#+coord_cartesian(ylim = c(-18, 18))
   #scale_y_continuous(trans='log10')
   #labs(title ="Boxplots of Coefficient estimates") +
-  coord_cartesian(ylim = c(-18, 18))
-
+  
 ggplot(mgwr_long) +
   geom_boxplot(mapping = aes(x = variable, y = value), position="dodge2")
   
@@ -575,11 +576,11 @@ gwr_sf = st_as_sf(gwr$SDF)
 #plot coefficients for GWR
 tmap_mode("plot")
 tm_shape(gwr_sf) +
-  tm_fill(c("medianIncome", "bornOverseas", "privateTransporTtoWork", "PTtoWork", "cycleToWork","noCar","carsPerPreson","PrEuropeanDesc","PrMaoriDesc","deprivation"), palette = "viridis", style = "kmeans") +
+  tm_fill(c("medianIncome", "Degree", "privateTransporTtoWork", "PTtoWork", "cycleToWork","noCar","carsPerPreson","PrEuropeanDesc","PrMaoriDesc","deprivation"), palette = "viridis", style = "kmeans") +
   tm_layout(legend.position = c("right","top"), frame = F)
 
 tm_shape(mgwr2_sf) +
-  tm_fill(c("privateTransporTtoWork", "PTtoWork", "cycleToWork","noCar","carsPerPreson","PrEuropeanDesc","PrMaoriDesc"), palette = "viridis", style = "kmeans") +
+  tm_fill(c("medianIncome","privateTransporTtoWork", "PTtoWork", "cycleToWork","noCar","carsPerPreson","PrEuropeanDesc","PrMaoriDesc","Degree"), palette = "viridis", style = "kmeans") +
   tm_layout(legend.position = c("right","top"), frame = F)
 
 # plot diverging coefs for GWR
@@ -633,7 +634,7 @@ map_signif_coefs_diverging_func = function(x, var_name, var_name_TV, method, var
                 n=8, palette = "seq") +
     #tm_style("col_blind") +
     # now add the tvalues layer
-    tm_shape(x[signif,]) + tm_borders(lwd = 0.2, col="black") +
+    tm_shape(x[signif,]) + tm_borders(lwd = 0.3, col="black") +
     tm_layout(main.title = method, legend.position = c("left","bottom"),
               frame = T, legend.outside = F,
               legend.format = list(fun = function(x) formatC(x, digits = 1, format = "f")),
@@ -642,6 +643,30 @@ map_signif_coefs_diverging_func = function(x, var_name, var_name_TV, method, var
               legend.bg.color="grey100", legend.bg.alpha=.7, main.title.fontfamily="serif",
               aes.palette = list(seq = "-RdBu"))
              # legend.hist.width = 1,legend.hist.height = 0.5)
+  #legend.hist.height=.2, legend.hist.width=.3, legend.hist.bg.color="grey90", legend.hist.bg.alpha=.4)
+  #tm_scale_bar(breaks = c(0, 100, 200), text.size = 0.6) +
+  #tm_compass(type = "4star", size = 2, position = c("left", "top"))
+  p_out
+}
+mapmgwr_signif_coefs_diverging_func = function(x, var_name, var_name_TV, method, varN) {
+  # determine which are significant
+  tval = x %>% dplyr::select(all_of(var_name_TV)) %>% st_drop_geometry()
+  signif = tval < -1.96 | tval > 1.96
+  # map the counties
+  p_out = tm_shape(x) +
+    tm_polygons(var_name, midpoint = 0, legend.hist = F, legend.show=T, lwd=0.04,
+                style = "kmeans", title = varN, title.fontfamily="serif",
+                n=6, palette = "seq") +
+    # now add the tvalues layer
+    tm_shape(x[signif,]) + tm_borders(lwd = 0.3, col="black") +
+    tm_layout(main.title = method, legend.position = c("left","bottom"),
+              frame = T, legend.outside = F,
+              legend.format = list(fun = function(x) formatC(x, digits = 1, format = "f")),
+              legend.title.fontfamily = "serif", main.title.size = 1, main.title.position = "center",
+              legend.width=1, legend.height=1, legend.text.size=,legend.title.size=1,
+              legend.bg.color="grey100", legend.bg.alpha=.7, main.title.fontfamily="serif",
+              aes.palette = list(seq = "-RdBu"))
+  # legend.hist.width = 1,legend.hist.height = 0.5)
   #legend.hist.height=.2, legend.hist.width=.3, legend.hist.bg.color="grey90", legend.hist.bg.alpha=.4)
   #tm_scale_bar(breaks = c(0, 100, 200), text.size = 0.6) +
   #tm_compass(type = "4star", size = 2, position = c("left", "top"))
@@ -656,20 +681,24 @@ gwr_privtr <- map_signif_coefs_diverging_func(x = gwr_sf, "privateTransporTtoWor
 gwr_eu <- map_signif_coefs_diverging_func(x = gwr_sf, "PrEuropeanDesc", "PrEuropeanDesc_TV", "% European Descent", "Coefficient")
 gwr_maori <- map_signif_coefs_diverging_func(x = gwr_sf, "PrMaoriDesc", "PrMaoriDesc_TV", "% Maori Descent", "Coefficient")
 gwr_nocar <- map_signif_coefs_diverging_func(x = gwr_sf, "noCar", "noCar_TV", "% No Car", "Coefficient")
+gwr_degree <- map_signif_coefs_diverging_func(x = gwr_sf, "Degree", "Degree_TV", "% Degree", "Coefficient")
 
-png(file="outputs/allgwr.png",width=3000, height=2000)
-tmap_arrange(gwr_cars, gwr_pt, gwr_cycle, gwr_privtr, gwr_eu, gwr_maori, gwr_nocar)
+png(file="outputs/allgwr2.png",width=3000, height=2000)
+tmap_arrange(gwr_cars, gwr_pt, gwr_cycle, gwr_privtr, gwr_eu, gwr_maori, gwr_nocar, gwr_degree)
 dev.off()
 
 # MGWR_2 Only significant coefficients
-mgwr_cars <- map_signif_coefs_diverging_func(x = mgwr2_sf, "carsPerPreson", "carsPerPreson_TV", "", "MGWR Coefficient")
-mgwr_privtr <- map_signif_coefs_diverging_func(x = mgwr2_sf, "privateTransporTtoWork", "privateTransporTtoWork_TV", "", "MGWR Coefficient")
-map_signif_coefs_diverging_func(x = mgwr2_sf, "PrEuropeanDesc", "PrEuropeanDesc_TV", "MGWR", "PrEuropeanDesc")
-map_signif_coefs_diverging_func(x = mgwr2_sf, "PTtoWork", "PTtoWork_TV", "MGWR", "PTtoWork") # insignificant
-map_signif_coefs_diverging_func(x = mgwr2_sf, "cycleToWork", "cycleToWork_TV", "MGWR", "cycleToWork") #insignificant
-map_signif_coefs_diverging_func(x = mgwr2_sf, "PrMaoriDesc", "PrMaoriDesc_TV", "MGWR", "PrMaoriDesc")# insignificant
-map_signif_coefs_diverging_func(x = mgwr2_sf, "noCar", "noCar_TV", "MGWR", "noCar") #insignificant
+mapmgwr_signif_coefs_diverging_func(x = mgwr2_sf, "carsPerPreson", "carsPerPreson_TV", "", "MGWR Coefficient")
+mapmgwr_signif_coefs_diverging_func(x = mgwr2_sf, "privateTransporTtoWork", "privateTransporTtoWork_TV", "", "MGWR Coefficient")
+mapmgwr_signif_coefs_diverging_func(x = mgwr2_sf, "PrEuropeanDesc", "PrEuropeanDesc_TV", "MGWR", "PrEuropeanDesc")
+mapmgwr_signif_coefs_diverging_func(x = mgwr2_sf, "PTtoWork", "PTtoWork_TV", "MGWR", "PTtoWork") # insignificant
+mapmgwr_signif_coefs_diverging_func(x = mgwr2_sf, "cycleToWork", "cycleToWork_TV", "MGWR", "cycleToWork") #insignificant
+mapmgwr_signif_coefs_diverging_func(x = mgwr2_sf, "PrMaoriDesc", "PrMaoriDesc_TV", "MGWR", "PrMaoriDesc")# insignificant
+mapmgwr_signif_coefs_diverging_func(x = mgwr2_sf, "noCar", "noCar_TV", "MGWR", "noCar") #insignificant
 
+png(file="outputs/allmgwr.png",width=3000, height=2000)
+tmap_arrange(gwr_cars, gwr_pt, gwr_cycle, gwr_privtr, gwr_eu, gwr_maori, gwr_nocar, gwr_degree)
+dev.off()
 tmap_arrange(gwr_privtr, gwr_cars, mgwr_privtr, mgwr_cars)#, widths = c(.5,.5))
 
 #Maori pop
