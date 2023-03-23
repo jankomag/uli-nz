@@ -162,7 +162,6 @@ sa1_all_index <- sa1_all |>
   mutate(freqbusstop1 = minmaxNORM(-Winsorize(dist_busstopsfreq, minval=0, maxval= 2000))) |> #checked
   mutate(bikeability1 = minmaxNORM(Winsorize(bikeBC, minval=-50, maxval = -25))) |> #checked
   mutate(carInfrastructure1 = minmaxNORM((evch1 + petrol1)/18)) |> #checked
-  #mutate(bustop1 = minmaxNORM(-Winsorize(dist_busstops, minval=0, maxval = 700))) |> #checked
   
   # WALKABILITY
   mutate(convstor1 = minmaxNORM(-Winsorize(log(dist_conveniencestore+0.1), minval=3, maxval=10))) |>#checked 
@@ -214,10 +213,11 @@ sa1_all_index <- sa1_all |>
   # GREEN SPACE
   mutate(bigpark1 = minmaxNORM(-Winsorize(dist_bigpark, minval=0, maxval=1500))) |> #checked
   mutate(beach1 = minmaxNORM(-Winsorize(dist_beach, minval=0, maxval=10000))) #checked
-  #mutate(smallpark1 = minmaxNORM(-Winsorize(dist_smallpark, minval=0, maxval=1500))) |> #checked
 
   # Other Indicators
   #mutate(popdens1 = minmaxNORM(Winsorize(log(popdens+0.0001), maxval = -2, minval = -10))) |>
+  #mutate(bustop1 = minmaxNORM(-Winsorize(dist_busstops, minval=0, maxval = 700))) |> #checked
+  #mutate(smallpark1 = minmaxNORM(-Winsorize(dist_smallpark, minval=0, maxval=1500))) |> #checked
 
 ##### Final Index Construction ####
 sa1_all_index <- sa1_all_index |> 

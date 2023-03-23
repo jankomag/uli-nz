@@ -457,7 +457,7 @@ gwr_full <- gwr.basic(formula,
                    data = au.sp,
                    bw = bw_adap)
 gwr <- gwr_full
-save(hexgrid, file="outputs/models/hexgrid_n1408_notnb.Rdata")
+save(gwr, file="outputs/models/gwr_renewed.Rdata")
 
 # specify MGWR model
 mgwr_full <- gwr.multiscale(formula,
