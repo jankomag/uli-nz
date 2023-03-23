@@ -250,6 +250,10 @@ tm_shape(index_sa1g) +
 index_sa1g |> ggplot() + geom_histogram(aes(c(kuli_arithAgg)),bins=100)
 st_write(index_sa1g, "data/geographic/sa1_kuli_all_renewed.gpkg")
 
+index_sa1g <- st_transform(index_sa1g,3857)
+simplified <- st_read("mapbox/web-map/sa1_kulisimps.json") |> st_transform(3857)
+st_write(index_sa1g, "mapbox/web-map/sa1_kuli.geojson")
+
 # Interpolate to SA2 for web-map
 sa2 = st_read('data/geographic/sa2.gpkg', quiet = T) # transform to OSGB projection
 sz_sf = index_sa1g[,c(113:151,154)]
@@ -305,7 +309,6 @@ densityplot = function(xpre, xpost, varN) {
   grid.arrange(pre_out, post_out, ncol=2)
 }
 densityplot(dist_stations, station1, "Train Station")
-#densityplot(dist_busstops, bustop1, "Bus Stop")
 densityplot(dist_busstopsfreq,freqbusstop1, "Frequent Buses")
 densityplot(dampness, damp1, "Dampness")
 densityplot(shannon, diversity1, "Shannon Index")
@@ -343,6 +346,7 @@ densityplot(dist_beach, beach1, "Beach")
 densityplot(medianRent, affordability1, "Affordability")
 densityplot(carInfrastructure2_add, carInfrastructure2_add, "Car Infrastructure")
 densityplot(dist_emergency, emergency1, "Emergency")
+#densityplot(dist_busstops, bustop1, "Bus Stop")
 #densityplot(popdens, popdens1, "Pop Density")
 #densityplot(househdens, housedens1, "House Density")
 #densityplot(dist_smallpark, smallpark1, "Small Park")
@@ -454,12 +458,6 @@ map_func = function(var_name, titl) {
   mapout
 }
 museu=map_func("museum1","Museum Indicator")
-libr=map_func("library1","Library Indicator")
-smolp=map_func("smallpark1","Small Park Indicator")
-  
-png(file="outputs/mapsindics3.png",width=2000, height=600)
-tmap_arrange(smolp,libr,museu, ncol = 3, nrow=1)
-dev.off()
 #### Other ####
 # SUBINDICATORS
 # second level aggregation - geometric average method

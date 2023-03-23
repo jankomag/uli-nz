@@ -16,8 +16,8 @@ cloned-geospatial-analysis.ipynb
 classic-distances.R
 distribute_setup.py
 Testing_network_analysis.R
-mapbox/config.js
 data_analysis_econometric_models.R
 .RDataTmp1
-mapbox/
-map.png
+mapboxstory/
+uli-nz.code-workspace
+zones.RData
