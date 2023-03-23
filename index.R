@@ -38,7 +38,7 @@ sa1_all <- sa1_allg |> st_drop_geometry()
 
 #### EDA ####
 ##### Correlations #####
-cor <- cor(x = sa1_all[c(5:6,13:50)], y = sa1_all[c(5:6,13:50)], use="complete.obs")
+cor <- cor(x = sa1_all[c(3:4,11:35,38:48)], y = sa1_all[c(3:4,11:35,38:48)], use="complete.obs")
 corrplot(cor, tl.srt = 25)
 corr <- rcorr(as.matrix(sa1_all))
 
@@ -120,14 +120,14 @@ sa1_alltest <- sa1_all |>
 # Choosing indicator transformations
 sa1_alltest <- sa1_allg |> 
   mutate(raw = dwelldensity_buff200_NUMPOINTS) |> 
-  mutate(testvar2 = minmaxNORM(Winsorize(dwelldensity_buff200_NUMPOINTS, minval=0, maxval=250)))
-
-tm_shape(sa1_alltest) +
-  tm_polygons(c("raw","testvar2"),lwd=0, style="kmeans", palette="Reds")
+  mutate(testvar2 = (Winsorize(raw, minval=0, maxval=1500)))
 
 sa1_alltest |>
   ggplot() +
-  geom_histogram(aes(testvar2), bins=200)
+  geom_histogram(aes(testvar2), bins=50)
+
+tm_shape(sa1_alltest) +
+  tm_polygons(c("raw", "testvar2"),lwd=0, style="kmeans", palette="Reds")
 
 # optimised lambda values for chosen variables
 lambdahealth <- 0.3434343
@@ -159,15 +159,15 @@ sa1_all_index <- sa1_all |>
   
   # TRANSPORTATION
   mutate(station1 = minmaxNORM(-Winsorize(log(dist_stations), minval=5, maxval=11))) |> #checked
-  mutate(bustop1 = minmaxNORM(-Winsorize(dist_busstops, minval=0, maxval = 700))) |> #checked
   mutate(freqbusstop1 = minmaxNORM(-Winsorize(dist_busstopsfreq, minval=0, maxval= 2000))) |> #checked
   mutate(bikeability1 = minmaxNORM(Winsorize(bikeBC, minval=-50, maxval = -25))) |> #checked
   mutate(carInfrastructure1 = minmaxNORM((evch1 + petrol1)/18)) |> #checked
+  #mutate(bustop1 = minmaxNORM(-Winsorize(dist_busstops, minval=0, maxval = 700))) |> #checked
   
   # WALKABILITY
   mutate(convstor1 = minmaxNORM(-Winsorize(log(dist_conveniencestore+0.1), minval=3, maxval=10))) |>#checked 
   mutate(supermarket1 = minmaxNORM(-Winsorize(log(dist_supermarket+0.1), minval=4.5, maxval=10))) |> #checked 
-  mutate(strconnectivity1 = minmaxNORM(Winsorize(log(str_connectivity+0.1), minval=-3, maxval=-2.297))) |> #checked
+  mutate(strconnectivity1 = minmaxNORM(Winsorize(streetconn, minval=0, maxval=15))) |> #checked
   mutate(housedens1 = minmaxNORM(dwelldensity_buff200_NUMPOINTS)) |> #checked
   
   # LEISURE
@@ -192,17 +192,17 @@ sa1_all_index <- sa1_all |>
   
   #CULTURE
   mutate(diversity1 = minmaxNORM(shannon)) |> #checked
-  mutate(marae1 = minmaxNORM(Winsorize(dist_marae, minval=0, maxval=10000))) |> #checked
+  mutate(marae1 = minmaxNORM(-Winsorize(dist_marae, minval=0, maxval=10000))) |> #checked
   
   #MEDICAL
-  mutate(chemist1 = minmaxNORM(Winsorize(log(dist_chemist), minval=6.2, maxval=10))) |> #checked
+  mutate(chemist1 = minmaxNORM(-Winsorize(log(dist_chemist), minval=6.2, maxval=10))) |> #checked
   mutate(dentist1 = minmaxNORM(-Winsorize(log(dist_dentist), minval=4.8, maxval=9))) |> #checked 
   mutate(healthcr1 = minmaxNORM(-Winsorize(healthcBC, minval=0, maxval = 58))) |> #checked 
   mutate(hospital1 = minmaxNORM(-Winsorize(dist_hospital,minval=0, maxval=11000))) |> #checked 
   
   #EDUCATION
   mutate(childcare1 = minmaxNORM(-Winsorize(childcareBC, minval=4.5, maxval = 12))) |> #checked 
-  mutate(primary1 = minmaxNORM(Winsorize((dist_primary), minval=200, maxval=2000))) |> #checked
+  mutate(primary1 = minmaxNORM(-Winsorize((dist_primary), minval=200, maxval=2000))) |> #checked
   mutate(secondary1 = minmaxNORM(-secondaryBC)) |> #checked 
   
   #FOOD OUTLETS
@@ -212,10 +212,10 @@ sa1_all_index <- sa1_all |>
   mutate(bbq1 = minmaxNORM(-Winsorize(log(dist_bbq+0.1), minval=5.5, maxval=10))) |> #checked
   
   # GREEN SPACE
-  mutate(bigpark1 = minmaxNORM(-Winsorize(dist_bigpark, minval=0, maxval=1700))) |> #checked
-  #mutate(smallpark1 = minmaxNORM(-Winsorize(dist_smallpark, minval=0, maxval=1500))) |> #checked
+  mutate(bigpark1 = minmaxNORM(-Winsorize(dist_bigpark, minval=0, maxval=1500))) |> #checked
   mutate(beach1 = minmaxNORM(-Winsorize(dist_beach, minval=0, maxval=10000))) #checked
-  
+  #mutate(smallpark1 = minmaxNORM(-Winsorize(dist_smallpark, minval=0, maxval=1500))) |> #checked
+
   # Other Indicators
   #mutate(popdens1 = minmaxNORM(Winsorize(log(popdens+0.0001), maxval = -2, minval = -10))) |>
 
@@ -226,19 +226,19 @@ sa1_all_index <- sa1_all_index |>
            chemist1 + dentist1 + healthcr1 + hospital1 +
            secondary1 + primary1 + childcare1 +
            crime1 + crashes1 + flood1 + alcohol1 + emergency1 +
-           station1 + bustop1 +freqbusstop1 +carInfrastructure1 + bikeability1 +
+           station1 +freqbusstop1 +carInfrastructure1 + bikeability1 + #bustop1
            diversity1+marae1 +
            cinema1 + gallery1 + library1 + museum1 + theatre1 + sport1 + gym1 +
            cafe1 + restaurant1 +  pub1 + bbq1 +
            bigpark1 + beach1 +
            affordability1 + damp1) |> 
   # KULI aggregation - arithmetic average method
-  mutate(kuli_arithAgg = minmaxNORM0_1(kuli_addAgg/38)) |>
+  mutate(kuli_arithAgg = minmaxNORM0_1(kuli_addAgg/37)) |>
   # KULI aggregation - additive method
   mutate(kuli_addAgg = minmaxNORM0_1(kuli_addAgg))
   # KULI aggregation - geometric average method
-sa1_all_index$kuli_geomAgg <- minmaxNORM0_1(apply(sa1_all_index[,64:101], 1, FUN = a_gmean))
-sa1_all_index$kuli_MPIAgg <- minmaxNORM0_1(ci_mpi(sa1_all_index,c(64:101),penalty="POS")$ci_mpi_est)
+sa1_all_index$kuli_geomAgg <- minmaxNORM0_1(apply(sa1_all_index[,62:98], 1, FUN = a_gmean))
+sa1_all_index$kuli_MPIAgg <- minmaxNORM0_1(ci_mpi(sa1_all_index,c(62:98),penalty="POS")$ci_mpi_est)
 
 # rejoin with geometry
 index_sa1g <- left_join(sa1_allg, sa1_all_index, by = c("SA12018_V1_00"="SA12018_V1_00"))
@@ -248,8 +248,9 @@ tm_shape(index_sa1g) +
               palette = "-RdBu", style = "kmeans", lwd=0, n=12)
 
 index_sa1g |> ggplot() + geom_histogram(aes(c(kuli_arithAgg)),bins=100)
-st_write(index_sa1g, "data/geographic/sa1_kuli_all_cleanednopark.gpkg")
+st_write(index_sa1g, "data/geographic/sa1_kuli_all_renewed.gpkg")
 
+# Interpolate to SA2 for web-map
 sa2 = st_read('data/geographic/sa2.gpkg', quiet = T) # transform to OSGB projection
 sz_sf = index_sa1g[,c(113:151,154)]
 tz_sf <- sa2 |> 
@@ -304,7 +305,7 @@ densityplot = function(xpre, xpost, varN) {
   grid.arrange(pre_out, post_out, ncol=2)
 }
 densityplot(dist_stations, station1, "Train Station")
-densityplot(dist_busstops, bustop1, "Bus Stop")
+#densityplot(dist_busstops, bustop1, "Bus Stop")
 densityplot(dist_busstopsfreq,freqbusstop1, "Frequent Buses")
 densityplot(dampness, damp1, "Dampness")
 densityplot(shannon, diversity1, "Shannon Index")
@@ -346,8 +347,8 @@ densityplot(dist_emergency, emergency1, "Emergency")
 #densityplot(househdens, housedens1, "House Density")
 #densityplot(dist_smallpark, smallpark1, "Small Park")
 
-df_indicators <- sa1_all_index[,64:100]
-colnames(df_indicators) <- c("Station","BusStop","FrequentBusStop","Bikeability","CarInfrastructure",
+df_indicators <- sa1_all_index[,c(62:98,101)]
+colnames(df_indicators) <- c("Station","FrequentBusStop","Bikeability","CarInfrastructure",
                              "ConvenienceStore","Supermarket","StreetConnectivity",
                              "Cinema","Gym","Theatre","Library",
                              "Museum","Gallery","Sport","Affordability",
@@ -355,8 +356,7 @@ colnames(df_indicators) <- c("Station","BusStop","FrequentBusStop","Bikeability"
                              "FloodProneness","EmergencyServices","Diversity","Marae",
                              "Chemist","Dentist","HealthCentre","Hospital",
                              "Childcare","Primary","Secondary","Cafe",
-                             "Restaurant","Pub","BBQ","BigPark",
-                             "Beach")
+                             "Restaurant","Pub","BBQ","BigPark","Beach","KULI")
 # Cronbach Alpha #
 cronbach.alpha(df_indicators)
 
@@ -384,7 +384,7 @@ indic_map_func = function(var_name, titl) {
   mapout
 }
 station = indic_map_func("station1", "Train Station")
-busstop = indic_map_func("bustop1", "Bus Stop")
+#busstop = indic_map_func("bustop1", "Bus Stop")
 freqb = indic_map_func("freqbusstop1", "Frequent Bus Stop")
 hous=indic_map_func("housedens1", "House Density")
 damp = indic_map_func("damp1", "Dampness")
@@ -427,7 +427,7 @@ emer <- indic_map_func("emergency1", "Emergency Service")
 #png(file="outputs/mapsindics2.png",width=4000, height=6400)
 png(file="outputs/mapsindics_full.png",width=4000, height=6400)
 
-tmap_arrange(station,busstop,freqb,bikeab,carinf,
+tmap_arrange(station,freqb,bikeab,carinf,
              convs,superm,stcon,
              cinem,gym,theat,libr,museum,gall,sport,#popden,hous,
              afford,damp,

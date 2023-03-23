@@ -116,11 +116,11 @@ supermarket <- st_read("data/walkability/supermarket_all.gpkg") |>
   st_transform(4326)# 27291
 sa1 <- get_distance(supermarket)
 
-bigpark2 <- st_read("data/green infrastructure/bigaprks_points.geojson") |>
+bigpark <- st_read("data/greeninfrastructure/final_interp_sinplif.gpkg") |>
   st_transform(4326)# 27291
-sa1 <- get_distance(bigpark2)
+sa1 <- get_distance(bigpark)
 
-smallpark2 <- st_read("data/green infrastructure/allsmallparknodes.geojson") |>
+smallpark2 <- st_read("data/greeninfrastructure/allsmallparknodes.geojson") |>
   st_transform(4326)# 27291
 sa1 <- get_distance(smallpark2)
 
@@ -180,7 +180,7 @@ sa1 <- get_distance(crash)
 
 #save
 #st_write(sa1, "data/kiwi/sa1_maraefinal.gpkg")
-st_write(sa1, "data/safety/emergency/emergency_dist.gpkg")
+st_write(sa1, "data/greeninfrastructure/bigpark_dist_new.gpkg")
 
 sa1done <- st_read("data/geographic/sa1_alldist_final.gpkg")
 head(sa1done)

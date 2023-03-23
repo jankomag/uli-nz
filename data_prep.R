@@ -24,7 +24,7 @@ sa1_base <- st_transform(sa1_polys, 27291) |> st_drop_geometry()
 ##### Census####
 census <- as.data.frame(read.csv("data/geographic/Census/auckland_census.csv"))
 census <- census |>
-  subset(select = -c(maori_desc, median_income, born_overseas, PacificNum)) |> 
+  subset(select = -c(maori_desc, median_income, born_overseas, PacificNum, Degree)) |> 
   mutate(code = as.character(code)) |> 
   mutate(dampness = as.numeric(dampness)) |> 
   mutate(European = as.numeric(European)) |> 
@@ -104,7 +104,7 @@ shannon <- function(p){
   H = -sum(p*log(p))
   return (H)
 }
-census$shannon <- apply(census[,7:12], 1, shannon)
+census$shannon <- apply(census[,6:11], 1, shannon)
 sa1_all <- left_join(sa1_base, census, by = c("SA12018_V1_00"="SA12018_V1_00"))
 ##### Crimes ####
 # Compute crime measure
@@ -157,11 +157,13 @@ sa1_all <- left_join(sa1_all, alco_sa1, by = c("SA12018_V1_00"="SA12018_V1"))
 sa1_all[which(is.na(sa1_all$alcoprohibited),), "alcoprohibited"] <- 0
 
 ##### Street Connectivity ####
-stconnectivity <- st_read("data/walkability/streetconnectivity.gpkg") |> st_drop_geometry()
-sa1_all <- left_join(sa1_all, stconnectivity, by = c("SA12018_V1_00"="SA12018_V1_00"))
+stconnectivity <- st_read("data/walkability/streetconn/streetconnectivity_new.gpkg") |> st_drop_geometry()
+stconnectivity_sa1 <- stconnectivity |>
+  subset(select = c(SA12018_V1_00, streetconn))
+sa1_all <- left_join(sa1_all, stconnectivity_sa1, by = c("SA12018_V1_00"="SA12018_V1_00"))
 
 #### Distances ####
-sa1_dists <- st_read("data/geographic/sa1_alldist_final.gpkg")|> st_drop_geometry() |> subset(select = -c(dist_marae))
+sa1_dists <- st_read("data/geographic/allsa1_dist.gpkg")|> st_drop_geometry() |> subset(select = -c(dist_marae))
 sa1_all <- left_join(sa1_all, sa1_dists, by = c("SA12018_V1_00"="SA12018_V1_00"))
 
 #add frequent bus stops
@@ -169,6 +171,10 @@ sa1_busfreq <- st_read("data/transport/public_transport/sa1_frequentbuses.gpkg")
 sa1_busfreq <- sa1_busfreq |>
   subset(select = c(SA12018_V1_00, dist_busstopsfreq))
 sa1_all <- left_join(sa1_all, sa1_busfreq, by = c("SA12018_V1_00"="SA12018_V1_00"))
+
+#add frequent bus stops
+sa1_park <- st_read("data/greeninfrastructure/bigpark_dist_new.gpkg")|> st_drop_geometry()
+sa1_all <- left_join(sa1_all, sa1_park, by = c("SA12018_V1_00"="SA12018_V1_00"))
 
 # add marae
 sa1_marae <- st_read("data/kiwi/sa1_maraefinal.gpkg")|> st_drop_geometry()

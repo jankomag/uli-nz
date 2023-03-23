@@ -180,7 +180,7 @@ corrmatrix <- corrmatrix |>
   filter(row == 'income')
 
 # plot correlations
-df[3:16] |>
+df[3:15] |>
   gather(-kuli_geomAgg, key = "var", value = "value") |> 
   ggplot(aes(x = kuli_geomAgg, y = value)) +
   facet_wrap(~ var, scales = "free") +
@@ -255,7 +255,7 @@ tm_shape(dfg) +
 
 #### OLS model ####
 # SA1 geometry
-formula = as.formula(kuli_geomAgg ~ medianIncome + privateTransporTtoWork +
+formula = as.formula(kuli_MPIAgg ~ medianIncome + privateTransporTtoWork +
                        PTtoWork + cycleToWork + noCar + carsPerPreson + PrEuropeanDesc +
                        PrMaoriDesc + deprivation + Degree)
 lm = lm(formula, data = df)
