@@ -61,7 +61,7 @@ p{
     margin-top:5px;
     margin-bottom:5px;
    }   
-
+/* add a border to the bottom of the last item */
   #menu a:last-child {
     border: none;
 }
@@ -85,24 +85,44 @@ p{
     font: 12px/20px 'Helvetica Neue', Arial, Helvetica, sans-serif;
 }
 
-/* #transport {
-  background-color: rgb(116, 206, 137);
+.menu-category.transport .title-container {
+  background-color: #ffd6cc; /* light orange */
 }
-#kuli {
-  background-color: rgb(227, 221, 108);
+
+.menu-category.walkability .title-container {
+  background-color: #d6e9c6; /* light green */
 }
-#walkability {
-    background-color: rgb(211, 211, 211);
+
+.menu-category.medical .title-container {
+  background-color: #c9daf8; /* light blue */
 }
-#medical {
-  background-color: rgb(236, 185, 218);
+
+.menu-category.KULI .title-container {
+  background-color: #e8ffbd; /* light blue */
 }
-#green {
-  background-color: rgb(147, 243, 156);
+.menu-category.greeninfrastructure .title-container {
+  background-color: #9dfb98; /* light blue */
 }
-#education {
-  background-color: rgb(176, 237, 163);
+
+.menu-category.leisure .title-container {
+  background-color: #f8c9df; /* light blue */
 }
-#safety {
-  background-color: rgb(205, 147, 243);
-} */
+
+.menu-category.housing .title-container {
+  background-color: #b2bccd; /* light blue */
+}
+
+.menu-category.safety .title-container {
+  background-color: #aea9ec; /* light blue */
+}
+
+.menu-category.culture .title-container {
+  background-color: #eed6ac; /* light blue */
+}
+.menu-category.education .title-container {
+  background-color: #daf2ac; /* light blue */
+}
+.menu-category.food .title-container {
+  background-color: #f2bba1; /* light blue */
+}
+

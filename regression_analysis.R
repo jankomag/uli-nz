@@ -49,7 +49,7 @@ library(collapse)
 # load the kuli data
 kuli = st_read('data/geographic/sa1_kuli_all_cleanednopark.gpkg', quiet = T) # transform to OSGB projection
 kuli <- kuli |> 
-  subset(select = c(SA12018_V1_00, kuli_geomAgg, kuli_MPIAgg)) |> st_transform(27291)
+  subset(select = c(SA12018_V1_00, kuli_MPIAgg)) |> st_transform(27291)
 
 sa1_polys <- kuli |>
   subset(select = c(SA12018_V1_00))
@@ -224,10 +224,9 @@ tz_sf <- sa2 |>
 sa2agg <- st_interpolate_aw(sz_sf, tz_sf, extensive = F)
 summary(sa2agg)
 tm_shape(sa2agg) + 
-  tm_polygons("kuli_geomAgg", palette = "YlGnBu", style="kmeans",
+  tm_polygons("kuli_MPIAgg", palette = "YlGnBu", style="kmeans",
               lwd=.1) + tm_layout(frame = F)
 st_write(sa2agg, "data/geographic/sa2agg.gpkg")
-
 
 #### KULI Map ####
 bckgd <- st_read('outputs/data/land.gpkg', quiet = T) # transform to OSGB projection
@@ -460,23 +459,23 @@ gwr <- gwr_full
 save(gwr, file="outputs/models/gwr_renewed.Rdata")
 
 # specify MGWR model
-mgwr_full <- gwr.multiscale(formula,
+mgwr_1 <- gwr.multiscale(formula,
                         data = sa2.sp,
                         adaptive = T, max.iterations = 10000,
                         criterion="dCVR",
                         kernel = "bisquare",
                         bws0=rep(100, 11),
                         verbose = F, predictor.centered=rep(T, 10))
-save(mgwr_full, file="outputs/models/mgwr_sa2.Rdata")
+save(mgwr_1, file="outputs/models/mgwr_sa2_renewed.Rdata")
 #load("outputs/models/gwr_1_n1408.Rdata")
 #load("outputs/models/mgwr_1_n1408.Rdata")
-mbwa <- round(mgwr_full[[2]]$bws,1)
+mbwa <- round(mgwr_1[[2]]$bws,1)
 # second MGWR model
 mgwr_2 <- gwr.multiscale(formula, data = sa2.sp, adaptive = T,
                          max.iterations = 10000,criterion="CVR",
                          kernel = "bisquare",bws0=c(mbwa),
                          bw.seled=rep(T, 11),verbose = F,predictor.centered=rep(F, 10))
-save(mgwr_2, file="outputs/models/mgwr_sa2_2.Rdata")
+save(mgwr_2, file="outputs/models/mgwr_sa2_2_renewed.Rdata")
 mgwr_2
 mgwr_2$GW.diagnostic
 
