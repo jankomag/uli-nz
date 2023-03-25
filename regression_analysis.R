@@ -267,28 +267,28 @@ summary(step.res)
 hex.lm = lm(formula, data = hexgrid)
 summary(hex.lm)
 
-stargazer(lm, flip=F, type="text", single.row = T)# style="qje")
+stargazer(lm,lm,lm, flip=F, type="latex", single.row = T)# style="qje")
 #### Autocorrelation ####
 ##### Moran's I####
 g.nb <- poly2nb(dfg)
 g.lw = nb2listw(g.nb)
 #plot spatially lagged mean
-dfg$lagged.means <- lag.listw(g.lw, dfg$kuli_geomAgg)
+dfg$lagged.means <- lag.listw(g.lw, dfg$kuli_MPIAgg)
 tm_shape(dfg) + 
   tm_polygons(col='lagged.means', 
               title='KULI',
               palette = "YlGnBu", lwd=0, style="kmeans")
 # moran scatterplot
-ggplot(data = dfg, aes(x = kuli_geomAgg, y = lagged.means)) +
+ggplot(data = dfg, aes(x = kuli_MPIAgg, y = lagged.means)) +
   geom_point(shape = 1, alpha = 0.5) +
   geom_hline(yintercept = mean(dfg$lagged.means), lty = 2) +
-  geom_vline(xintercept = mean(dfg$kuli_geomAgg), lty = 2) +
+  geom_vline(xintercept = mean(dfg$kuli_MPIAgg), lty = 2) +
   geom_abline() +
   coord_equal()
 # create and assign the Moran plot - with more details
-moran.plot(x = dfg$kuli_geomAgg, listw = g.lw)
+moran.plot(x = dfg$kuli_MPIAgg, listw = g.lw)
 # get Moran's I statistic
-moran.test(x = dfg$kuli_geomAgg, listw = g.lw) 
+moran.test(x = dfg$kuli_MPIAgg, listw = g.lw) 
 # normlaise Moran's I to interpret
 moran.range <- function(lw) {
   wmat <- listw2mat(lw)
@@ -344,13 +344,13 @@ text(eval(incr.v - incr * 0.5), morI.mc, round(sign.mc,3), pos = 3, cex = 0.5)
 
 ##### LISA ####
 # Local Statistic #
-dfg$li <- localmoran(dfg$kuli_geomAgg, g.lw)[, 1] 
-dfg$localmoranpval <- localmoran(dfg$kuli_geomAgg,g.lw)[, 5]
+dfg$li <- localmoran(dfg$kuli_MPIAgg, g.lw)[, 1] 
+dfg$localmoranpval <- localmoran(dfg$kuli_MPIAgg,g.lw)[, 5]
 index  = dfg$localmoranpval <= 0.05 # outline significant pvals as borders
 
 map1 <- tm_shape(dfg) +
   tm_fill(col = "li", style = "quantile",title="Local Moran Statistic") +
-  tm_shape(dfg[index,]) + tm_borders(lwd=0.3, col="black") +
+  tm_shape(dfg[index,]) + tm_borders(lwd=0.2, col="black") +
   tm_layout(legend.position = c("left","bottom"), frame = T, legend.outside = F,
             legend.title.fontfamily = "serif", main.title.position = "center",
             legend.width=1, legend.height=1, legend.text.size=0.8, legend.title.size = 1.2,
@@ -358,7 +358,7 @@ map1 <- tm_shape(dfg) +
 
 # Local Moran Cluster Map #
 queen_wts <- queen_weights(dfg)
-moran <- local_moran(queen_wts, dfg["kuli_geomAgg"])
+moran <- local_moran(queen_wts, dfg["kuli_MPIAgg"])
 moran_lbls <- lisa_labels(moran)[1:5]
 moran_colors <- setNames(lisa_colors(moran)[1:5], moran_lbls)
 
@@ -467,7 +467,7 @@ mgwr_1 <- gwr.multiscale(formula,
                         bws0=rep(100, 11),
                         verbose = F, predictor.centered=rep(T, 10))
 save(mgwr_1, file="outputs/models/mgwr_sa2_renewed.Rdata")
-#load("outputs/models/gwr_1_n1408.Rdata")
+#load("outputs/models/gwr_renewed.RData")
 #load("outputs/models/mgwr_1_n1408.Rdata")
 mbwa <- round(mgwr_1[[2]]$bws,1)
 # second MGWR model
@@ -476,15 +476,15 @@ mgwr_2 <- gwr.multiscale(formula, data = sa2.sp, adaptive = T,
                          kernel = "bisquare",bws0=c(mbwa),
                          bw.seled=rep(T, 11),verbose = F,predictor.centered=rep(F, 10))
 save(mgwr_2, file="outputs/models/mgwr_sa2_2_renewed.Rdata")
-mgwr_2
-mgwr_2$GW.diagnostic
+mgwr_1
+mgwr_1$GW.diagnostic
 
 # Examine Boxplots of coef distributions
 gwr_coef_cols <- data.frame(gwr$SDF@data[, 1:11])
 gwr_coef_cols$id <- 1:nrow(gwr_coef_cols)
 gwr_coef_cols$Model <- "GWR"
 gwr_long <- melt(gwr_coef_cols, id = c("id","Model"))
-mgwr_coef_cols <- data.frame(mgwr_2$SDF@data[, 1:11])
+mgwr_coef_cols <- data.frame(mgwr_1$SDF@data[, 1:11])
 mgwr_coef_cols$id <- 1:nrow(mgwr_coef_cols)
 mgwr_coef_cols$Model <- "MGWR"
 mgwr_long <- melt(mgwr_coef_cols, id = c("id","Model"))
@@ -546,12 +546,12 @@ ggplot(allses, aes(x = variable, y = value, col= kind)) +
 tab.gwr <- apply(gwr$SDF@data[, 1:11], 2, summary)
 tab.gwr <- t(round(tab.gwr, 3))
 gwr_meancoef <- data.frame(tab.gwr[,4])
-#stargazer(gwr_meancoef, summary=FALSE, digits=3, type="text")
+
 stargazer(lm, lm, lm, flip=F, type="latex", single.row = T, style="qje", digits=2)
 
 # create a table with coefficient stats for MGWR
-coefs_msgwr = apply(mgwr_2$SDF@data[, 1:11], 2, summary)
-tab.mgwr = data.frame(Bandwidth = mbwa_2, t(round(coefs_msgwr,3)))
+coefs_msgwr = apply(mgwr_1$SDF@data[, 1:11], 2, summary)
+tab.mgwr = data.frame(Bandwidth = mbwa, t(round(coefs_msgwr,3)))
 names(tab.mgwr)[c(3,6)] = c("Q1", "Q3")
 tab.mgwr
 
@@ -565,10 +565,10 @@ summary_table
 
 # show diagnostics
 c(gwr$GW.diagnostic$AICc, gwr$GW.diagnostic$gwR2.adj)
-c(mgwr_2$GW.diagnostic$AICc, mgwr_2$GW.diagnostic$R2.val)
+c(mgwr_1$GW.diagnostic$AICc, mgwr_1$GW.diagnostic$R2.val)
 
 ##### Plotting results #####
-mgwr2_sf = st_as_sf(mgwr_2$SDF)
+mgwr_sf = st_as_sf(mgwr_1$SDF)
 #mgwr1_sf = st_as_sf(mgwr_8_12$SDF)
 gwr_sf = st_as_sf(gwr$SDF)
 
@@ -578,12 +578,12 @@ tm_shape(gwr_sf) +
   tm_fill(c("medianIncome", "Degree", "privateTransporTtoWork", "PTtoWork", "cycleToWork","noCar","carsPerPreson","PrEuropeanDesc","PrMaoriDesc","deprivation"), palette = "viridis", style = "kmeans") +
   tm_layout(legend.position = c("right","top"), frame = F)
 
-tm_shape(mgwr2_sf) +
+tm_shape(mgwr_sf) +
   tm_fill(c("medianIncome","privateTransporTtoWork", "PTtoWork", "cycleToWork","noCar","carsPerPreson","PrEuropeanDesc","PrMaoriDesc","Degree"), palette = "viridis", style = "kmeans") +
   tm_layout(legend.position = c("right","top"), frame = F)
 
-# plot diverging coefs for GWR
-tm_shape(mgwr2_sf) +
+# plot diverging coefs for MGWR
+tm_shape(mgwr_sf) +
   tm_fill(c("privateTransporTtoWork", "PTtoWork", "cycleToWork","noCar","carsPerPreson","PrEuropeanDesc","PrMaoriDesc"),midpoint = 0, style = "kmeans") +
   tm_style("col_blind")+
   tm_layout(legend.position = c("right","top"), frame = F)
@@ -657,7 +657,7 @@ mapmgwr_signif_coefs_diverging_func = function(x, var_name, var_name_TV, method,
                 style = "kmeans", title = varN, title.fontfamily="serif",
                 n=6, palette = "seq") +
     # now add the tvalues layer
-    tm_shape(x[signif,]) + tm_borders(lwd = 0.3, col="black") +
+    tm_shape(x[signif,]) + tm_borders(lwd = 0.25, col="black") +
     tm_layout(main.title = method, legend.position = c("left","bottom"),
               frame = T, legend.outside = F,
               legend.format = list(fun = function(x) formatC(x, digits = 1, format = "f")),
@@ -674,6 +674,7 @@ mapmgwr_signif_coefs_diverging_func = function(x, var_name, var_name_TV, method,
 
 # GWR all coefficients
 gwr_cars <- map_signif_coefs_diverging_func(x = gwr_sf, "carsPerPreson", "carsPerPreson_TV", "Cars per Person", "Coefficient")
+gwr_income <- map_signif_coefs_diverging_func(x = gwr_sf, "medianIncome", "medianIncome_TV", "Median Income", "Coefficient")
 gwr_pt <- map_signif_coefs_diverging_func(x = gwr_sf, "PTtoWork", "PTtoWork_TV", "% Public Transport to Work", "Coefficient")
 gwr_cycle <- map_signif_coefs_diverging_func(x = gwr_sf, "cycleToWork", "cycleToWork_TV", "% Cycle to Work", "Coefficient")
 gwr_privtr <- map_signif_coefs_diverging_func(x = gwr_sf, "privateTransporTtoWork", "privateTransporTtoWork_TV", "% Private Transport", "Coefficient")
@@ -681,31 +682,37 @@ gwr_eu <- map_signif_coefs_diverging_func(x = gwr_sf, "PrEuropeanDesc", "PrEurop
 gwr_maori <- map_signif_coefs_diverging_func(x = gwr_sf, "PrMaoriDesc", "PrMaoriDesc_TV", "% Maori Descent", "Coefficient")
 gwr_nocar <- map_signif_coefs_diverging_func(x = gwr_sf, "noCar", "noCar_TV", "% No Car", "Coefficient")
 gwr_degree <- map_signif_coefs_diverging_func(x = gwr_sf, "Degree", "Degree_TV", "% Degree", "Coefficient")
+gwr_depriv <- map_signif_coefs_diverging_func(x = gwr_sf, "deprivation", "deprivation_TV", "Deprivation", "Coefficient")
 
 png(file="outputs/allgwr2.png",width=3000, height=2000)
-tmap_arrange(gwr_cars, gwr_pt, gwr_cycle, gwr_privtr, gwr_eu, gwr_maori, gwr_nocar, gwr_degree)
+tmap_arrange(gwr_income, gwr_cars, gwr_pt, gwr_cycle, gwr_privtr, gwr_eu, gwr_maori, gwr_nocar, gwr_degree,gwr_depriv,ncol=5)
 dev.off()
 
-# MGWR_2 Only significant coefficients
-mapmgwr_signif_coefs_diverging_func(x = mgwr2_sf, "carsPerPreson", "carsPerPreson_TV", "", "MGWR Coefficient")
-mapmgwr_signif_coefs_diverging_func(x = mgwr2_sf, "privateTransporTtoWork", "privateTransporTtoWork_TV", "", "MGWR Coefficient")
-mapmgwr_signif_coefs_diverging_func(x = mgwr2_sf, "PrEuropeanDesc", "PrEuropeanDesc_TV", "MGWR", "PrEuropeanDesc")
-mapmgwr_signif_coefs_diverging_func(x = mgwr2_sf, "PTtoWork", "PTtoWork_TV", "MGWR", "PTtoWork") # insignificant
-mapmgwr_signif_coefs_diverging_func(x = mgwr2_sf, "cycleToWork", "cycleToWork_TV", "MGWR", "cycleToWork") #insignificant
-mapmgwr_signif_coefs_diverging_func(x = mgwr2_sf, "PrMaoriDesc", "PrMaoriDesc_TV", "MGWR", "PrMaoriDesc")# insignificant
-mapmgwr_signif_coefs_diverging_func(x = mgwr2_sf, "noCar", "noCar_TV", "MGWR", "noCar") #insignificant
+# MGWR coefficients
+mgwr_cars <- map_signif_coefs_diverging_func(x = mgwr_sf, "carsPerPreson", "carsPerPreson_TV", "Cars per Person", "Coefficient")
+mgwr_income <- map_signif_coefs_diverging_func(x = mgwr_sf, "medianIncome", "medianIncome_TV", "Median Income", "Coefficient")
+mgwr_pt <- map_signif_coefs_diverging_func(x = mgwr_sf, "PTtoWork", "PTtoWork_TV", "% Public Transport to Work", "Coefficient")
+mgwr_cycle <- map_signif_coefs_diverging_func(x = mgwr_sf, "cycleToWork", "cycleToWork_TV", "% Cycle to Work", "Coefficient")
+mgwr_privtr <- map_signif_coefs_diverging_func(x = mgwr_sf, "privateTransporTtoWork", "privateTransporTtoWork_TV", "% Private Transport", "Coefficient")
+mgwr_eu <- map_signif_coefs_diverging_func(x = mgwr_sf, "PrEuropeanDesc", "PrEuropeanDesc_TV", "% European Descent", "Coefficient")
+mgwr_maori <- map_signif_coefs_diverging_func(x = mgwr_sf, "PrMaoriDesc", "PrMaoriDesc_TV", "% Maori Descent", "Coefficient")
+mgwr_nocar <- map_signif_coefs_diverging_func(x = mgwr_sf, "noCar", "noCar_TV", "% No Car", "Coefficient")
+mgwr_degree <- map_signif_coefs_diverging_func(x = mgwr_sf, "Degree", "Degree_TV", "% Degree", "Coefficient")
+mgwr_depriv <- map_signif_coefs_diverging_func(x = mgwr_sf, "deprivation", "deprivation_TV", "Deprivation", "Coefficient")
 
-png(file="outputs/allmgwr.png",width=3000, height=2000)
-tmap_arrange(gwr_cars, gwr_pt, gwr_cycle, gwr_privtr, gwr_eu, gwr_maori, gwr_nocar, gwr_degree)
+png(file="outputs/allmgwr_2.png",width=3000, height=2000)
+tmap_arrange(mgwr_income, mgwr_cars, mgwr_pt, mgwr_cycle, mgwr_privtr, mgwr_eu, mgwr_maori, mgwr_nocar, mgwr_degree, mgwr_depriv,ncol=5)
 dev.off()
-tmap_arrange(gwr_privtr, gwr_cars, mgwr_privtr, mgwr_cars)#, widths = c(.5,.5))
 
 #Maori pop
-maorimap <- tm_shape(dfg) + tm_polygons("PrMaoriDesc",lwd=0, style="kmeans", title="%Maori Descent") +
-  tm_layout(frame=T, main.title = "Percentage Maori Descent",
+mgwr_maori <- mapmgwr_signif_coefs_diverging_func(x = mgwr_sf, "PrMaoriDesc", "PrMaoriDesc_TV", "MGWR - % Maori Descent", "MGWR Coefficient")
+gwr_maori <- mapmgwr_signif_coefs_diverging_func(x = gwr_sf, "PrMaoriDesc", "PrMaoriDesc_TV", "GWR - % Maori Descent", "GWR Coefficient")
+
+maorimap <- tm_shape(dfg) + tm_polygons("PrMaoriDesc",lwd=0, style="kmeans", title="% Maori Descent") +
+  tm_layout(frame=T, main.title = "% Maori Descent",
             legend.title.fontfamily = "serif", main.title.fontfamily = "serif",
             main.title.size = 1, title.size = .5, main.title.position = "center") 
-tmap_arrange(gwr_maori, maorimap, widths = c(.5,.5))
+tmap_arrange(maorimap, gwr_maori, mgwr_maori, ncol = 3)
 
 #### Quantile - analysis ####
 #load data
@@ -727,7 +734,7 @@ population <- population |>
 #impute
 sa1_pop <- left_join(sa1_polys, population, by = c("SA12018_V1_00"="code"))
 kulionly <- kulinong |> 
-  subset(select = c(SA12018_V1_00, kuli_geomAgg))
+  subset(select = c(SA12018_V1_00, kuli_MPIAgg))
 popdf <- left_join(sa1_pop, kulionly, by = c("SA12018_V1_00"="SA12018_V1_00"))
 popdf <- st_drop_geometry(popdf)
 
@@ -740,7 +747,7 @@ popdf[which(is.na(popdf$OtherEthnicity),), "OtherEthnicity"] <- 0
 popdf[which(is.na(popdf$PacificNum),), "PacificNum"] <- 0
 #popdf[which(is.na(popdf$medianIncome),), "medianIncome"] <- mean(popdf$medianIncome, na.rm=T)
 
-popdf1 <- within(popdf, quartile <- as.integer(cut(kuli_geomAgg, quantile(kuli_geomAgg, seq(0,1,.01)), include.lowest=T)))
+popdf1 <- within(popdf, quartile <- as.integer(cut(kuli_MPIAgg, quantile(kuli_MPIAgg, seq(0,1,.01)), include.lowest=T)))
 popdf2 <- popdf1 |>
   subset(select = -c(SA12018_V1_00)) |> 
   dplyr::group_by(quartile) |>
