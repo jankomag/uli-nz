@@ -36,7 +36,7 @@ p{
     border-radius: 3px;
     width: 240px;
     border: 0px solid rgba(0, 0, 0, 0.4);
-    font-family: 'Lato', sans-serif;
+    font-family: 'Lato', serif;
     overflow: scroll;
     max-height: 60vh;
   }
@@ -56,6 +56,7 @@ p{
     text-transform:capitalize;
     padding-left:0px;
     font-size:20px;
+    font-family: 'Lato', serif;
     font-weight:500;
     padding-top:0px;
     margin-top:5px;
@@ -87,25 +88,31 @@ p{
 
 .menu-category.transport .title-container {
   background-color: #ffd6cc; /* light orange */
+  padding: 5px;
 }
 
 .menu-category.walkability .title-container {
   background-color: #d6e9c6; /* light green */
+  padding: 5px;
 }
 
 .menu-category.medical .title-container {
   background-color: #c9daf8; /* light blue */
+  padding: 5px;
 }
 
 .menu-category.KULI .title-container {
   background-color: #e8ffbd; /* light blue */
+  padding: 5px;
 }
 .menu-category.greeninfrastructure .title-container {
   background-color: #9dfb98; /* light blue */
+  padding: 5px;
 }
 
 .menu-category.leisure .title-container {
   background-color: #f8c9df; /* light blue */
+  padding: 5px;
 }
 
 .menu-category.housing .title-container {

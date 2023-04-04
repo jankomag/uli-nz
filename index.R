@@ -134,7 +134,6 @@ lambdahealth <- 0.3434343
 lambdachildcare <- 0.06060606
 lambdasport <- 0.3838384
 lambdasecond <- 0.3434343
-lambdaprimary <- 0.4242424
 lambdapetrol <- 0.4242424
 lambdaev <- 0.6262626
 lambdapubs <- 0.3434343
@@ -310,6 +309,16 @@ densityplot = function(xpre, xpost, varN) {
 }
 densityplot(dist_stations, station1, "Train Station")
 densityplot(dist_busstopsfreq,freqbusstop1, "Frequent Buses")
+densityplot(bikeperarea, bikeability1, "Bikeability")
+densityplot(carInfrastructure1, carInfrastructure1, "Car Infrastructure")
+
+densityplot(dist_conveniencestore, convstor1, "Convenience Store")
+densityplot(dist_supermarket, supermarket1, "Supermarket")
+densityplot(streetconn, strconnectivity1, "Street Connectivity")
+
+densityplot(dist_bigpark, bigpark1, "Big Park")
+densityplot(dist_beach, beach1, "Beach")
+
 densityplot(dampness, damp1, "Dampness")
 densityplot(shannon, diversity1, "Shannon Index")
 densityplot(crime_perarea, crime1, "Crime")
@@ -328,23 +337,17 @@ densityplot(dist_healthcentre, healthcr1, "Healthcentre")
 densityplot(dist_hospital, hospital1, "Hospital")
 densityplot(dist_childcare, childcare1, "Childcare")
 densityplot(dist_sport, sport1, "Sport Facilities")
-densityplot(dist_conveniencestore, convstor1, "Convenience Store")
-densityplot(dist_supermarket, supermarket1, "Supermarket")
+
 densityplot(dist_secondary, secondary1, "Secondary")
 densityplot(dist_primary, primary1 , "Primary")
 densityplot(dist_petrol, petrol1, "Petrol")
 densityplot(dist_evs, evch1, "EVs")
-densityplot(str_connectivity, strconnectivity1, "Street Connectivity")
-densityplot(dist_bigpark, bigpark1, "Big Park")
 densityplot(dist_cafe, cafe1, "Cafe")
 densityplot(dist_restaurants, restaurant1, "Restaurant")
 densityplot(dist_pubs, pub1, "Pub")
 densityplot(dist_bbq, bbq1, "BBQ")
-densityplot(bikeperarea, bikeability1, "Bikeability")
 densityplot(dist_gym, gym1, "Gym")
-densityplot(dist_beach, beach1, "Beach")
 densityplot(medianRent, affordability1, "Affordability")
-densityplot(carInfrastructure2_add, carInfrastructure2_add, "Car Infrastructure")
 densityplot(dist_emergency, emergency1, "Emergency")
 #densityplot(dist_busstops, bustop1, "Bus Stop")
 #densityplot(popdens, popdens1, "Pop Density")
