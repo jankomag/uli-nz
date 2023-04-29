@@ -457,6 +457,7 @@ gwr_full <- gwr.basic(formula,
                    bw = bw_adap)
 gwr <- gwr_full
 save(gwr, file="outputs/models/gwr_renewed.Rdata")
+load("outputs/models/gwr_renewed.Rdata")
 
 # specify MGWR model
 mgwr_1 <- gwr.multiscale(formula,
@@ -467,7 +468,9 @@ mgwr_1 <- gwr.multiscale(formula,
                         bws0=rep(100, 11),
                         verbose = F, predictor.centered=rep(T, 10))
 save(mgwr_1, file="outputs/models/mgwr_sa2_renewed.Rdata")
-#load("outputs/models/gwr_renewed.RData")
+load("outputs/models/mgwr_sa2_renewed.Rdata")
+mgwr_1
+
 #load("outputs/models/mgwr_1_n1408.Rdata")
 mbwa <- round(mgwr_1[[2]]$bws,1)
 # second MGWR model
@@ -476,6 +479,9 @@ mgwr_2 <- gwr.multiscale(formula, data = sa2.sp, adaptive = T,
                          kernel = "bisquare",bws0=c(mbwa),
                          bw.seled=rep(T, 11),verbose = F,predictor.centered=rep(F, 10))
 save(mgwr_2, file="outputs/models/mgwr_sa2_2_renewed.Rdata")
+
+load("outputs/models/mgwr_sa2_2_renewed.Rdata")
+mgwr_2
 mgwr_1
 mgwr_1$GW.diagnostic
 
@@ -484,10 +490,17 @@ gwr_coef_cols <- data.frame(gwr$SDF@data[, 1:11])
 gwr_coef_cols$id <- 1:nrow(gwr_coef_cols)
 gwr_coef_cols$Model <- "GWR"
 gwr_long <- melt(gwr_coef_cols, id = c("id","Model"))
+
 mgwr_coef_cols <- data.frame(mgwr_1$SDF@data[, 1:11])
 mgwr_coef_cols$id <- 1:nrow(mgwr_coef_cols)
 mgwr_coef_cols$Model <- "MGWR"
 mgwr_long <- melt(mgwr_coef_cols, id = c("id","Model"))
+
+mgwr_coef_cols <- data.frame(mgwr_2$SDF@data[, 1:11])
+mgwr_coef_cols$id <- 1:nrow(mgwr_coef_cols)
+mgwr_coef_cols$Model <- "MGWR2"
+mgwr2_long <- melt(mgwr_coef_cols, id = c("id","Model"))
+
 olssum <- data.frame(lm$coefficients)
 olssum <- cbind(variable = rownames(olssum), olssum)
 rownames(olssum) <- 1:nrow(olssum)
@@ -498,6 +511,8 @@ olssum$variable[olssum$variable == '(Intercept)'] <- 'Intercept'
 olssum <- olssum[,c(4,3,1,2)]
 
 allcoefs <- rbind(gwr_long, mgwr_long)
+allcoefs <- rbind(allcoefs, mgwr2_long)
+
 allcoefs <- rbind(allcoefs, olssum)
 
 ggplot() +
@@ -508,7 +523,7 @@ ggplot() +
         axis.text.x = element_text(angle = 45, hjust=1),
         plot.title = element_text(hjust = 0.5),
         text=element_text(size=13,  family="serif")) +
-  scale_color_manual(values=c("#6ECCAF","#344D67", "black")) +
+  scale_color_manual(values=c("#6ECCAF","#344D67","red", "black")) +
   ylab('Coefficient estimate') +xlab ('')#+coord_cartesian(ylim = c(-18, 18))
   #scale_y_continuous(trans='log10')
   #labs(title ="Boxplots of Coefficient estimates") +

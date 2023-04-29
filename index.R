@@ -356,7 +356,7 @@ densityplot(dist_emergency, emergency1, "Emergency")
 
 df_indicators <- sa1_all_index[,c(62:98,101)]
 colnames(df_indicators) <- c("Station","FrequentBusStop","Bikeability","CarInfrastructure",
-                             "ConvenienceStore","Supermarket","StreetConnectivity",
+                             "ConvenienceStore","Supermarket","StreetConnectivity","HosuingDensity",
                              "Cinema","Gym","Theatre","Library",
                              "Museum","Gallery","Sport","Affordability",
                              "Dampness","AlcoholEnvs","Crime","RoadSafety",
@@ -368,12 +368,15 @@ colnames(df_indicators) <- c("Station","FrequentBusStop","Bikeability","CarInfra
 cronbach.alpha(df_indicators)
 
 # Correlations #
-cor <- cor(x = df_indicators, y = df_indicators, use="complete.obs")
-stargazer(cor, type = "latex")
+cor <- cor(x = df_indicators, y = df_indicators, use="complete.obs", method="pearson")
+stargazer(cor, type = "text")
 corrplot(cor, tl.srt = 45, type = "lower", method = "ellipse",
          order = "FPC", tl.cex = 0.8,
         tl.col = "black", diag = T, cl.cex=0.7,cl.offset=0.3)
-corr <- rcorr(as.matrix(df_indicators))
+
+round(cor(x = df_indicators$KULI, y = df_indicators$Supermarket),3)
+
+
 
 #### Mapping indicators ####
 border <- st_read("data/geographic/sa1_auckland_waiheke_urban_new_final.gpkg") |> st_transform(27291)
