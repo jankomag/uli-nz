@@ -315,44 +315,51 @@ densityplot(carInfrastructure1, carInfrastructure1, "Car Infrastructure")
 densityplot(dist_conveniencestore, convstor1, "Convenience Store")
 densityplot(dist_supermarket, supermarket1, "Supermarket")
 densityplot(streetconn, strconnectivity1, "Street Connectivity")
+densityplot(dwelldensity_buff200_NUMPOINTS, housedens1, "House Density")
 
 densityplot(dist_bigpark, bigpark1, "Big Park")
 densityplot(dist_beach, beach1, "Beach")
 
-densityplot(dampness, damp1, "Dampness")
+densityplot(dist_marae,marae1, "Marae")
 densityplot(shannon, diversity1, "Shannon Index")
+
 densityplot(crime_perarea, crime1, "Crime")
 densityplot(dist_crash, crashes1, "Crashes")
 densityplot(floodprone_prc,flood1, "Floods")
 densityplot(alcoprohibited,alcohol1, "Alcohol Prohibited")
-densityplot(dist_marae,marae1, "Marae")
+densityplot(dist_emergency, emergency1, "Emergency")
+
 densityplot(dist_cinema,cinema1, "Cinema")
 densityplot(dist_galleries, gallery1,"Gallery")
 densityplot(dist_libraries,library1, "Library")
 densityplot(dist_museums,museum1, "Museum")
 densityplot(dist_theatre,theatre1, "Theatre")
+
 densityplot(dist_chemist, chemist1, "Chemist")
 densityplot(dist_dentist, dentist1, "Dentist")
 densityplot(dist_healthcentre, healthcr1, "Healthcentre")
 densityplot(dist_hospital, hospital1, "Hospital")
-densityplot(dist_childcare, childcare1, "Childcare")
+
 densityplot(dist_sport, sport1, "Sport Facilities")
 
+
+densityplot(dist_childcare, childcare1, "Childcare")
 densityplot(dist_secondary, secondary1, "Secondary")
 densityplot(dist_primary, primary1 , "Primary")
-densityplot(dist_petrol, petrol1, "Petrol")
-densityplot(dist_evs, evch1, "EVs")
+
 densityplot(dist_cafe, cafe1, "Cafe")
 densityplot(dist_restaurants, restaurant1, "Restaurant")
 densityplot(dist_pubs, pub1, "Pub")
 densityplot(dist_bbq, bbq1, "BBQ")
 densityplot(dist_gym, gym1, "Gym")
+
 densityplot(medianRent, affordability1, "Affordability")
-densityplot(dist_emergency, emergency1, "Emergency")
-#densityplot(dist_busstops, bustop1, "Bus Stop")
+densityplot(dampness, damp1, "Dampness")
+
 #densityplot(popdens, popdens1, "Pop Density")
-#densityplot(househdens, housedens1, "House Density")
 #densityplot(dist_smallpark, smallpark1, "Small Park")
+#densityplot(dist_petrol, petrol1, "Petrol")
+#densityplot(dist_evs, evch1, "EVs")
 
 df_indicators <- sa1_all_index[,c(62:98,101)]
 colnames(df_indicators) <- c("Station","FrequentBusStop","Bikeability","CarInfrastructure",
@@ -394,7 +401,6 @@ indic_map_func = function(var_name, titl) {
   mapout
 }
 station = indic_map_func("station1", "Train Station")
-#busstop = indic_map_func("bustop1", "Bus Stop")
 freqb = indic_map_func("freqbusstop1", "Frequent Bus Stop")
 hous=indic_map_func("housedens1", "House Density")
 damp = indic_map_func("damp1", "Dampness")
@@ -431,6 +437,7 @@ beach <- indic_map_func("beach1", "Beach")
 afford <- indic_map_func("affordability1", "Affordability")
 carinf <- indic_map_func("carInfrastructure1", "Car Infrastructure")
 emer <- indic_map_func("emergency1", "Emergency Service")
+#busstop = indic_map_func("bustop1", "Bus Stop")
 #smolp <- indic_map_func("smallpark1", "Small Park")
 #popden = indic_map_func("popdens1", "Population Density")
 
@@ -438,7 +445,7 @@ emer <- indic_map_func("emergency1", "Emergency Service")
 png(file="outputs/mapsindics_full.png",width=4000, height=6400)
 
 tmap_arrange(station,freqb,bikeab,carinf,
-             convs,superm,stcon,
+             convs,hous,superm,stcon,
              cinem,gym,theat,libr,museum,gall,sport,#popden,hous,
              afford,damp,
              alco,crime,crash,flood,emer,

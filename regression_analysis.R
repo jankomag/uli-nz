@@ -157,6 +157,8 @@ tm_shape(dfg) + tm_polygons(col=c("PrEuropeanDesc","carsPerPreson","noCar",
                                   "bornOverseas","medianIncome","PrMaoriDesc","maoriDescent"), lwd=0, style="kmeans")
 df <- st_drop_geometry(dfg)
 summary(dfg)
+tm_shape(dfg) + tm_polygons(col=c("noCar"), lwd=0, style="kmeans")
+                            
 #### EDA ####
 cor <- cor(x = df[3:16], y = df[3:16], use="complete.obs")
 corrplot(cor, tl.srt = 25)
@@ -481,6 +483,7 @@ mgwr_2 <- gwr.multiscale(formula, data = sa2.sp, adaptive = T,
 save(mgwr_2, file="outputs/models/mgwr_sa2_2_renewed.Rdata")
 
 load("outputs/models/mgwr_sa2_2_renewed.Rdata")
+
 mgwr_2
 mgwr_1
 mgwr_1$GW.diagnostic
@@ -651,7 +654,7 @@ map_signif_coefs_diverging_func = function(x, var_name, var_name_TV, method, var
     tm_shape(x[signif,]) + tm_borders(lwd = 0.3, col="black") +
     tm_layout(main.title = method, legend.position = c("left","bottom"),
               frame = T, legend.outside = F,
-              legend.format = list(fun = function(x) formatC(x, digits = 1, format = "f")),
+              legend.format = list(fun = function(x) formatC(x, digits = 2, format = "f")),
               legend.title.fontfamily = "serif", main.title.size = 4, main.title.position = "center",
               legend.width=2, legend.height=2, legend.text.size=2,legend.title.size=3,
               legend.bg.color="grey100", legend.bg.alpha=.7, main.title.fontfamily="serif",
@@ -692,7 +695,7 @@ gwr_cars <- map_signif_coefs_diverging_func(x = gwr_sf, "carsPerPreson", "carsPe
 gwr_income <- map_signif_coefs_diverging_func(x = gwr_sf, "medianIncome", "medianIncome_TV", "Median Income", "Coefficient")
 gwr_pt <- map_signif_coefs_diverging_func(x = gwr_sf, "PTtoWork", "PTtoWork_TV", "% Public Transport to Work", "Coefficient")
 gwr_cycle <- map_signif_coefs_diverging_func(x = gwr_sf, "cycleToWork", "cycleToWork_TV", "% Cycle to Work", "Coefficient")
-gwr_privtr <- map_signif_coefs_diverging_func(x = gwr_sf, "privateTransporTtoWork", "privateTransporTtoWork_TV", "% Private Transport", "Coefficient")
+gwr_privtr <- map_signif_coefs_diverging_func(x = gwr_sf, "privateTransporTtoWork", "privateTransporTtoWork_TV", "% Private Transport to Work", "Coefficient")
 gwr_eu <- map_signif_coefs_diverging_func(x = gwr_sf, "PrEuropeanDesc", "PrEuropeanDesc_TV", "% European Descent", "Coefficient")
 gwr_maori <- map_signif_coefs_diverging_func(x = gwr_sf, "PrMaoriDesc", "PrMaoriDesc_TV", "% Maori Descent", "Coefficient")
 gwr_nocar <- map_signif_coefs_diverging_func(x = gwr_sf, "noCar", "noCar_TV", "% No Car", "Coefficient")
@@ -708,23 +711,23 @@ mgwr_cars <- map_signif_coefs_diverging_func(x = mgwr_sf, "carsPerPreson", "cars
 mgwr_income <- map_signif_coefs_diverging_func(x = mgwr_sf, "medianIncome", "medianIncome_TV", "Median Income", "Coefficient")
 mgwr_pt <- map_signif_coefs_diverging_func(x = mgwr_sf, "PTtoWork", "PTtoWork_TV", "% Public Transport to Work", "Coefficient")
 mgwr_cycle <- map_signif_coefs_diverging_func(x = mgwr_sf, "cycleToWork", "cycleToWork_TV", "% Cycle to Work", "Coefficient")
-mgwr_privtr <- map_signif_coefs_diverging_func(x = mgwr_sf, "privateTransporTtoWork", "privateTransporTtoWork_TV", "% Private Transport", "Coefficient")
+mgwr_privtr <- map_signif_coefs_diverging_func(x = mgwr_sf, "privateTransporTtoWork", "privateTransporTtoWork_TV", "% Private Transport to Work", "Coefficient")
 mgwr_eu <- map_signif_coefs_diverging_func(x = mgwr_sf, "PrEuropeanDesc", "PrEuropeanDesc_TV", "% European Descent", "Coefficient")
 mgwr_maori <- map_signif_coefs_diverging_func(x = mgwr_sf, "PrMaoriDesc", "PrMaoriDesc_TV", "% Maori Descent", "Coefficient")
 mgwr_nocar <- map_signif_coefs_diverging_func(x = mgwr_sf, "noCar", "noCar_TV", "% No Car", "Coefficient")
 mgwr_degree <- map_signif_coefs_diverging_func(x = mgwr_sf, "Degree", "Degree_TV", "% Degree", "Coefficient")
 mgwr_depriv <- map_signif_coefs_diverging_func(x = mgwr_sf, "deprivation", "deprivation_TV", "Deprivation", "Coefficient")
 
-png(file="outputs/allmgwr_2.png",width=3000, height=2000)
+png(file="outputs/allmgwr_3.png",width=3000, height=2000)
 tmap_arrange(mgwr_income, mgwr_cars, mgwr_pt, mgwr_cycle, mgwr_privtr, mgwr_eu, mgwr_maori, mgwr_nocar, mgwr_degree, mgwr_depriv,ncol=5)
 dev.off()
 
 #Maori pop
-mgwr_maori <- mapmgwr_signif_coefs_diverging_func(x = mgwr_sf, "PrMaoriDesc", "PrMaoriDesc_TV", "MGWR - % Maori Descent", "MGWR Coefficient")
-gwr_maori <- mapmgwr_signif_coefs_diverging_func(x = gwr_sf, "PrMaoriDesc", "PrMaoriDesc_TV", "GWR - % Maori Descent", "GWR Coefficient")
+mgwr_maori <- mapmgwr_signif_coefs_diverging_func(x = mgwr_sf, "PrMaoriDesc", "PrMaoriDesc_TV", "c) MGWR - % Maori Descent", "MGWR Coefficient")
+gwr_maori <- mapmgwr_signif_coefs_diverging_func(x = gwr_sf, "PrMaoriDesc", "PrMaoriDesc_TV", "b) GWR - % Maori Descent", "GWR Coefficient")
 
 maorimap <- tm_shape(dfg) + tm_polygons("PrMaoriDesc",lwd=0, style="kmeans", title="% Maori Descent") +
-  tm_layout(frame=T, main.title = "% Maori Descent",
+  tm_layout(frame=T, main.title = "a) % Maori Descent",
             legend.title.fontfamily = "serif", main.title.fontfamily = "serif",
             main.title.size = 1, title.size = .5, main.title.position = "center") 
 tmap_arrange(maorimap, gwr_maori, mgwr_maori, ncol = 3)
