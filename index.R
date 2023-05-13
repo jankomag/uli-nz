@@ -381,7 +381,7 @@ corrplot(cor, tl.srt = 45, type = "lower", method = "ellipse",
          order = "FPC", tl.cex = 0.8,
         tl.col = "black", diag = T, cl.cex=0.7,cl.offset=0.3)
 
-round(cor(x = df_indicators$KULI, y = df_indicators$Supermarket),3)
+round(cor(x = df_indicators$KULI, y = df_indicators$Diversity),3)
 
 
 

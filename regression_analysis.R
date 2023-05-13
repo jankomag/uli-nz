@@ -69,10 +69,12 @@ census <- census |>
   mutate(PrMaoriDesc = as.numeric(PrMaoriDesc)) |> 
   mutate(Degree = as.numeric(Degree))
 
+popdens <- st_read('data/geographic/kuli_popdensity.gpkg') |> st_drop_geometry() |> 
+  subset(select = c(SA12018_V1_00, popdens_new))
+census <- left_join(census, popdens, by = c("code"="SA12018_V1_00"))
 
 #load additional data
-deprivation <- read.csv('data/additionalData/deprivation_joined.csv')
-deprivation <- deprivation |>
+deprivation <- read.csv('data/additionalData/deprivation_joined.csv') |>
   mutate(SA12018_V1_00 = as.character(SA12018_V1_00))
 census <- left_join(census, deprivation, by = c("code"="SA12018_V1_00"))
 
@@ -147,14 +149,15 @@ sa1_imped[which(is.na(sa1_imped$noCar),), "noCar"] <- mean(sa1_imped$noCar, na.r
 sa1_imped[which(is.na(sa1_imped$carsPerPreson),), "carsPerPreson"] <- mean(sa1_imped$carsPerPreson, na.rm=T)
 sa1_imped[which(is.na(sa1_imped$Degree),), "Degree"] <- mean(sa1_imped$Degree, na.rm=T)
 sa1_imped[which(is.na(sa1_imped$popUsual),), "popUsual"] <- 0
+sa1_imped[which(is.na(sa1_imped$popdens_new),), "popdens_new"] <- 0
 summary(sa1_imped)
 
-#sa1_census <- left_join(sa1_polys, census, by = c("SA12018_V1_00"="code"))
 kulinong <- st_drop_geometry(kuli)
 dfg <- left_join(sa1_imped, kulinong, by = c("SA12018_V1_00"="SA12018_V1_00"))
-tm_shape(dfg) + tm_polygons(col=c("PrEuropeanDesc","carsPerPreson","noCar",
+tm_shape(dfg) + tm_polygons(col=c("PrEuropeanDesc","carsPerPreson","noCar","popdens_new",
                                   "cycleToWork","PTtoWork","privateTransporTtoWork",
                                   "bornOverseas","medianIncome","PrMaoriDesc","maoriDescent"), lwd=0, style="kmeans")
+tm_shape(dfg) + tm_polygons(col="popdens_new", lwd=0, style="quantile")
 df <- st_drop_geometry(dfg)
 summary(dfg)
 tm_shape(dfg) + tm_polygons(col=c("noCar"), lwd=0, style="kmeans")
@@ -162,7 +165,9 @@ tm_shape(dfg) + tm_polygons(col=c("noCar"), lwd=0, style="kmeans")
 #### EDA ####
 cor <- cor(x = df[3:16], y = df[3:16], use="complete.obs")
 corrplot(cor, tl.srt = 25)
-corr <- rcorr(as.matrix(df[3:14]))
+corr <- rcorr(as.matrix(df[3:16]))
+
+round(cor(x = df$kuli_MPIAgg, y = df$popdens_new),3)
 
 # function to make correlation matrix§-
 flattenCorrMatrix <- function(cormat, pmat) {
@@ -182,9 +187,9 @@ corrmatrix <- corrmatrix |>
   filter(row == 'income')
 
 # plot correlations
-df[3:15] |>
-  gather(-kuli_geomAgg, key = "var", value = "value") |> 
-  ggplot(aes(x = kuli_geomAgg, y = value)) +
+df[3:16] |>
+  gather(-kuli_MPIAgg, key = "var", value = "value") |> 
+  ggplot(aes(x = kuli_MPIAgg, y = value)) +
   facet_wrap(~ var, scales = "free") +
   geom_point(alpha=0.2) +
   theme_bw() +
@@ -220,11 +225,11 @@ tm_shape(hexgrid) + tm_borders(col='grey') +
 
 ##### SA2 #####
 sa2 = st_read('data/geographic/sa2.gpkg', quiet = T) # transform to OSGB projection
-sz_sf = dfg[3:15]
+sz_sf = dfg[3:16]
 tz_sf <- sa2 |> 
   subset(select = c(SA22023_V1_00)) |> st_transform(27291)
 sa2agg <- st_interpolate_aw(sz_sf, tz_sf, extensive = F)
-summary(sa2agg)
+
 tm_shape(sa2agg) + 
   tm_polygons("kuli_MPIAgg", palette = "YlGnBu", style="kmeans",
               lwd=.1) + tm_layout(frame = F)
@@ -258,7 +263,7 @@ tm_shape(dfg) +
 # SA1 geometry
 formula = as.formula(kuli_MPIAgg ~ medianIncome + privateTransporTtoWork +
                        PTtoWork + cycleToWork + noCar + carsPerPreson + PrEuropeanDesc +
-                       PrMaoriDesc + deprivation + Degree)
+                       PrMaoriDesc + deprivation + Degree + popdens_new)
 lm = lm(formula, data = df)
 summary(lm)
 
@@ -448,9 +453,9 @@ hex.sp = as(hexgrid, "Spatial")
 # determine the kernel bandwidth
 bw_adap <- bw.gwr(data=au.sp, formula=formula, approach = "AIC", kernel="bisquare",
              adaptive = T) # adaptive as no of neighbors
-bw_fixed <- bw.gwr(data=hex.sp, formula=formula,approach = "AIC", kernel="bisquare",
+bw_fixed <- bw.gwr(data=au.sp, formula=formula,approach = "AIC", kernel="bisquare",
              adaptive = F) # fixed bandwidth (in m)
-summary(as.vector(st_distance(hexgrid)))
+summary(as.vector(st_distance(dfg)))
 
 # specify GWR model
 gwr_full <- gwr.basic(formula, 
@@ -458,7 +463,7 @@ gwr_full <- gwr.basic(formula,
                    data = au.sp,
                    bw = bw_adap)
 gwr <- gwr_full
-save(gwr, file="outputs/models/gwr_renewed.Rdata")
+save(gwr, file="outputs/models/gwr_renewed_wpopdens.Rdata")
 load("outputs/models/gwr_renewed.Rdata")
 
 # specify MGWR model
@@ -467,9 +472,9 @@ mgwr_1 <- gwr.multiscale(formula,
                         adaptive = T, max.iterations = 10000,
                         criterion="dCVR",
                         kernel = "bisquare",
-                        bws0=rep(100, 11),
-                        verbose = F, predictor.centered=rep(T, 10))
-save(mgwr_1, file="outputs/models/mgwr_sa2_renewed.Rdata")
+                        bws0=rep(100, 12),
+                        verbose = F, predictor.centered=rep(T, 11))
+save(mgwr_1, file="outputs/models/mgwr_sa2_renewed_wpopdens.Rdata")
 load("outputs/models/mgwr_sa2_renewed.Rdata")
 mgwr_1
 
@@ -481,7 +486,6 @@ mgwr_2 <- gwr.multiscale(formula, data = sa2.sp, adaptive = T,
                          kernel = "bisquare",bws0=c(mbwa),
                          bw.seled=rep(T, 11),verbose = F,predictor.centered=rep(F, 10))
 save(mgwr_2, file="outputs/models/mgwr_sa2_2_renewed.Rdata")
-
 load("outputs/models/mgwr_sa2_2_renewed.Rdata")
 
 mgwr_2
@@ -489,20 +493,20 @@ mgwr_1
 mgwr_1$GW.diagnostic
 
 # Examine Boxplots of coef distributions
-gwr_coef_cols <- data.frame(gwr$SDF@data[, 1:11])
+gwr_coef_cols <- data.frame(gwr$SDF@data[, 1:12])
 gwr_coef_cols$id <- 1:nrow(gwr_coef_cols)
 gwr_coef_cols$Model <- "GWR"
 gwr_long <- melt(gwr_coef_cols, id = c("id","Model"))
 
-mgwr_coef_cols <- data.frame(mgwr_1$SDF@data[, 1:11])
+mgwr_coef_cols <- data.frame(mgwr_1$SDF@data[, 1:12])
 mgwr_coef_cols$id <- 1:nrow(mgwr_coef_cols)
 mgwr_coef_cols$Model <- "MGWR"
 mgwr_long <- melt(mgwr_coef_cols, id = c("id","Model"))
 
-mgwr_coef_cols <- data.frame(mgwr_2$SDF@data[, 1:11])
-mgwr_coef_cols$id <- 1:nrow(mgwr_coef_cols)
-mgwr_coef_cols$Model <- "MGWR2"
-mgwr2_long <- melt(mgwr_coef_cols, id = c("id","Model"))
+#mgwr_coef_cols <- data.frame(mgwr_2$SDF@data[, 1:11])
+#mgwr_coef_cols$id <- 1:nrow(mgwr_coef_cols)
+#mgwr_coef_cols$Model <- "MGWR2"
+#mgwr2_long <- melt(mgwr_coef_cols, id = c("id","Model"))
 
 olssum <- data.frame(lm$coefficients)
 olssum <- cbind(variable = rownames(olssum), olssum)
@@ -514,7 +518,7 @@ olssum$variable[olssum$variable == '(Intercept)'] <- 'Intercept'
 olssum <- olssum[,c(4,3,1,2)]
 
 allcoefs <- rbind(gwr_long, mgwr_long)
-allcoefs <- rbind(allcoefs, mgwr2_long)
+#allcoefs <- rbind(allcoefs, mgwr2_long)
 
 allcoefs <- rbind(allcoefs, olssum)
 
@@ -526,8 +530,8 @@ ggplot() +
         axis.text.x = element_text(angle = 45, hjust=1),
         plot.title = element_text(hjust = 0.5),
         text=element_text(size=13,  family="serif")) +
-  scale_color_manual(values=c("#6ECCAF","#344D67","red", "black")) +
-  ylab('Coefficient estimate') +xlab ('')#+coord_cartesian(ylim = c(-18, 18))
+  scale_color_manual(values=c("#6ECCAF","#344D67","red")) +
+  ylab('Coefficient estimate') +xlab ('')+coord_cartesian(ylim = c(-18, 18))
   #scale_y_continuous(trans='log10')
   #labs(title ="Boxplots of Coefficient estimates") +
   
@@ -568,7 +572,7 @@ gwr_meancoef <- data.frame(tab.gwr[,4])
 stargazer(lm, lm, lm, flip=F, type="latex", single.row = T, style="qje", digits=2)
 
 # create a table with coefficient stats for MGWR
-coefs_msgwr = apply(mgwr_1$SDF@data[, 1:11], 2, summary)
+coefs_msgwr = apply(mgwr_1$SDF@data[, 1:12], 2, summary)
 tab.mgwr = data.frame(Bandwidth = mbwa, t(round(coefs_msgwr,3)))
 names(tab.mgwr)[c(3,6)] = c("Q1", "Q3")
 tab.mgwr
