@@ -368,7 +368,7 @@ colnames(df_indicators) <- c("Station","FrequentBusStop","Bikeability","CarInfra
                              "Museum","Gallery","Sport","Affordability",
                              "Dampness","AlcoholEnvs","Crime","RoadSafety",
                              "FloodProneness","EmergencyServices","Diversity","Marae",
-                             "Chemist","Dentist","HealthCentre","Hospital",
+                             "Pharmacy","Dentist","HealthCentre","Hospital",
                              "Childcare","Primary","Secondary","Cafe",
                              "Restaurant","Pub","BBQ","Park","Beach","KULI")
 # Cronbach Alpha #
@@ -381,9 +381,13 @@ corrplot(cor, tl.srt = 45, type = "lower", method = "ellipse",
          order = "FPC", tl.cex = 0.8,
         tl.col = "black", diag = T, cl.cex=0.7,cl.offset=0.3)
 
-round(cor(x = df_indicators$KULI, y = df_indicators$Diversity),3)
+round(cor(x = df_indicators$KULI, y = df_indicators$Affordability),3)
 
+plot(x = df_indicators$KULI, y = df_indicators$Affordabilit)
 
+ggplot(df_indicators) +
+  geom_point(aes(x = KULI, y = Affordability)) +
+  geom_abline()
 
 #### Mapping indicators ####
 border <- st_read("data/geographic/sa1_auckland_waiheke_urban_new_final.gpkg") |> st_transform(27291)

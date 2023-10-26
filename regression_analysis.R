@@ -27,7 +27,6 @@ library(MuMIn)
 library(VIM)
 library(spdep)
 library(rgdal)
-library(rgeos)
 library(stargazer)
 library(spatialreg)
 library(rgeoda)
@@ -41,13 +40,13 @@ library(ggspatial)
 library(spdep)
 library(gstat)
 library(geodaData)
-library(spatmap)
+#library(spatmap)
 library(data.table)
 library(collapse)
 
 #### Loading data ####
 # load the kuli data
-kuli = st_read('data/geographic/sa1_kuli_all_cleanednopark.gpkg', quiet = T) # transform to OSGB projection
+kuli = st_read('uli-nz/data/sa1_kuli_all_renewed.gpkg', quiet = T) # transform to OSGB projection
 kuli <- kuli |> 
   subset(select = c(SA12018_V1_00, kuli_MPIAgg)) |> st_transform(27291)
 
@@ -55,7 +54,7 @@ sa1_polys <- kuli |>
   subset(select = c(SA12018_V1_00))
 
 #load additional data
-census <- read.csv('data/additionalData/auckland_census_2.csv')
+census <- read.csv('uli-nz/data/auckland_census_2.csv')
 census <- census |>
   subset(select = -c(European, Maori, Pacific, Asian, MiddleEasternLatinAmericanAfrican, numberdriveToWork, OtherEthnicity, PacificNum, medianRent)) |> 
   mutate(code = as.character(code)) |> 
@@ -739,7 +738,7 @@ tmap_arrange(maorimap, gwr_maori, mgwr_maori, ncol = 3)
 #### Quantile - analysis ####
 #load data
 #load additional data
-population <- read.csv('data/additionalData/auckland_census_2.csv')
+population <- read.csv('uli-nz/data/auckland_census_2.csv')
 population <- population |>
   subset(select = c(code, European, Maori, Pacific, Asian, MiddleEasternLatinAmericanAfrican, OtherEthnicity, PacificNum, popUsual, medianIncome)) |> 
   mutate(code = as.character(code)) |> 
@@ -755,6 +754,8 @@ population <- population |>
 
 #impute
 sa1_pop <- left_join(sa1_polys, population, by = c("SA12018_V1_00"="code"))
+
+kulinong <- st_drop_geometry(kuli)
 kulionly <- kulinong |> 
   subset(select = c(SA12018_V1_00, kuli_MPIAgg))
 popdf <- left_join(sa1_pop, kulionly, by = c("SA12018_V1_00"="SA12018_V1_00"))
@@ -794,6 +795,28 @@ ggplot(popdf2) +
   scale_color_manual(values = colors) +
   labs(color = "Legend") +
   theme(text=element_text(family="serif", size=12))
+
+# The KS test to examine the differences
+summary(popdf2)
+
+hist(popdf2['csum_maori']) 
+hist(uniform_data) 
+
+n <- 1000  # Number of data points
+constant_value <- 0.5  # Value for the perfectly uniform distribution
+uniform_data <- rep(constant_value, n)
+hist(uniform_data) 
+
+# Rescale the variable to the 0 to 1 range
+popdf2$csum_maori_rescaled <- (popdf2$csum_maori - min(popdf2$csum_maori)) / (max(popdf2$csum_maori) - min(popdf2$csum_maori))
+
+ks.test(popdf2$csum_popusual, popdf2$csum_maori)
+ks.test(popdf2$csum_popusual, popdf2$csum_maori_rescaled)
+ks.test(popdf2$csum_popusual, popdf2$csum_pacific)
+ks.test(popdf2$csum_popusual, popdf2$csum_popusual)
+ks.test(popdf2$csum_popusual, popdf2$csum_asian)
+ks.test(popdf2$csum_popusual, popdf2$csum_melaa)
+ks.test(popdf2$csum_popusual, popdf2$csum_eur)
 
 #### Spatial Econometric models ####
 # first Moran's I
