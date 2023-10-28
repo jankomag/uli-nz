@@ -797,19 +797,6 @@ ggplot(popdf2) +
   theme(text=element_text(family="serif", size=12))
 
 # The KS test to examine the differences
-summary(popdf2)
-
-hist(popdf2['csum_maori']) 
-hist(uniform_data) 
-
-n <- 1000  # Number of data points
-constant_value <- 0.5  # Value for the perfectly uniform distribution
-uniform_data <- rep(constant_value, n)
-hist(uniform_data) 
-
-# Rescale the variable to the 0 to 1 range
-popdf2$csum_maori_rescaled <- (popdf2$csum_maori - min(popdf2$csum_maori)) / (max(popdf2$csum_maori) - min(popdf2$csum_maori))
-
 ks.test(popdf2$csum_popusual, popdf2$csum_maori)
 ks.test(popdf2$csum_popusual, popdf2$csum_maori_rescaled)
 ks.test(popdf2$csum_popusual, popdf2$csum_pacific)
@@ -817,6 +804,13 @@ ks.test(popdf2$csum_popusual, popdf2$csum_popusual)
 ks.test(popdf2$csum_popusual, popdf2$csum_asian)
 ks.test(popdf2$csum_popusual, popdf2$csum_melaa)
 ks.test(popdf2$csum_popusual, popdf2$csum_eur)
+
+kuli_nong <- st_drop_geometry(kuli)
+kuli_nong <- rename(kuli_nong, KULI = kuli_MPIAgg)
+kuli_nong <- rename(kuli_nong, SA1_2018 = SA12018_V1_00)
+
+st_write(kuli, "uli-nz/kuli.csv")
+
 
 #### Spatial Econometric models ####
 # first Moran's I
