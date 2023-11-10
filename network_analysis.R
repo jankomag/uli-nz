@@ -12,8 +12,8 @@ library(dodgr)
 library(expss)
 library(stringr)
 library(DescTools)
+library(osmdata)
 
-## RERUN WITH WAIHEKE ISLAND NETWORK - IT WAS EXCLUDED
 #### Data Imports ####
 edges <- st_read("data/network_analysis/auckland_waiheke_network_walk.gpkg", layer='edges') |> 
   st_transform(4326) |> 
@@ -22,6 +22,7 @@ edges <- st_read("data/network_analysis/auckland_waiheke_network_walk.gpkg", lay
 sa1 <- st_read("data/geographic/sa1_kuli_all.gpkg") |> 
   st_transform(4326) |> 
   subset(select = c(SA12018_V1_00)) #area
+
 #get network
 network <- as_sfnetwork(edges, directed = FALSE) |> 
   st_transform(4326) |> 
@@ -36,22 +37,60 @@ get_distance <- function(supply) {
   cbind(sa1, last_data)
 }
 
-#calulate distances to train stations
+#### Querying OSM ####
+bbox_coords <- c(174.489515, -37.159816, 175.258558, -36.570920)
+bbox <- matrix(c(bbox_coords[1], bbox_coords[2], bbox_coords[3], bbox_coords[4]), ncol = 2, byrow = TRUE)
+get_osm_data <- function(osm_key, osm_value) {
+  # Query OSM data
+  osm_data <- opq(bbox = bbox, timeout = 100) %>%
+    add_osm_feature(key = osm_key, value = osm_value) %>%
+    osmdata_sf()
+  points <- osm_data$osm_points[, c("osm_id")]
+  colnames(points) <- c('id', 'geometry')
+  
+  # Check for polygons and add centroids 
+  if (!is.null(osm_data$osm_polygons)) {
+    centroids <- st_centroid(osm_data$osm_polygons$geometry)
+    centroids_sf <- st_sf(
+      name = paste0((osm_value), "Centroids"),
+      geometry = centroids
+    )
+    colnames(centroids_sf) <- c('id', 'geometry')
+    result <- rbind(points, centroids_sf)
+  } else {
+    result <- points
+  }
+  return(result)
+}
+
+cafe <- get_osm_data("amenity", "cafe")
+restaurant <- get_osm_data("amenity", "restaurant")
+cinema <- get_osm_data("amenity", "cinema")
+theatre <- get_osm_data("amenity", "theatre")
+gallerie <- get_osm_data("tourism", "gallery")
+museum <- get_osm_data("tourism", "museum")
+library <- get_osm_data("amenity", "library")
+chemist <- get_osm_data("shop", "chemist")
+dentist <- get_osm_data("amenity", "dentist")
+conveniencestore <- get_osm_data("shop", "convenience")
+supermarket <- get_osm_data("shop", "supermarket")
+pub <- get_osm_data("amenity", "pub")
+gym <- get_osm_data("leisure", "fitness_centre")
+petrol <- get_osm_data("amenity", "fuel")
+
+#### Walking distance calculations ####
 stations <- st_read("data/transport/public_transport/trains_auckland.gpkg") |>
   st_transform(4326)# 27291
 sa1 <- get_distance(stations)
 
-#calulate distances to bus stops
 busstopsfreq <- st_read("data/transport/public_transport/frequentBusStoptsDone.gpkg") |>
   st_transform(4326)# 27291
 sa1 <- get_distance(busstopsfreq)
 
-#calulate distances to bus stops with frequent service
 busstops <- st_read("data/transport/public_transport/bus_stops_auckland.geojson") |>
   st_transform(4326)# 27291
 sa1 <- get_distance(busstops)
 
-#calulate distances to marae
 marae <- st_read("data/kiwi/auckland_marae_final.gpkg") |>
   st_transform(4326)# 27291
 sa1 <- get_distance(marae)
@@ -148,11 +187,11 @@ beach <- st_read("data/social infrastructure/sport/beaches_all.geojson") |>
   st_transform(4326)# 27291
 sa1 <- get_distance(beach)
 
-#calulate distances to train stations
 bigpark_vert <- st_read("data/greeninfrastructure/bigpark_vertex.gpkg") |>
   st_transform(4326)# 27291
 sa1 <- get_distance(bigpark_vert)
 
+#### Driving distance calculations ####
 edges <- st_read("data/network_analysis/auckland_waiheke_network_drive.gpkg", layer='edges') |> 
   st_transform(4326) |> 
   subset(select = -c(u,v,key,osmid, lanes, name, highway, oneway, reversed, from, to,ref, service, access, bridge,
@@ -178,18 +217,7 @@ crash <- st_read("data/safety/crash/Crash_Analysis_System_(CAS)_data.geojson") |
   st_transform(4326)# 27291
 sa1 <- get_distance(crash)
 
-#save
-#st_write(sa1, "data/kiwi/sa1_maraefinal.gpkg")
 st_write(sa1, "data/greeninfrastructure/bigpark_dist_new.gpkg")
 
 sa1done <- st_read("data/geographic/sa1_alldist_final.gpkg")
 head(sa1done)
-
-
-# old way pre-function
-dist_matrix = data.frame(st_network_cost(network, from = sa1, to = stations, weights = "length"))
-dist_matrix$station_dist <- do.call(pmin, dist_matrix)
-dist_matrix <- dist_matrix |> 
-  subset(select = c(min_dist_station))
-
-sa1_dist <- cbind(sa1, dist_matrix)
