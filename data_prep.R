@@ -11,18 +11,18 @@ library(tidyr)
 library(mice)
 library(VIM)
 library(stringr)
-library(nngeo)
+library(spatialkernel)
+library(spatstat)
 
 #### Data imports ####
 # geographic data
-sa1_polys <- st_read("data/geographic/sa1_auckland_waiheke_urban_new_final.gpkg")
-sa1_polys <- sa1_polys |>
-  subset(select = c(SA12018_V1_00))
-#transforming to the same coordinate system
-sa1_base <- st_transform(sa1_polys, 27291) |> st_drop_geometry()
+sa1_polys <- st_read("data/sa1_auckland_waiheke_urban.gpkg") |>
+  subset(select = c(SA12018_V1_00)) |> 
+  st_transform(27291) #transforming to the same coordinate system
+sa1_base <- sa1_polys |> st_drop_geometry()
 
 ##### Census####
-census <- as.data.frame(read.csv("data/geographic/Census/auckland_census.csv"))
+census <- as.data.frame(read.csv("data/auckland_census.csv"))
 census <- census |>
   subset(select = -c(maori_desc, median_income, born_overseas, PacificNum, Degree)) |> 
   mutate(code = as.character(code)) |> 
@@ -37,10 +37,8 @@ census <- census |>
   mutate(medianRent = as.numeric(medianRent))
 
 # Dealing with missing values #
-# find NAs
-md.pattern(census)
 aggr_plot <- aggr(census, col=c('navyblue','red'), numbers=TRUE, sortVars=TRUE, labels=names(census), cex.axis=.7, gap=3, ylab=c("Histogram of missing data","Pattern"))
-# replace with 0s
+
 census[which(census$pop_usual == 0,),5:10] <- 0 # assign ethnicity values to 0 in rows where no population is registered
 
 #calculate percentages ethnicity
@@ -52,11 +50,12 @@ census <- census |>
   mutate(pcMiddleEasternLatinAmericanAfrican = MiddleEasternLatinAmericanAfrican/pop_usual, na.rm=T) |> 
   mutate(pcOtherEthnicity = OtherEthnicity/pop_usual, na.rm=T)
 census[which(census$pop_usual == 0,),12:18] <- 0 # 0 in rows where no population is registered
-census[which(census$pcEuropean>1), "pcEuropean"] <- 1 # 3 rows where white pop is larger than total pop
+census[which(census$pcEuropean>1), "pcEuropean"] <- 1 # 3 rows where european pop is larger than total pop
 
 #### NN impute - impute NAs based on neighbouring values
 sa1_imp <- left_join(sa1_polys, census, by = c("SA12018_V1_00"="code"))
 index <- st_touches(sa1_imp, sa1_imp)
+
 sa1_imped <- sa1_imp %>% 
   mutate(dampness = ifelse(is.na(dampness),
                        apply(index, 1, function(i){mean(.$dampness[i], na.rm=T)}),
@@ -89,10 +88,11 @@ sa1_imped <- sa1_imped %>%
   mutate(pcOtherEthnicity = ifelse(is.na(pcOtherEthnicity),
                              apply(index, 1, function(i){mean(.$pcOtherEthnicity[i], na.rm=T)}),
                              pcOtherEthnicity))
-sa1_imped[which(is.na(sa1_imped$dampness),), "dampness"] <- mean(sa1_imped$dampness, na.rm=T)
+# any remaining missing values replaced with global mean
 sa1_imped[which(is.na(sa1_imped$medianRent),), "medianRent"] <- mean(sa1_imped$medianRent, na.rm=T)
 census <- st_drop_geometry(sa1_imped) |> 
   subset(select = -c(na.rm, European,Maori, Pacific, Asian, MiddleEasternLatinAmericanAfrican, OtherEthnicity))
+
 ##### Diversity ####
 # Compute Diversity Index #
 shannon <- function(p){
@@ -106,39 +106,66 @@ shannon <- function(p){
 }
 census$shannon <- apply(census[,6:11], 1, shannon)
 sa1_all <- left_join(sa1_base, census, by = c("SA12018_V1_00"="SA12018_V1_00"))
-##### Crimes ####
-# Compute crime measure
-crime <- as.data.frame(read.csv("data/safety/crime/crimes_originaldata.csv"))
-crime$Area.Unit = substr(crime$Area.Unit,1,nchar(crime$Area.Unit)-1)
-crime <- crime |> 
-  mutate(terrau = as.factor(Territorial.Authority)) |> 
-  mutate(Meshblock = as.factor(Meshblock)) |> 
-  mutate(Area.Unit = as.factor(Area.Unit))
-crime <- crime[crime$terrau == 'Auckland.',]
 
-# sum all cases by Area Units
-crime_agg <- aggregate(crime["Victimisations"], by=crime["Area.Unit"], sum)
-areaunits <- st_read("data/geographic/areaunit/area-units.gpkg")
-areaunits <- st_transform(areaunits, 27291)
-areaunits_crimes <- left_join(areaunits, crime_agg, by = c("name"="Area.Unit"))
-#st_write(areaunits_crimes, "data/safety/crime/crimes_aggregated_areaunit.gpkg")
-tm_shape(areaunits_crimes)+
-  tm_polygons("Victimisations")
+##### Crime Risk ####
+# load raw crime counts data
+crime <- as.data.frame(read.csv("data/crime_23.csv"))|> 
+  select(Area.Unit, Victimisations, Meshblock, Weapon, ANZSOC.Subdivision, ANZSOC.Group)
+crime$Area.Unit = substr(crime$Area.Unit,1,nchar(crime$Area.Unit)-1) # clean Area unit field
+crime <- crime %>%
+  group_by(Area.Unit) %>%
+  summarise(Sum_Victimisations = sum(Victimisations)) |> #aggregate across all types of crimes
+  as.data.frame()
 
-# aggregation to SA1 level was done in QGIS
-sa1_crime <- st_read("data/safety/crime/sa1_crimes_final.gpkg") |> st_drop_geometry()
-sa1_crime <- sa1_crime |>
-  subset(select = c(SA12018_V1_00, crime_perarea))
+# load Area Unit spatial Data
+au <- st_read("data/area-unit-2017-generalised-version.gpkg") |> 
+  select(AU2017_NAME, LAND_AREA_SQ_KM) |> 
+  st_transform(27291) #transforming to the same coordinate system
 
-sa1_all <- left_join(sa1_all, sa1_crime, by = c("SA12018_V1_00"="SA12018_V1_00"))
-sa1_all[which(is.na(sa1_all$crime_perarea),), "crime_perarea"] <- 0
+# Join crime data with spatial data
+crimes <- left_join(au, crime, by = c("AU2017_NAME" = "Area.Unit")) %>%
+  mutate(across("Sum_Victimisations", ~replace(., is.na(.), 0))) |> #replace areas with no crimes reported with with 0
+  mutate(crimerisk = Sum_Victimisations/LAND_AREA_SQ_KM) # calculate crimes by area measure
+sa1_crime <- st_join(sa1_polys, crimes, by = FALSE) #join to sa1
+sa1_crime[which(is.na(sa1_crime$crimerisk),), "crimerisk"] <- 0 #replace nas with 0
+sa1_crime[which(is.infinite(sa1_crime$crimerisk),), "crimerisk"] <- 0 #replace Infs with 0
+
+# add to sa1_all
+sa1_crime <- select(sa1_crime, SA12018_V1_00, crimerisk)
+sa1_all <- left_join(sa1_all, sa1_crime, by = c("SA12018_V1_00"="SA12018_V1_00")) #join to full data
 
 ##### Road Safety ####
-crashes_sa1 <- st_read("data/safety/crash/sa1_crashdist.gpkg") |> st_drop_geometry()
-crashes_sa1 <- crashes_sa1 |>
-  subset(select = c(SA12018_V1_00, dist_crash))
+crash <- st_read("data/Crash_Analysis_System_(CAS)_data.geojson") |> 
+  st_transform(27291) #transforming to the same coordinate system
+# Simple crash risk = no of crashes / area
+sa1_polys$area <- st_area(sa1_polys)
+sa1_crash <- st_join(sa1_polys, crash)
+sa1_crash <- sa1_crash %>%
+  group_by(SA12018_V1_00) %>%
+  mutate(crash_count = n()) %>%
+  ungroup() %>%
+  select(SA12018_V1_00, area, crash_count, geom) |> 
+  mutate(crash_risk = crash_count / area)
 
-sa1_all <- left_join(sa1_all, crashes_sa1, by = c("SA12018_V1_00"="SA12018_V1_00"))
+# trying Distance weighted method
+sa1_centroids <- st_centroid(sa1_crash)
+sa1_buffers <- st_buffer(sa1_centroids, dist = 1000)
+sa1_pp <- as.ppp(sa1_centroids)
+crash_pp <- as.ppp(crash)
+crash_kernel <- density(crash_pp, sigma = 1000)
+
+sa1_crash$crash_risk <- as.vector(crash_kernel[sa1_pp])
+popsa1 <- census[,c("SA12018_V1_00","pop_usual")] # add population data
+sa1_crash <- left_join(sa1_crash, popsa1, by="SA12018_V1_00") 
+sa1_crash$area <- st_area(sa1_crash)
+sa1_crash$popdens <- sa1_crash$pop_usual / sa1_crash$area
+sa1_crash$crash_risk_weighted <- ifelse(sa1_crash$pop_usual == 0,sa1_crash$crash_risk, # divide by population
+                                        sa1_crash$crash_risk * sa1_crash$pop_usual)
+tm_shape(sa1_crash) +
+  tm_fill("crash_risk_weighted", style="jenks", lwd=0)
+
+sa1_crash <- select(sa1_polys, SA12018_V1_00, crash_risk_weighted)
+sa1_all <- left_join(sa1_all, sa1_crash, by = c("SA12018_V1_00"="SA12018_V1_00")) #join to full data
 
 ##### Floods ####
 floods_sa1 <- st_read("data/safety/floods/sa1_floods_final.gpkg") |> st_drop_geometry()

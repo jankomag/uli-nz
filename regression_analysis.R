@@ -43,6 +43,8 @@ library(geodaData)
 #library(spatmap)
 library(data.table)
 library(collapse)
+library(cluster)
+
 
 #### Loading data ####
 # load the kuli data
@@ -810,7 +812,6 @@ kuli_nong <- rename(kuli_nong, KULI = kuli_MPIAgg)
 kuli_nong <- rename(kuli_nong, SA1_2018 = SA12018_V1_00)
 
 st_write(kuli, "uli-nz/kuli.csv")
-
 
 #### Spatial Econometric models ####
 # first Moran's I
