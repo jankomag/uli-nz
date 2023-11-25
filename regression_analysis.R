@@ -45,18 +45,16 @@ library(data.table)
 library(collapse)
 library(cluster)
 
-
 #### Loading data ####
 # load the kuli data
-kuli = st_read('uli-nz/data/sa1_kuli_all_renewed.gpkg', quiet = T) # transform to OSGB projection
-kuli <- kuli |> 
-  subset(select = c(SA12018_V1_00, kuli_MPIAgg)) |> st_transform(27291)
+kuli <- st_read('data/sa1_kuli_all.gpkg', quiet = T) |> st_transform(27291)
+only_kuli <- kuli[, c("SA12018_V1_00", "kuli_MPIAgg")]
 
 sa1_polys <- kuli |>
   subset(select = c(SA12018_V1_00))
 
 #load additional data
-census <- read.csv('uli-nz/data/auckland_census_2.csv')
+census <- read.csv('data/auckland_census_2.csv')
 census <- census |>
   subset(select = -c(European, Maori, Pacific, Asian, MiddleEasternLatinAmericanAfrican, numberdriveToWork, OtherEthnicity, PacificNum, medianRent)) |> 
   mutate(code = as.character(code)) |> 
@@ -813,31 +811,40 @@ kuli_nong <- rename(kuli_nong, SA1_2018 = SA12018_V1_00)
 
 st_write(kuli, "uli-nz/kuli.csv")
 
-#### Spatial Econometric models ####
-# first Moran's I
-moran(hexgrid$kuli_no2s_geomAgg, hex.lw, length(hexgrid$kuli_no2s_geomAgg), Szero(hex.lw))
-moran.test(hexgrid$kuli_no2s_geomAgg, hex.lw)
 
-# Residual test
-lm.morantest(hex.lm,hex.lw) # H0 says no spatial correlation in the residuals
+#### Regress popdensity ####
+# load the kuli data
+kuli <- st_read('data/sa1_kuli_all.gpkg', quiet = T) |> st_transform(27291) |> 
+  dplyr::select(SA12018_V1_00, kuli_MPIAgg)
+sa1_polys <- kuli |>
+  subset(select = c(SA12018_V1_00))
+sa1_polys$area <- st_area(sa1_polys)
 
-# LaGrenge Multiplier Tests
-lm.LMtests(hex.lm, hex.lw, test='all') #error and Spatial Lag model (lag y)
+kuli <- kuli |> st_drop_geometry()
 
-# Spatially Lagged X (lag X -SLX)
-reg2 <- lmSLX(formula, hexgrid, hex.lw)
-summary(reg2)
+census <- read.csv('data/auckland_census_2.csv') |> 
+  dplyr::select(popUsual, code)
+census$code <- as.character(census$code)
+census[which(is.na(census$popUsual),), "popUsual"] <- 0
 
-# Spaitally Lagged y Model (Autoregressive)
-reg3 <- lagsarlm(formula, hexgrid, hex.lw)
-summary(reg3)
-save(reg3, file="outputs/models/spatiallyLaggedModel.Rdata")
-auto <- spautolm(formula, hexgrid, hex.lw)
+kuli <- left_join(kuli, census, by = c("SA12018_V1_00" = "code"))kuli
+kuli <- left_join(sa1_polys, kuli, by = c("SA12018_V1_00" = "SA12018_V1_00"))
+kuli$popdens = as.numeric(kuli$popUsual / kuli$area)
 
-# Spatial error model
-reg4 <- errorsarlm(formula, hexgrid, hex.lw)
-save(reg4, file="outputs/models/spatialErrorModel.Rdata")
-summary(reg4)
-impacts(reg4, hex.lw)
-summary(impacts(reg4,hex.lw, R=500), zstat=TRUE)
+lm_model <- lm(kuli_MPIAgg ~ popdens, data = as.data.frame(kuli))
+residuals <- residuals(lm_model)
+kuli$residuals <- residuals
 
+tm_shape(kuli) +
+  tm_fill("residuals", lwd=0)
+
+plot_data <- as.data.frame(kuli)
+
+# Plot the data, residuals, and linear regression line
+ggplot(data = plot_data, aes(x = popdens, y = kuli_MPIAgg)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, color = "red") +
+  labs(title = "Scatterplot with Linear Regression Line",
+       x = "popdens",
+       y = "kuli_MPIAgg") +
+  theme_minimal()
