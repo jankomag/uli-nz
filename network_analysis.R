@@ -15,12 +15,12 @@ library(DescTools)
 library(osmdata)
 
 #### Data Imports ####
-edges <- st_read("uli-nz/data/networks/auckland_waiheke_network_walk.gpkg", layer='edges') |> 
+edges <- st_read("data/networks/auckland_waiheke_network_walk.gpkg", layer='edges') |> 
   st_transform(4326) |> 
   subset(select = -c(u,v,key,osmid, lanes, name, highway, oneway, reversed, from, to,ref, service, access, bridge,
                      width, junction, tunnel)) #area
 
-sa1 <- st_read("uli-nz/data/sa1_kuli_all.gpkg") |> 
+sa1 <- st_read("data/sa1_kuli_all.gpkg") |> 
   st_transform(4326) |> 
   subset(select = c(SA12018_V1_00))
 
@@ -93,9 +93,8 @@ primary <- st_read("uli-nz/data/primary_schools.gpkg") |> st_transform(4326)
 secondary <- st_read("uli-nz/data/secondary_schools.gpkg") |> st_transform(4326)
 sport <- st_read("uli-nz/data/sport_facilities.gpkg") |> st_transform(4326)
 bigpark <- st_read("uli-nz/data/final_interp_sinplif.gpkg") |> st_transform(4326)
-
+  
 #### Walking distance calculations ####
-
 sa1 <- get_distance(cafe)
 sa1 <- get_distance(restaurant)
 sa1 <- get_distance(pub)
@@ -115,8 +114,12 @@ sa1 <- get_distance(supermarket)
 sa1 <- get_distance(gym)
 sa1 <- get_distance(beach)
 sa1 <- get_distance(bigpark)
-
-head(sa1)
+sa1 <- get_distance(stations)
+sa1 <- get_distance(busstopsfreq)
+sa1 <- get_distance(marae)
+sa1 <- get_distance(primary)
+sa1 <- get_distance(secondary)
+sa1 <- get_distance(sport)
 
 tm_shape(sa1) +
   tm_borders(lwd = 0) +
@@ -135,11 +138,11 @@ network <- as_sfnetwork(edges, directed = FALSE) |>
 
 emergency <- st_read("uli-nz/data/emergencies_auck.gpkg") |> st_transform(4326)
 ev_charge <- st_read("uli-nz/data/EV_NZ_charging_stations.geojson") |> st_transform(4326)
-crash <- st_read("uli-nz/data/Crash_Analysis_System_(CAS)_data.geojson") |> st_transform(4326)
+#crash <- st_read("uli-nz/data/Crash_Analysis_System_(CAS)_data.geojson") |> st_transform(4326)
 
 sa1 <- get_distance(emergency)
 sa1 <- get_distance(ev_charge)
-sa1 <- get_distance(crash)
+#sa1 <- get_distance(crash)
 sa1 <- get_distance(petrol)
 
 st_write(sa1, "uli-nz/data/sa1_out_dist.gpkg")
