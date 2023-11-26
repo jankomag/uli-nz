@@ -86,13 +86,13 @@ gym <- get_osm_data("leisure", "fitness_centre")
 petrol <- get_osm_data("amenity", "fuel")
 beach <- get_osm_data("natural", "beach")
 # Load remaining data
-stations <- st_read("uli-nz/data/trains_auckland.gpkg") |> st_transform(4326)
-busstopsfreq <- st_read("uli-nz/data/frequentBusStoptsDone.gpkg") |> st_transform(4326)
-marae <- st_read("uli-nz/data/auckland_marae_final.gpkg") |> st_transform(4326)
-primary <- st_read("uli-nz/data/primary_schools.gpkg") |> st_transform(4326)
-secondary <- st_read("uli-nz/data/secondary_schools.gpkg") |> st_transform(4326)
-sport <- st_read("uli-nz/data/sport_facilities.gpkg") |> st_transform(4326)
-bigpark <- st_read("uli-nz/data/final_interp_sinplif.gpkg") |> st_transform(4326)
+stations <- st_read("data/trains_auckland.gpkg") |> st_transform(4326)
+busstopsfreq <- st_read("data/frequentBusStoptsDone.gpkg") |> st_transform(4326)
+marae <- st_read("data/auckland_marae_final.gpkg") |> st_transform(4326)
+primary <- st_read("data/primary_schools.gpkg") |> st_transform(4326)
+secondary <- st_read("data/secondary_schools.gpkg") |> st_transform(4326)
+sport <- st_read("data/sport_facilities.gpkg") |> st_transform(4326)
+bigpark <- st_read("data/final_interp_sinplif.gpkg") |> st_transform(4326)
   
 #### Walking distance calculations ####
 sa1 <- get_distance(cafe)
@@ -127,7 +127,7 @@ tm_shape(sa1) +
   tm_layout(legend.position = c("left", "bottom"))
 
 #### Driving distance calculations ####
-edges <- st_read("uli-nz/data/networks/auckland_waiheke_network_drive.gpkg", layer='edges') |> 
+edges <- st_read("data/networks/auckland_waiheke_network_drive.gpkg", layer='edges') |> 
   st_transform(4326) |> 
   subset(select = -c(u,v,key,osmid, lanes, name, highway, oneway, reversed, from, to,ref, service, access, bridge,
                      width, junction, tunnel)) #area
@@ -136,8 +136,8 @@ network <- as_sfnetwork(edges, directed = FALSE) |>
   st_transform(4326) |> 
   activate("edges")
 
-emergency <- st_read("uli-nz/data/emergencies_auck.gpkg") |> st_transform(4326)
-ev_charge <- st_read("uli-nz/data/EV_NZ_charging_stations.geojson") |> st_transform(4326)
+emergency <- st_read("data/emergencies_auck.gpkg") |> st_transform(4326)
+ev_charge <- st_read("data/EV_NZ_charging_stations.geojson") |> st_transform(4326)
 #crash <- st_read("uli-nz/data/Crash_Analysis_System_(CAS)_data.geojson") |> st_transform(4326)
 
 sa1 <- get_distance(emergency)
@@ -145,4 +145,4 @@ sa1 <- get_distance(ev_charge)
 #sa1 <- get_distance(crash)
 sa1 <- get_distance(petrol)
 
-st_write(sa1, "uli-nz/data/sa1_out_dist.gpkg")
+st_write(sa1, "data/sa1_out_dist.gpkg")

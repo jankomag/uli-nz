@@ -153,7 +153,7 @@ sa1_buffers <- st_buffer(sa1_centroids, dist = 1000)
 sa1_pp <- as.ppp(sa1_centroids)
 crash_pp <- as.ppp(crash)
 density <- density(crash_pp, sigma = 1000)
-sa1_crash$crash_risk <- as.vector(crash_kernel[sa1_pp])
+sa1_crash$crash_risk <- as.vector(density[sa1_pp])
 
 sa1_crash <- left_join(sa1_crash, census[,c("SA12018_V1_00","pop_usual")], by="SA12018_V1_00") # add population column
 sa1_crash <- sa1_crash |> 
@@ -166,9 +166,6 @@ sa1_crash <- st_drop_geometry(sa1_crash) |>
   summarize(
     crash_risk = mean(crash_risk),
     crash_risk_weighted = mean(crash_risk_weighted))
-  
-tm_shape(sa1_crash) +
-  tm_fill(col="crash_risk_weighted", style="jenks", lwd=0)
 
 sa1_all <- left_join(sa1_all, sa1_crash, by = c("SA12018_V1_00"="SA12018_V1_00")) #join to full data
 
@@ -200,15 +197,14 @@ sa1_dwelldens <- st_read("data/newdwellingdensity.gpkg")|> st_drop_geometry()
 sa1_all <- left_join(sa1_all, sa1_dwelldens, by = c("SA12018_V1_00"="SA12018_V1_00"))
 
 #### Distances ####
-sa1_dists <- st_read("data/sa1_out_dist.gpkg")|> st_drop_geometry()
+sa1_dists <- st_read("data/sa1_out_dist_new.gpkg")|> st_drop_geometry()
 sa1_all <- left_join(sa1_all, sa1_dists, by = c("SA12018_V1_00"="SA12018_V1_00"))
 
 #join with spatial
 sa1_allg <- left_join(sa1_polys, sa1_all, by=c("SA12018_V1_00"="SA12018_V1_00"))
 
 sa1_allg[which(is.infinite(sa1_allg$dist_stations),), "dist_stations"] <- 100000
-sa1_allg[which(is.infinite(sa1_allg$dist_childcare),), "dist_childcare"] <- 100000
 sa1_allg[which(is.infinite(sa1_allg$dist_hospital),), "dist_hospital"] <- 100000
 sa1_allg[which(is.infinite(sa1_allg$dist_chemist),), "dist_chemist"] <- 100000
 
-st_write(sa1_allg, "data/geographic/sa1_allvars.gpkg")
+st_write(sa1_allg, "data/sa1_allvars.gpkg")
