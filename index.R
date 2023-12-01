@@ -16,7 +16,6 @@ library(tidyr)
 library(cowplot)
 library(stringr)
 library(DescTools)
-library(equatiomatic)
 library(moments)
 library(envalysis)
 require(gridExtra)
@@ -26,56 +25,36 @@ library(gstat)
 library(ltm)
 library(Compind)
 
+
 #### Data imports ####
 # geographic data
-sa1_allold <- st_read("data/geographic/sa1_allvars.gpkg") |> st_transform(27291) |> st_drop_geometry() #transforming to the same coordinate system
-sa1_boundry <- st_read("data/geographic/sa1_auckland_waiheke_urban_new_final.gpkg") |> st_transform(27291) |> subset(select = c(SA12018_V1_00)) #transforming to the same coordinate system
-sa1_allg <- left_join(sa1_boundry, sa1_allold, by = c("SA12018_V1_00"="SA12018_V1_00"))
-
-summary(sa1_allg)
-# strip from geography for EDA
-sa1_all <- sa1_allg |> st_drop_geometry()
+prekuli <- st_read("data/sa1_allvars.gpkg") |> st_transform(27291) #transforming to the same coordinate system
+summary(prekuli)
 
 #### EDA ####
-##### Correlations #####
-cor <- cor(x = sa1_all[c(3:4,11:35,38:48)], y = sa1_all[c(3:4,11:35,38:48)], use="complete.obs")
-corrplot(cor, tl.srt = 25)
-corr <- rcorr(as.matrix(sa1_all))
-
-# function to make correlation matrix
-flattenCorrMatrix <- function(cormat, pmat) {
-  ut <- upper.tri(cormat)
-  data.frame(
-    row = rownames(cormat)[row(cormat)[ut]],
-    column = rownames(cormat)[col(cormat)[ut]],
-    cor  =(cormat)[ut],
-    p = pmat[ut]
-  )
+column_names <- colnames(prekuli)
+column_indices <- seq_along(prekuli)
+for (i in seq_along(column_names)) {
+  print(paste("Column Name:", column_names[i], "Index:", column_indices[i]))
 }
-# Get correlation matrix with coefficients and p-values
-corrmatrix <- flattenCorrMatrix(corr$r, corr$P)
-corrmatrix <- corrmatrix |>
-  arrange(row) |>
-  filter(row == 'income')
-# plot correlations
-sa1_all |>
-  gather(key = "var", value = "value") |> 
-  ggplot(aes(x = "shannon", y = value)) +
-  facet_wrap(~ var, scales = "free") +
-  geom_point(alpha=0.2) +
-  theme_bw() +
-  geom_smooth(method="lm")
+# drop geometry for EDA
+sa1_all <- prekuli |> st_drop_geometry()
+##### Correlations #####
+datacorr <- sa1_all[c(5:8,10:43)]
+cor <- cor(x = datacorr, y = datacorr, use="complete.obs")
+corrplot(cor, tl.srt = 25)
+corr <- rcorr(as.matrix(datacorr))
 
 ##### Examine Distributions of all variables #####
-my_plots <- lapply(names(sa1_all), function(var_x){
-  p <- ggplot(sa1_all) +
-    aes_string(var_x)
-  if(is.numeric(sa1_all[[var_x]])) {
+my_plots <- lapply(names(datacorr), function(var_x){
+  p <- ggplot(datacorr, aes(x = .data[[var_x]]))
+  if(is.numeric(datacorr[[var_x]])) {
     p <- p + geom_density()
   } else {
     p <- p + geom_bar()
   } 
 })
+
 plot_grid(plotlist = my_plots)
 
 #### Index Construction ####
@@ -99,7 +78,7 @@ a_gmean <- function(x, w = NULL){
   if(any(!is.na(x))){
     if(any((x <= 0), na.rm = TRUE)){
       stop("Negative or zero values found when applying geometric mean. This doesn't work because geometric
-         mean uses log. Normalise to remove negative/zero values first or use another aggregation method.")}
+         mean uses log. Normalise to remove negative/zero values first.")}
     # have to set any weights to NA to correspond to NAs in x
     w[is.na(x)] <- NA
     # calculate geom mean
@@ -118,13 +97,15 @@ sa1_alltest <- sa1_all |>
   mutate(testvar2 = )
 
 # Choosing indicator transformations
-sa1_alltest <- sa1_allg |> 
-  mutate(raw = dwelldensity_buff200_NUMPOINTS) |> 
-  mutate(testvar2 = (Winsorize(raw, minval=0, maxval=1500)))
+sa1_alltest <- prekuli |> 
+  mutate(raw = crash_risk) |> 
+  mutate(testvar2 = (Winsorize(raw, minval=0, maxval=0.01)))
 
-sa1_alltest |>
-  ggplot() +
-  geom_histogram(aes(testvar2), bins=50)
+sa1_alltest %>%
+  pivot_longer(cols = c(raw, testvar2), names_to = "Variable") %>%
+  ggplot(aes(x = value)) +
+  geom_histogram(bins = 50) +
+  facet_grid(Variable ~ .)
 
 tm_shape(sa1_alltest) +
   tm_polygons(c("raw", "testvar2"),lwd=0, style="kmeans", palette="Reds")
@@ -147,8 +128,8 @@ sa1_all_index <- sa1_all |>
   mutate(healthcBC = ((dist_healthcentre+0.1) ^ lambdahealth - 1) / lambdahealth) |> 
   mutate(childcareBC = ((dist_childcare+0.1) ^ lambdachildcare - 1) / lambdachildcare) |> 
   mutate(petrolBC = ((dist_petrol+0.1) ^ lambdapetrol - 1) / lambdapetrol) |> 
-  mutate(evchBC = ((dist_evs+0.1) ^ lambdaev - 1) / lambdaev) |> 
-  mutate(pubBC = ((dist_pubs+0.1) ^ lambdapubs - 1) / lambdapubs) |> 
+  mutate(evchBC = ((dist_ev_charge+0.1) ^ lambdaev - 1) / lambdaev) |> 
+  mutate(pubBC = ((dist_pub+0.1) ^ lambdapubs - 1) / lambdapubs) |> 
   mutate(sportBC = ((dist_sport+0.1) ^ lambdasport - 1) / lambdasport) |> 
   mutate(secondaryBC = ((dist_secondary+0.1) ^ lambdasecond - 1) / lambdasecond) |> 
   mutate(bikeBC = ((bikeperarea+0.1) ^ lambdabike - 1) / lambdabike) |> 
@@ -172,9 +153,9 @@ sa1_all_index <- sa1_all |>
   mutate(cinema1 = minmaxNORM(-Winsorize(log(dist_cinema), minval=6, maxval=max(log(dist_cinema))))) |> #checked
   mutate(gym1 = minmaxNORM(-Winsorize(log(dist_gym+0.1), minval=5, maxval=10))) |> #checked
   mutate(theatre1 = minmaxNORM(-Winsorize(dist_theatre, minval=0, maxval=11000))) |> #checked 
-  mutate(library1 = minmaxNORM(-Winsorize(log(dist_libraries), minval=5.3, maxval=max(log(dist_libraries))))) |> #checked 
-  mutate(museum1 = minmaxNORM(-Winsorize(dist_museums, minval=0, maxval=18000))) |> #checked 
-  mutate(gallery1 = minmaxNORM(-Winsorize(log(dist_galleries), minval=6, maxval=max(log(dist_galleries))))) |> #checked
+  mutate(library1 = minmaxNORM(-Winsorize(log(dist_library), minval=5.3, maxval=max(log(dist_library))))) |> #checked 
+  mutate(museum1 = minmaxNORM(-Winsorize(dist_museum, minval=0, maxval=18000))) |> #checked 
+  mutate(gallery1 = minmaxNORM(-Winsorize(log(dist_gallery), minval=6, maxval=max(log(dist_gallery))))) |> #checked
   mutate(sport1 = minmaxNORM(-Winsorize((sportBC), minval=0, maxval=60))) |> #checked 
   
   # HOUSING
@@ -183,9 +164,9 @@ sa1_all_index <- sa1_all |>
   
   #SAFETY
   mutate(alcohol1 = minmaxNORM(-alcoprohibited)) |> #checked
-  mutate(crime1 = minmaxNORM(-Winsorize(crime_perarea, minval=0, maxval=.0015))) |> #checked
-  mutate(crashes1 = minmaxNORM(Winsorize(log(dist_crash), minval=4, maxval=10))) |> 
-  mutate(flood1 = minmaxNORM(-Winsorize(floodprone_prc, minval=0, maxval=.125))) |> #checked
+  mutate(crime1 = minmaxNORM(-Winsorize(crimerisk, minval=0, maxval=.0015))) |> #checked
+  mutate(crashes1 = minmaxNORM(-crash_risk)) |> 
+  mutate(flood1 = minmaxNORM(-Winsorize(flood_pc, minval=0, maxval=.125))) |> #checked
   mutate(emergency1 = minmaxNORM(-Winsorize(emergencyBC, minval=0, maxval=90))) |> #checked
   
   #CULTURE
@@ -205,7 +186,7 @@ sa1_all_index <- sa1_all |>
   
   #FOOD OUTLETS
   mutate(cafe1 = minmaxNORM(-Winsorize(dist_cafe, minval=0, maxval=3000))) |> #checked
-  mutate(restaurant1 = minmaxNORM(-Winsorize(dist_restaurants, minval=0, maxval=4000))) |> #checked
+  mutate(restaurant1 = minmaxNORM(-Winsorize(dist_restaurant, minval=0, maxval=4000))) |> #checked
   mutate(pub1 = minmaxNORM(-pubBC)) |> #checked
   mutate(bbq1 = minmaxNORM(-Winsorize(log(dist_bbq+0.1), minval=5.5, maxval=10))) |> #checked
   
@@ -235,30 +216,39 @@ sa1_all_index <- sa1_all_index |>
   mutate(kuli_arithAgg = minmaxNORM0_1(kuli_addAgg/37)) |>
   # KULI aggregation - additive method
   mutate(kuli_addAgg = minmaxNORM0_1(kuli_addAgg))
+
+# show column index
+column_names <- colnames(index_sa1g)
+column_indices <- seq_along(index_sa1g)
+for (i in seq_along(column_names)) {
+  print(paste("Column Name:", column_names[i], "Index:", column_indices[i]))
+}
   # KULI aggregation - geometric average method
-sa1_all_index$kuli_geomAgg <- minmaxNORM0_1(apply(sa1_all_index[,62:98], 1, FUN = a_gmean))
-sa1_all_index$kuli_MPIAgg <- minmaxNORM0_1(ci_mpi(sa1_all_index,c(62:98),penalty="POS")$ci_mpi_est)
+sa1_all_index$kuli_geomAgg <- minmaxNORM0_1(apply(sa1_all_index[,56:92], 1, FUN = a_gmean))
+sa1_all_index$kuli_MPIAgg <- ci_mpi(sa1_all_index,c(56:92),penalty="POS")$ci_mpi_est
+sa1_all_index$kuli_MPIAgg <- minmaxNORM0_1(Winsorize(sa1_all_index$kuli_MPIAgg, maxval = 150, minval = 86))
+hist(sa1_all_index$kuli_MPIAgg, breaks=40)
 
 # rejoin with geometry
-index_sa1g <- left_join(sa1_allg, sa1_all_index, by = c("SA12018_V1_00"="SA12018_V1_00"))
-
+sa1_boundry <- st_read("data/sa1_auckland_waiheke_urban.gpkg") |> st_transform(27291) #transforming to the same coordinate system
+index_sa1g <- left_join(sa1_boundry, sa1_all_index, by = c("SA12018_V1_00"="SA12018_V1_00"))
+#preview kuli
 tm_shape(index_sa1g) +
   tm_polygons(col = c("kuli_geomAgg","kuli_MPIAgg"),
-              palette = "-RdBu", style = "kmeans", lwd=0, n=12)
+              palette = "-RdBu", style = "jenks", lwd=0, n=12)
+index_sa1g |> ggplot() + geom_histogram(aes(c(kuli_MPIAgg)),bins=100)
 
-index_sa1g |> ggplot() + geom_histogram(aes(c(kuli_arithAgg)),bins=100)
-st_write(index_sa1g, "data/geographic/sa1_kuli_all_renewed.gpkg")
-
-index_sa1g <- st_transform(index_sa1g,3857)
-simplified <- st_read("mapbox/web-map/sa1_kulisimps.json") |> st_transform(3857)
-st_write(index_sa1g, "mapbox/web-map/sa1_kuli.geojson")
+# save the KULI
+kuli <- index_sa1g[,c(1,56:92,96)]
+st_write(kuli, "data/sa1_kuli.gpkg")
+# save for webmap
+kuli <- st_transform(kuli,3857)
+st_write(kuli, "web-map/sa1_kuli.geojson")
 
 # Interpolate to SA2 for web-map
-sa2 = st_read('data/geographic/sa2.gpkg', quiet = T) # transform to OSGB projection
-sz_sf = index_sa1g[,c(113:151,154)]
-tz_sf <- sa2 |> 
-  subset(select = c(SA22023_V1_00)) |> st_transform(27291)
-sa2agg <- st_interpolate_aw(sz_sf, tz_sf, extensive = F)
+sa2 = st_read('data/geographic/sa2.gpkg', quiet = T) |>
+  st_transform(27291) |> select(SA22023_V1_00)
+sa2agg <- st_interpolate_aw(kuli, sa2, extensive = F)
 summary(sa2agg)
 tm_shape(sa2agg) + 
   tm_polygons("kuli_geomAgg", palette = "YlGnBu", style="kmeans",
@@ -266,7 +256,7 @@ tm_shape(sa2agg) +
 sa2agg <- st_transform(sa2agg, 4326)
 st_write(sa2agg, "data/geographic/sa2agg.geojson")
 
-#### EDA2 ####
+ #### EDA2 ####
 # Evaluate the transformation method of each indicator
 densityplot = function(xpre, xpost, varN) {
   xpre <- deparse(substitute(xpre))
@@ -342,7 +332,6 @@ densityplot(dist_hospital, hospital1, "Hospital")
 
 densityplot(dist_sport, sport1, "Sport Facilities")
 
-
 densityplot(dist_childcare, childcare1, "Childcare")
 densityplot(dist_secondary, secondary1, "Secondary")
 densityplot(dist_primary, primary1 , "Primary")
@@ -356,12 +345,7 @@ densityplot(dist_gym, gym1, "Gym")
 densityplot(medianRent, affordability1, "Affordability")
 densityplot(dampness, damp1, "Dampness")
 
-#densityplot(popdens, popdens1, "Pop Density")
-#densityplot(dist_smallpark, smallpark1, "Small Park")
-#densityplot(dist_petrol, petrol1, "Petrol")
-#densityplot(dist_evs, evch1, "EVs")
-
-df_indicators <- sa1_all_index[,c(62:98,101)]
+df_indicators <- sa1_all_index[,c(56:92,96)]
 colnames(df_indicators) <- c("Station","FrequentBusStop","Bikeability","CarInfrastructure",
                              "ConvenienceStore","Supermarket","StreetConnectivity","HosuingDensity",
                              "Cinema","Gym","Theatre","Library",
@@ -385,12 +369,8 @@ round(cor(x = df_indicators$KULI, y = df_indicators$Affordability),3)
 
 plot(x = df_indicators$KULI, y = df_indicators$Affordabilit)
 
-ggplot(df_indicators) +
-  geom_point(aes(x = KULI, y = Affordability)) +
-  geom_abline()
-
 #### Mapping indicators ####
-border <- st_read("data/geographic/sa1_auckland_waiheke_urban_new_final.gpkg") |> st_transform(27291)
+border <- st_read("data/sa1_auckland_waiheke_urban.gpkg") |> st_transform(27291)
 
 indicators_sa1g <- left_join(sa1_allg, sa1_all_index, by = c("SA12018_V1_00"="SA12018_V1_00"))
 indic_map_func = function(var_name, titl) {
@@ -441,11 +421,8 @@ beach <- indic_map_func("beach1", "Beach")
 afford <- indic_map_func("affordability1", "Affordability")
 carinf <- indic_map_func("carInfrastructure1", "Car Infrastructure")
 emer <- indic_map_func("emergency1", "Emergency Service")
-#busstop = indic_map_func("bustop1", "Bus Stop")
-#smolp <- indic_map_func("smallpark1", "Small Park")
-#popden = indic_map_func("popdens1", "Population Density")
 
-#png(file="outputs/mapsindics2.png",width=4000, height=6400)
+
 png(file="outputs/mapsindics_full.png",width=4000, height=6400)
 
 tmap_arrange(station,freqb,bikeab,carinf,
@@ -475,6 +452,7 @@ map_func = function(var_name, titl) {
   mapout
 }
 museu=map_func("museum1","Museum Indicator")
+
 #### Other ####
 # SUBINDICATORS
 # second level aggregation - geometric average method
