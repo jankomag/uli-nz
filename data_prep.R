@@ -135,39 +135,9 @@ sa1_crime <- st_join(sa1_polys, crimes, by = FALSE) |> st_drop_geometry() |> # s
 sa1_all <- left_join(sa1_all, sa1_crime, by = "SA12018_V1_00")
 
 ##### Road Safety ####
-crash <- st_read("data/Crash_Analysis_System_(CAS)_data.geojson") |> 
+crash <- st_read("data/sa1_crashrisk.gpkg") |> 
   st_transform(27291) #transforming to the same coordinate system
-# Option 1) crash risk = no of crashes / area
-sa1_polys$area <- as.numeric(st_area(sa1_polys))
-sa1_crash <- st_join(sa1_polys, crash)
-sa1_crash <- sa1_crash %>%
-  group_by(SA12018_V1_00) %>%
-  mutate(crash_count = n()) %>%
-  ungroup() %>%
-  select(SA12018_V1_00, area, crash_count, geom) |> 
-  mutate(crash_risk = crash_count / area)
 
-# Option 2) Distance weighted method
-sa1_centroids <- st_centroid(sa1_crash)
-sa1_buffers <- st_buffer(sa1_centroids, dist = 1000)
-sa1_pp <- as.ppp(sa1_centroids)
-crash_pp <- as.ppp(crash)
-density <- density(crash_pp, sigma = 1000)
-sa1_crash$crash_risk <- as.vector(density[sa1_pp])
-
-sa1_crash <- left_join(sa1_crash, census[,c("SA12018_V1_00","pop_usual")], by="SA12018_V1_00") # add population column
-sa1_crash <- sa1_crash |> 
-  mutate(popdens = pop_usual/area) |> # get population density
-  mutate(crash_risk_weighted = ifelse(popdens == 0, crash_risk,crash_risk / popdens)) # TO BE CHANGED
-
-sa1_crash <- st_drop_geometry(sa1_crash) |> 
-  select(SA12018_V1_00, crash_risk, crash_risk_weighted) |> 
-  group_by(SA12018_V1_00) |>
-  summarize(
-    crash_risk = mean(crash_risk),
-    crash_risk_weighted = mean(crash_risk_weighted))
-
-sa1_all <- left_join(sa1_all, sa1_crash, by = c("SA12018_V1_00"="SA12018_V1_00")) #join to full data
 
 #### Remaining Variables ####
 ## Flood Proneness ##

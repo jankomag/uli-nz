@@ -155,8 +155,8 @@ sa1_polys <- st_read("data/sa1_auckland_waiheke_urban.gpkg") |>
   st_transform(27291) #transforming to the same coordinate system
 
 # get population data
-census <- read.csv('data/auckland_census_2.csv') |>
-  subset(select = c(popUsual, code)) |> 
+census <- read.csv('data/auckland_census_3.csv') |>
+  subset(select = c(censusnightpop, code)) |> 
   mutate(code = as.character(code))
 sa1_polys <- left_join(sa1_polys, census, by=c("SA12018_V1_00"="code"))
 
@@ -188,11 +188,10 @@ sa1_crash <- left_join(sa1_polys, sa1_crash)
 sa1_crash$area <- as.numeric(st_area(sa1_crash))
 
 sa1_crash <- sa1_crash |> 
-  mutate(road_length_per_area = total_road_length/area) |> 
-  mutate(crashes_per_roadlen = crash_count/total_road_length) |> 
+  mutate(road_length_per_area = total_road_length.x/area) |> 
+  mutate(crashes_per_roadlen = crash_count/total_road_length.x) |> 
   mutate(crasehs_per_roadlen_per_area = crash_count/road_length_per_area) |> 
-  mutate(crasehs_per_roadlen_per_population = crashes_per_roadlen/(popUsual+1)) |> 
-  mutate(crash_risk = log(crasehs_per_roadlen_per_population+0.01))
+  mutate(crash_risk = crashes_per_roadlen/(censusnightpop+0.1))
 tm_shape(sa1_crash)+tm_fill("crash_risk", style="jenks")
 
 min_max_scale <- function(x) {
@@ -210,4 +209,4 @@ sa1_crash <- sa1_crash |>
   st_drop_geometry()
 sa1 <- left_join(sa1, sa1_crash, by="SA12018_V1_00")
 
-st_write(sa1, "data/sa1_out_dist.gpkg")
+st_write(sa1, "data/sa1_crashrisk.gpkg")
