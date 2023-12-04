@@ -196,7 +196,7 @@ lm_sa1 = lm(formula, data = gdf)
 lm_sa2 = lm(formula, data = sa2agg)
 summary(lm_sa1)
 summary(lm_sa2)
-
+plot(gdf$carsPerPreson, gdf$privateTransporTtoWork)
 # stepwise model
 steplmsa1 = stepAIC(lm_sa1, trace = 0)
 steplmsa2 = stepAIC(lm_sa2, trace = 0)
@@ -238,13 +238,7 @@ moran.test(gdf$residuals, gdf.lw)
 sa2.sp = as(sa2agg, "Spatial")
 
 # specify MGWR model
-model_file <- "outputs/models/mgwr_sa2.Rdata"
-
-if (file.exists(model_file)) {
-  # Load the pre-trained model
-  load(model_file)
-} else {
-  mgwr <- gwr.multiscale(formulastep,
+mgwr <- gwr.multiscale(formulastep,
                          data = sa2.sp,
                          adaptive = TRUE, max.iterations = 10000,
                          criterion = "dCVR", approach = "AIC",
@@ -252,11 +246,14 @@ if (file.exists(model_file)) {
                          bws0 = rep(100, 11),
                          verbose = FALSE, predictor.centered = rep(TRUE, 10))
   
-  # Save the model
-  save(mgwr, file = model_file)
-}
+# Save the model
+save(mgwr, file = "outputs/models/mgwr_sa2.Rdata")
+mbwa <- mgwr[[2]]$bws #save bandwidths for later
+
 mgwr
 mgwr$GW.diagnostic
+# show diagnostics
+c(mgwr$GW.diagnostic$AICc, mgwr$GW.diagnostic$R2.val)
 
 # Examine Boxplots of coef distributions
 mgwr_coef_cols <- data.frame(mgwr$SDF@data[, 1:11])
@@ -273,7 +270,7 @@ olssum$id <- 1:nrow(olssum)
 olssum$variable[olssum$variable == '(Intercept)'] <- 'Intercept'
 olssum <- olssum[,c(4,3,1,2)]
 
-allcoefs <- rbind(mgwr2_long, olssum)
+allcoefs <- rbind(mgwr_long, olssum)
 
 ggplot() +
   geom_boxplot(allcoefs, mapping = aes(x = variable, y = value, col= Model), position="dodge2") +
@@ -284,9 +281,8 @@ ggplot() +
         plot.title = element_text(hjust = 0.5),
         text=element_text(size=13,  family="serif")) +
   scale_color_manual(values=c("#6ECCAF","#344D67","red")) +
-  ylab('Coefficient estimate') +xlab ('')+coord_cartesian(ylim = c(-18, 18))
-  #scale_y_continuous(trans='log10')
-  #labs(title ="Boxplots of Coefficient estimates") +
+  ylab('Coefficient estimate') +xlab ('')+coord_cartesian(ylim = c(-2, 4)) +
+  labs(title ="Boxplots of Coefficient estimates")
   
 ggplot(mgwr_long) +
   geom_boxplot(mapping = aes(x = variable, y = value), position="dodge2")
@@ -303,38 +299,32 @@ my_plots <- lapply(names(mgwr_coef_cols), function(var_x){
 })
 plot_grid(plotlist = my_plots)
 
-# Examine Boxplots of SE distributions - not that useful - would need RMSE
-gwr_se <- gwr$SDF@data[, 17:29]
-gwr_se$id <- 1:nrow(gwr_se)
-gwr_se$kind <- "GWR"
-gwr_se_long <- melt(gwr_se, id = c("id","kind"))
-mgwr_se <- mgwr_2$SDF@data[, 14:24]
+# Examine Boxplots of SE distributions
+mgwr_se <- mgwr_2$SDF@data[, 14:24] # select standard errors
 mgwr_se$id <- 1:nrow(mgwr_se)
 mgwr_se$kind <- "MGWR"
 mgwr_se_long <- melt(mgwr_se, id = c("id","kind"))
-allses <- rbind(gwr_se_long, mgwr_se_long)
-ggplot(allses, aes(x = variable, y = value, col= kind)) +
-  geom_boxplot()
+ggplot(mgwr_se_long, aes(x = variable, y = value, col= kind)) +
+  geom_boxplot()+
+  theme(legend.position="right",
+        axis.text.x = element_text(angle = 45, hjust=1),
+        plot.title = element_text(hjust = 0.5),
+        text=element_text(size=13,  family="serif"))
 
 ##### Model Summary tables #####
-stargazer(lm, lm, lm, flip=F, type="latex", single.row = T, style="qje", digits=2)
-
 # create a table with coefficient stats for MGWR
-coefs_msgwr = apply(mgwr_1$SDF@data[, 1:12], 2, summary)
+coefs_msgwr = apply(mgwr$SDF@data[, 1:11], 2, summary)
 tab.mgwr = data.frame(Bandwidth = mbwa, t(round(coefs_msgwr,3)))
 names(tab.mgwr)[c(3,6)] = c("Q1", "Q3")
 tab.mgwr
 
-olssum <- data.frame(lm$coefficients)
+olssum <- data.frame(steplmsa1$coefficients)
 olssum <- cbind(variable = rownames(olssum), olssum)
 rownames(olssum) <- 1:nrow(olssum)
 colnames(olssum)[2] <- "coef"
 
-summary_table <- data.frame(olssum, tab.gwr[,4], tab.mgwr[,c(5,1)])
+summary_table <- data.frame(olssum, tab.mgwr[,c(5,1)])
 summary_table
-
-# show diagnostics
-c(mgwr_1$GW.diagnostic$AICc, mgwr_1$GW.diagnostic$R2.val)
 
 ##### Mapping GW results #####
 mgwr_sf = st_as_sf(mgwr$SDF)

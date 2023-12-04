@@ -128,13 +128,16 @@ tm_shape(sa1) +
 
 #### Driving distance calculations ####
 edges <- st_read("data/networks/auckland_waiheke_network_drive.gpkg", layer='edges') |> 
-  st_transform(4326) |> 
+  st_transform(27291) |> 
   subset(select = -c(u,v,key,osmid, lanes, name, highway, oneway, reversed, from, to,ref, service, access, bridge,
                      width, junction, tunnel)) #area
+
+head(edges)
 #get network
 network <- as_sfnetwork(edges, directed = FALSE) |> 
   st_transform(4326) |> 
   activate("edges")
+
 
 emergency <- st_read("data/emergencies_auck.gpkg") |> st_transform(4326)
 ev_charge <- st_read("data/EV_NZ_charging_stations.geojson") |> st_transform(4326)
@@ -144,5 +147,67 @@ sa1 <- get_distance(emergency)
 sa1 <- get_distance(ev_charge)
 #sa1 <- get_distance(crash)
 sa1 <- get_distance(petrol)
+
+#### Road Crash Risk ####
+# get polygon data
+sa1_polys <- st_read("data/sa1_auckland_waiheke_urban.gpkg") |>
+  subset(select = c(SA12018_V1_00)) |> 
+  st_transform(27291) #transforming to the same coordinate system
+
+# get population data
+census <- read.csv('data/auckland_census_2.csv') |>
+  subset(select = c(popUsual, code)) |> 
+  mutate(code = as.character(code))
+sa1_polys <- left_join(sa1_polys, census, by=c("SA12018_V1_00"="code"))
+
+# Intersect roads with SA1 areas
+sa1_roads <- st_intersection(sa1_polys, edges)
+# calculate areas
+sa1_roads <- sa1_roads %>%
+  group_by(SA12018_V1_00) %>% # group by area
+  summarize(total_road_length = sum(length)) |> # calculate road length 
+  st_drop_geometry()
+
+sa1_polys <- sa1_polys  |> 
+  left_join(sa1_roads, by = "SA12018_V1_00")
+sa1_polys[which(is.na(sa1_polys$total_raod_length),), "total_raod_length"] <- 1
+
+# get crashes data
+crash <- st_read("data/Crash_Analysis_System_(CAS)_data.geojson") |> 
+  st_transform(27291) #transforming to the same coordinate system
+
+sa1_crash <- st_join(sa1_polys, crash)
+sa1_crash <- sa1_crash %>%
+  group_by(SA12018_V1_00) %>%
+  mutate(crash_count = n()) %>%
+  ungroup() %>%
+  select(SA12018_V1_00, crash_count, geom) |> 
+  st_drop_geometry()
+
+sa1_crash <- left_join(sa1_polys, sa1_crash)
+sa1_crash$area <- as.numeric(st_area(sa1_crash))
+
+sa1_crash <- sa1_crash |> 
+  mutate(road_length_per_area = total_road_length/area) |> 
+  mutate(crashes_per_roadlen = crash_count/total_road_length) |> 
+  mutate(crasehs_per_roadlen_per_area = crash_count/road_length_per_area) |> 
+  mutate(crasehs_per_roadlen_per_population = crashes_per_roadlen/(popUsual+1)) |> 
+  mutate(crash_risk = log(crasehs_per_roadlen_per_population+0.01))
+tm_shape(sa1_crash)+tm_fill("crash_risk", style="jenks")
+
+min_max_scale <- function(x) {
+  min_val <- min(x)
+  max_val <- max(x)
+  scaled <- 1 + 9 * ((x - min_val) / (max_val - min_val))
+  return(scaled)
+}
+sa1_crash$crash_riskscaled <- min_max_scale(sa1_crash$crasehs_per_roadlen_per_population)
+tm_shape(sa1_crash)+tm_fill("crash_riskscaled", style="jenks")
+
+# finally join to the rest of the data
+sa1_crash <- sa1_crash |> 
+  select(SA12018_V1_00, crash_risk) |> 
+  st_drop_geometry()
+sa1 <- left_join(sa1, sa1_crash, by="SA12018_V1_00")
 
 st_write(sa1, "data/sa1_out_dist.gpkg")
