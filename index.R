@@ -40,7 +40,7 @@ for (i in seq_along(column_names)) {
 # drop geometry for EDA
 sa1_all <- prekuli |> st_drop_geometry()
 ##### Correlations #####
-datacorr <- sa1_all[c(5:8,10:43)]
+datacorr <- sa1_all[c(4:6,8:42)]
 cor <- cor(x = datacorr, y = datacorr, use="complete.obs")
 corrplot(cor, tl.srt = 25)
 corr <- rcorr(as.matrix(datacorr))
@@ -89,26 +89,51 @@ a_gmean <- function(x, w = NULL){
   gm
 }
 
-# testing box cox transformation
-b <- boxcox(lm(((dist_emergency+0.0001)) ~ 1, data=sa1_all))
-lambda <- b$x[which.max(b$y)]
-sa1_alltest <- sa1_all |> 
-  mutate(testvar = ((dist_emergency+0.0001) ^ lambda - 1) / lambda) |> 
-  mutate(testvar2 = )
 
-# Choosing indicator transformations
+# Test box cox function
+transform_to_normal <- function(column, small_constant = 0.000001) {
+  # Add a small constant to the column
+  transformed_column <- column + small_constant
+  
+  # Find optimal lambda using Box-Cox transformation
+  b <- boxcox(lm((transformed_column ~ 1,data=sa1_all)))
+  print(b)
+  lambda <- b$x[which.max(b$y)]
+  
+  # Apply Box-Cox transformation
+  transformed_column <- ((transformed_column) ^ lambda - 1) / lambda
+  
+  return (transformed_column)
+}
+transform_to_normal(sa1_all$dist_marae, small_constant = 0.1)
+
+# box cox transformation
+b <- boxcox(lm((crash_per_roadlen_LM) ~ 1, data=sa1_all))
+lambda <- b$x[which.max(b$y)]
 sa1_alltest <- prekuli |> 
-  mutate(raw = crash_risk) |> 
-  mutate(testvar2 = (Winsorize(raw, minval=0, maxval=0.01)))
+  mutate(boxc = ((crash_per_roadlen_LM) ^ lambda - 1) / lambda)
+
+# Choosing indicator prekuli
+sa1_alltest <- prekuli |> 
+  mutate(raw = bikeability) |> 
+  mutate(testvar = Winsorize(raw, maxval=10,minval=-700)) |> 
+  mutate(testvar2 = log(raw+0.00000001)) |> 
+  mutate(newtestvar = as.numeric(testvar2))#,minval=-8,maxval=2))
 
 sa1_alltest %>%
-  pivot_longer(cols = c(raw, testvar2), names_to = "Variable") %>%
+  pivot_longer(cols = raw) %>%
   ggplot(aes(x = value)) +
-  geom_histogram(bins = 50) +
-  facet_grid(Variable ~ .)
+  geom_histogram(bins = 100)
 
 tm_shape(sa1_alltest) +
-  tm_polygons(c("raw", "testvar2"),lwd=0, style="kmeans", palette="Reds")
+  tm_fill("raw",lwd=0, style="jenks", palette="Blues")
+
+
+
+st_write(dplyr::select(sa1_alltest,newtestvar), "testing.gpkg")
+obj <- st_read("testing.gpkg")
+tm_shape(obj) + tm_fill("newtestvar")
+
 
 # optimised lambda values for chosen variables
 lambdahealth <- 0.3434343
@@ -118,9 +143,12 @@ lambdasecond <- 0.3434343
 lambdapetrol <- 0.4242424
 lambdaev <- 0.6262626
 lambdapubs <- 0.3434343
-lambdabike <- -2
 lambdarent <- 1.151515
 lambdaemergency <- 0.4646465
+lambdaconv <- 0.3434343
+lambdabike <- 0.4646465
+lambdacrashrisk <- -0.06060606
+
 ##### Custom Transformation of each variable ##### original no box-cox
 sa1_all_index <- sa1_all |> 
   # BoxCox prep
@@ -132,22 +160,23 @@ sa1_all_index <- sa1_all |>
   mutate(pubBC = ((dist_pub+0.1) ^ lambdapubs - 1) / lambdapubs) |> 
   mutate(sportBC = ((dist_sport+0.1) ^ lambdasport - 1) / lambdasport) |> 
   mutate(secondaryBC = ((dist_secondary+0.1) ^ lambdasecond - 1) / lambdasecond) |> 
-  mutate(bikeBC = ((bikeperarea+0.1) ^ lambdabike - 1) / lambdabike) |> 
   mutate(emergencyBC = ((dist_emergency+0.1) ^ lambdaemergency - 1) / lambdaemergency) |> 
+  mutate(crashriskBC = ((crash_per_roadlen_LM+0.1) ^ lambdacrashrisk - 1) / lambdacrashrisk) |> 
+  mutate(convstoreBC = ((dist_conveniencestore+0.000001) ^ lambdaconv - 1) / lambdaconv) |> 
   mutate(petrol1 = minmaxNORM(-Winsorize(petrolBC, minval=1, maxval = 80))) |>
   mutate(evch1 = minmaxNORM(-(evchBC))) |> 
   
   # TRANSPORTATION
   mutate(station1 = minmaxNORM(-Winsorize(log(dist_stations), minval=5, maxval=11))) |> #checked
   mutate(freqbusstop1 = minmaxNORM(-Winsorize(dist_busstopsfreq, minval=0, maxval= 2000))) |> #checked
-  mutate(bikeability1 = minmaxNORM(Winsorize(bikeBC, minval=-50, maxval = -25))) |> #checked
+  mutate(bikeability1 = minmaxNORM(Winsorize(bikeability,maxval=0.04))) |> #checked
   mutate(carInfrastructure1 = minmaxNORM((evch1 + petrol1)/18)) |> #checked
   
   # WALKABILITY
-  mutate(convstor1 = minmaxNORM(-Winsorize(log(dist_conveniencestore+0.1), minval=3, maxval=10))) |>#checked 
+  mutate(convstor1 = minmaxNORM(-Winsorize(convstoreBC, maxval=45,minval=-1))) |>
   mutate(supermarket1 = minmaxNORM(-Winsorize(log(dist_supermarket+0.1), minval=4.5, maxval=10))) |> #checked 
   mutate(strconnectivity1 = minmaxNORM(Winsorize(streetconn, minval=0, maxval=15))) |> #checked
-  mutate(housedens1 = minmaxNORM(dwelldensity_buff200_NUMPOINTS)) |> #checked
+  mutate(dwelldensity1 = minmaxNORM(dwelldensity_transf_LM)) |> #checked
   
   # LEISURE
   mutate(cinema1 = minmaxNORM(-Winsorize(log(dist_cinema), minval=6, maxval=max(log(dist_cinema))))) |> #checked
@@ -164,8 +193,8 @@ sa1_all_index <- sa1_all |>
   
   #SAFETY
   mutate(alcohol1 = minmaxNORM(-alcoprohibited)) |> #checked
-  mutate(crime1 = minmaxNORM(-Winsorize(crimerisk, minval=0, maxval=.0015))) |> #checked
-  mutate(crashes1 = minmaxNORM(-crash_risk)) |> 
+  mutate(crime1 = minmaxNORM(-log(crimerisk+0.00001))) |> #checked
+  mutate(crashes1 = minmaxNORM(-Winsorize(crashriskBC, maxval=1,minval=-8))) |> 
   mutate(flood1 = minmaxNORM(-Winsorize(flood_pc, minval=0, maxval=.125))) |> #checked
   mutate(emergency1 = minmaxNORM(-Winsorize(emergencyBC, minval=0, maxval=90))) |> #checked
   
@@ -202,7 +231,7 @@ sa1_all_index <- sa1_all |>
 ##### Final Index Construction ####
 sa1_all_index <- sa1_all_index |> 
   # KULI aggregation - without subindicators
-  mutate(kuli_addAgg = convstor1 + supermarket1 + strconnectivity1 + housedens1 +
+  mutate(kuli_addAgg = convstor1 + supermarket1 + strconnectivity1 + dwelldensity1 +
            chemist1 + dentist1 + healthcr1 + hospital1 +
            secondary1 + primary1 + childcare1 +
            crime1 + crashes1 + flood1 + alcohol1 + emergency1 +
@@ -218,16 +247,16 @@ sa1_all_index <- sa1_all_index |>
   mutate(kuli_addAgg = minmaxNORM0_1(kuli_addAgg))
 
 # show column index
-column_names <- colnames(index_sa1g)
-column_indices <- seq_along(index_sa1g)
+column_names <- colnames(sa1_all_index)
+column_indices <- seq_along(sa1_all_index)
 for (i in seq_along(column_names)) {
   print(paste("Column Name:", column_names[i], "Index:", column_indices[i]))
 }
   # KULI aggregation - geometric average method
 sa1_all_index$kuli_geomAgg <- minmaxNORM0_1(apply(sa1_all_index[,56:92], 1, FUN = a_gmean))
-sa1_all_index$kuli_MPIAgg <- ci_mpi(sa1_all_index,c(56:92),penalty="POS")$ci_mpi_est
-sa1_all_index$kuli_MPIAgg <- minmaxNORM0_1(Winsorize(sa1_all_index$kuli_MPIAgg, maxval = 150, minval = 86))
-hist(sa1_all_index$kuli_MPIAgg, breaks=40)
+sa1_all_index$kuli_MPIAgg <- minmaxNORM0_1(ci_mpi(sa1_all_index,c(56:92),penalty="POS")$ci_mpi_est)
+#sa1_all_index$kuli_MPIAgg <- minmaxNORM0_1(Winsorize(sa1_all_index$kuli_MPIAgg, maxval = 150, minval = 86))
+hist(sa1_all_index$kuli_MPIAgg, breaks=50)
 
 # rejoin with geometry
 sa1_boundry <- st_read("data/sa1_auckland_waiheke_urban.gpkg") |> st_transform(27291) #transforming to the same coordinate system
@@ -235,7 +264,7 @@ index_sa1g <- left_join(sa1_boundry, sa1_all_index, by = c("SA12018_V1_00"="SA12
 #preview kuli
 tm_shape(index_sa1g) +
   tm_polygons(col = c("kuli_geomAgg","kuli_MPIAgg"),
-              palette = "-RdBu", style = "jenks", lwd=0, n=12)
+              palette = "-RdBu", style = "jenks", lwd=0)
 index_sa1g |> ggplot() + geom_histogram(aes(c(kuli_MPIAgg)),bins=100)
 
 # save the KULI
@@ -347,7 +376,7 @@ densityplot(dampness, damp1, "Dampness")
 
 df_indicators <- sa1_all_index[,c(56:92,96)]
 colnames(df_indicators) <- c("Station","FrequentBusStop","Bikeability","CarInfrastructure",
-                             "ConvenienceStore","Supermarket","StreetConnectivity","HosuingDensity",
+                             "ConvenienceStore","Supermarket","StreetConnectivity","DwellingDensity",
                              "Cinema","Gym","Theatre","Library",
                              "Museum","Gallery","Sport","Affordability",
                              "Dampness","AlcoholEnvs","Crime","RoadSafety",
@@ -386,7 +415,7 @@ indic_map_func = function(var_name, titl) {
 }
 station = indic_map_func("station1", "Train Station")
 freqb = indic_map_func("freqbusstop1", "Frequent Bus Stop")
-hous=indic_map_func("housedens1", "House Density")
+hous=indic_map_func("dwelldensity1", "Dwelling Density")
 damp = indic_map_func("damp1", "Dampness")
 diver = indic_map_func("diversity1", "Diversity")
 crime = indic_map_func("crime1", "Crime")
@@ -511,15 +540,6 @@ sa1_all_index_2level <- sa1_all_index |>
 # KULI aggregation -  MPI aggregation method
 kuli_MPI <- ci_mpi(sa1_all_index,c(67:105,117),penalty="POS")
 sa1_all_index$kuli_no2s_MPIAgg <- minmaxNORM01(kuli_MPI$ci_mpi_est)
-
-# Reward Points
-reward = 0.1
-sa1_all_index$kuli_no2s_geomAgg_wrewards <- sa1_all_index$kuli_no2s_geomAgg
-sa1_all_index$kuli_no2s_MPIAgg_wrewards <- sa1_all_index$kuli_no2s_MPIAgg
-sa1_all_index$kuli_no2s_geomAgg_wrewards[sa1_all_index$dist_stations < 1000 & sa1_all_index$dist_busstopsfreq < 300 & sa1_all_index$dist_bigpark < 800] <- minmaxNORM01(sa1_all_index$kuli_no2s_geomAgg_wrewards[sa1_all_index$dist_stations < 1000 & sa1_all_index$dist_busstopsfreq < 300 & sa1_all_index$dist_bigpark < 800] + reward)
-sa1_all_index$kuli_no2s_MPIAgg_wrewards[sa1_all_index$dist_stations < 1000 & sa1_all_index$dist_busstopsfreq < 300 & sa1_all_index$dist_bigpark < 800] <- minmaxNORM01(sa1_all_index$kuli_no2s_MPIAgg_wrewards[sa1_all_index$dist_stations < 1000 & sa1_all_index$dist_busstopsfreq < 300 & sa1_all_index$dist_bigpark < 800] + reward)
-
-# lambdas
 #Common maximum value for tranformations
 commonMaxval = 5000
 sa1_all_index_commonmax <- sa1_all |> 
@@ -555,25 +575,3 @@ sa1_all_index_commonmax <- sa1_all |>
   mutate(strconnectivity1 = minmaxNORM(Winsorize(str_connectivity, maxval = 0.0003))) |> 
   mutate(bigpark1 = minmaxNORM(-Winsorize(dist_bigpark, minval=50, maxval = commonMaxval))) |> 
   mutate(smallpark1 = minmaxNORM(-Winsorize(dist_smallpark, minval=50, maxval = commonMaxval)))
-
-#add reward parameters
-reward=1
-sa1_all_index_commonmax$station1[sa1_all_index$dist_stations < 1000] <- sa1_all_index_commonmax$station1[sa1_all_index$dist_stations < 1000] + reward
-sa1_all_index_commonmax$freqbusstop1[sa1_all_index$dist_busstopsfreq < 400] <- sa1_all_index_commonmax$freqbusstop1[sa1_all_index$dist_busstopsfreq < 400] + reward
-sa1_all_index_commonmax$bigpark1[sa1_all_index$dist_bigpark < 1000] <- sa1_all_index_commonmax$bigpark1[sa1_all_index$dist_bigpark < 1000] + reward
-sa1_all_index_commonmax$smallpark1[sa1_all_index$dist_smallpark < 300] <- sa1_all_index_commonmax$smallpark1[sa1_all_index$dist_smallpark < 300] + reward
-
-# testing table
-colname <- c("Variable","Skewness", "Kurtosis")
-SmallPark <- c("Small Park", skewness(sa1_all_index$dist_smallpark), skewness(sa1_all_index$smallpark1))
-BigPark <- c("Big Park", skewness(sa1_all_index$dist_bigpark), skewness(sa1_all_index$bigpark1))
-table <- rbind(colname, SmallPark, BigPark)
-stargazer(table, type="text")
-
-# testing that the geometric mean function actually does what I think it does
-x <- c(1,3,6,1,10,3)
-mean(x)
-product <- prod(x)
-product^(1/6)
-exp(sum(log(x), na.rm = TRUE)/6)
-

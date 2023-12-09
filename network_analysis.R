@@ -13,6 +13,9 @@ library(expss)
 library(stringr)
 library(DescTools)
 library(osmdata)
+library(ggplot2)
+library(units)
+library(geodist)
 
 #### Data Imports ####
 edges <- st_read("data/networks/auckland_waiheke_network_walk.gpkg", layer='edges') |> 
@@ -23,7 +26,7 @@ edges <- st_read("data/networks/auckland_waiheke_network_walk.gpkg", layer='edge
 sa1 <- st_read("data/sa1_kuli_all.gpkg") |> 
   st_transform(4326) |> 
   subset(select = c(SA12018_V1_00))
-
+smoledges <- head(edges, 1000)
 #get network
 network <- as_sfnetwork(edges, directed = FALSE) |> 
   st_transform(4326) |> 
@@ -93,7 +96,7 @@ primary <- st_read("data/primary_schools.gpkg") |> st_transform(4326)
 secondary <- st_read("data/secondary_schools.gpkg") |> st_transform(4326)
 sport <- st_read("data/sport_facilities.gpkg") |> st_transform(4326)
 bigpark <- st_read("data/final_interp_sinplif.gpkg") |> st_transform(4326)
-  
+
 #### Walking distance calculations ####
 sa1 <- get_distance(cafe)
 sa1 <- get_distance(restaurant)
@@ -126,18 +129,31 @@ tm_shape(sa1) +
   tm_fill("dist_cinema", title = "Distance") +
   tm_layout(legend.position = c("left", "bottom"))
 
+smolpolys <- head(sa1_polys,10)
+# Testing Density based measure
+osmdata <- opq(bbox = bbox) %>%
+  add_osm_feature(key = "highway", value = c("primary", "secondary", "tertiary", "residential", 
+                                             "path", "footway", "unclassified", "living_street", "pedestrian")) %>%
+  # And then pipe this into our osmdata_sf object
+  osmdata_sf()
+walkingosm_edges <- osmdata$osm_lines[, c("osm_id", "name", "highway", "maxspeed", 
+                                           "oneway")]
+graph <- weight_streetnet(walkingosm_edges, wt_profile = "foot", type_col="highway")
+smolpolys_to_bigpark_calc <- dodgr_distances(graph, from = st_coordinates(smolpolys), to = st_coordinates(bigpark), 
+                                  shortest = TRUE, pairwise = FALSE, quiet = FALSE)
+
+smolpolys$park_within_400m <- count_row_if(lt(401), smolpolys_to_bigpark_calc)
+
+
 #### Driving distance calculations ####
 edges <- st_read("data/networks/auckland_waiheke_network_drive.gpkg", layer='edges') |> 
   st_transform(27291) |> 
   subset(select = -c(u,v,key,osmid, lanes, name, highway, oneway, reversed, from, to,ref, service, access, bridge,
                      width, junction, tunnel)) #area
-
-head(edges)
 #get network
 network <- as_sfnetwork(edges, directed = FALSE) |> 
-  st_transform(4326) |> 
+  st_transform(27291) |> 
   activate("edges")
-
 
 emergency <- st_read("data/emergencies_auck.gpkg") |> st_transform(4326)
 ev_charge <- st_read("data/EV_NZ_charging_stations.geojson") |> st_transform(4326)
@@ -145,7 +161,6 @@ ev_charge <- st_read("data/EV_NZ_charging_stations.geojson") |> st_transform(432
 
 sa1 <- get_distance(emergency)
 sa1 <- get_distance(ev_charge)
-#sa1 <- get_distance(crash)
 sa1 <- get_distance(petrol)
 
 #### Road Crash Risk ####
@@ -160,53 +175,85 @@ census <- read.csv('data/auckland_census_3.csv') |>
   mutate(code = as.character(code))
 sa1_polys <- left_join(sa1_polys, census, by=c("SA12018_V1_00"="code"))
 
+#option 1
 # Intersect roads with SA1 areas
-sa1_roads <- st_intersection(sa1_polys, edges)
-# calculate areas
-sa1_roads <- sa1_roads %>%
-  group_by(SA12018_V1_00) %>% # group by area
-  summarize(total_road_length = sum(length)) |> # calculate road length 
-  st_drop_geometry()
+roadlens <- sf::st_intersection(edges, sa1_polys) %>% # Find the intersections, which should all be points or multilines
+  dplyr::mutate(len_m = sf::st_length(geom)) %>% # Find the length of each line
+  dplyr::group_by(SA12018_V1_00) %>% # Here you need to insert all the columns from your shapes
+  dplyr::summarize(len_m = sum(len_m))
+roadlens <- st_drop_geometry(roadlens)
 
-sa1_polys <- sa1_polys  |> 
-  left_join(sa1_roads, by = "SA12018_V1_00")
-sa1_polys[which(is.na(sa1_polys$total_raod_length),), "total_raod_length"] <- 1
+sa1_roadlens <- left_join(sa1_polys, roadlens, by="SA12018_V1_00")
+tm_shape(sa1_roadlens)+tm_fill("len_m", style="jenks")
+#st_write(sa1_roadlens, "sa1_roadlens.gpkg")
+summary(sa1_roadlens)
+
+# Simple calculate road lengths
+sa1_roadsSimple <- sa1_roads %>%
+  group_by(SA12018_V1_00) %>% # group by area
+  summarize(total_road_length = sum(length))
+tm_shape(sa1_roadsSimple)+tm_fill("total_road_length", style="jenks")
+sa1_polys[which(is.na(sa1_roadsSimple$total_raod_length),), "total_raod_length"] <- 0
+
+# Buffering #
+smol <- head(edges, 500)
+l1.sf.buf <- st_buffer(smol, dist = 50)
+l1.sf.buf.dis <- l1.sf.buf %>% 
+  group_by()  %>% 
+  summarise()
+ggplot(l1.sf.buf.dis) + geom_sf() 
 
 # get crashes data
-crash <- st_read("data/Crash_Analysis_System_(CAS)_data.geojson") |> 
+crash <- st_read("data/auckland_CAS.gpkg") |> 
   st_transform(27291) #transforming to the same coordinate system
 
-sa1_crash <- st_join(sa1_polys, crash)
-sa1_crash <- sa1_crash %>%
-  group_by(SA12018_V1_00) %>%
-  mutate(crash_count = n()) %>%
-  ungroup() %>%
-  select(SA12018_V1_00, crash_count, geom) |> 
-  st_drop_geometry()
-
-sa1_crash <- left_join(sa1_polys, sa1_crash)
+sa1_crash <- mutate(sa1_polys, n = lengths(st_intersects(sa1_polys, crash))) 
 sa1_crash$area <- as.numeric(st_area(sa1_crash))
+sa1_crash <- left_join(sa1_crash, roadlens, by="SA12018_V1_00")
 
 sa1_crash <- sa1_crash |> 
-  mutate(road_length_per_area = total_road_length.x/area) |> 
-  mutate(crashes_per_roadlen = crash_count/total_road_length.x) |> 
-  mutate(crasehs_per_roadlen_per_area = crash_count/road_length_per_area) |> 
-  mutate(crash_risk = crashes_per_roadlen/(censusnightpop+0.1))
-tm_shape(sa1_crash)+tm_fill("crash_risk", style="jenks")
+  mutate(crashesperarea = n/area) |> 
+  mutate(crash_per_roadlen = n/len_m) |> 
+  mutate(crash_risk = crash_per_roadlen/(censusnightpop/area))
 
-min_max_scale <- function(x) {
-  min_val <- min(x)
-  max_val <- max(x)
-  scaled <- 1 + 9 * ((x - min_val) / (max_val - min_val))
-  return(scaled)
-}
-sa1_crash$crash_riskscaled <- min_max_scale(sa1_crash$crasehs_per_roadlen_per_population)
-tm_shape(sa1_crash)+tm_fill("crash_riskscaled", style="jenks")
+tm_shape(sa1_crash)+tm_fill("crash_risk", style="jenks")
+sa1_crash %>%
+  ggplot(aes(x = crash_risk)) +
+  geom_histogram(bins = 10)
 
 # finally join to the rest of the data
 sa1_crash <- sa1_crash |> 
-  select(SA12018_V1_00, crash_risk) |> 
+  select(SA12018_V1_00, crash_risk, crash_per_roadlen) |> 
   st_drop_geometry()
 sa1 <- left_join(sa1, sa1_crash, by="SA12018_V1_00")
 
-st_write(sa1, "data/sa1_crashrisk.gpkg")
+#### Bikeability ####
+edges_bike <- st_read("data/networks/auckland_waiheke_network_bike.gpkg", layer='edges') |> 
+  st_transform(27291) |> 
+  subset(select = -c(u,v,key,osmid, lanes, name, highway, oneway, reversed, from, to,ref, service, access, bridge,
+                     width, junction, tunnel)) #area
+
+sa1 <- st_read("data/sa1_kuli_all.gpkg") |> 
+  st_transform(27291) |> 
+  subset(select = c(SA12018_V1_00))
+
+bike_lengths <- sf::st_intersection(edges_bike, sa1_polys) %>% # Find the intersections, which should all be points or multilines
+  dplyr::mutate(len_m = sf::st_length(geom)) %>% # Find the length of each line
+  dplyr::group_by(SA12018_V1_00) %>% # Here you need to insert all the columns from your shapes
+  dplyr::summarize(len_m = sum(len_m))
+bike_lengths <- st_drop_geometry(bike_lengths)
+
+sa1_polys$area <- st_area(sa1_polys)
+sa1_bikeability <- left_join(sa1_polys, bike_lengths, by="SA12018_V1_00")
+sa1_bikeability <- sa1_bikeability |> 
+  mutate(bikeability = as.numeric(len_m/area))
+sa1_bikeability <- dplyr::select(sa1_bikeability, SA12018_V1_00, bikeability)
+
+tm_shape(sa1_bikeability)+tm_fill("bikeability", style="jenks")
+
+#st_write(sa1_bikeability, "sa1_bikeability.gpkg")
+
+# finally join to the rest of the data
+sa1 <- left_join(sa1, sa1_bikeability, by="SA12018_V1_00")
+
+st_write(sa1_bikeability, "data/sa1_bikeability.gpkg")

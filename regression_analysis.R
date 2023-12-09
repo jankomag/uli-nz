@@ -74,13 +74,22 @@ deprivation <- read.csv('data/deprivation_joined.csv') |>
   mutate(SA12018_V1_00 = as.character(SA12018_V1_00))
 census <- left_join(census, deprivation, by = c("code"="SA12018_V1_00"))
 
+#load age data
+age <- read.csv('data/auckland_census_3.csv') |> 
+  dplyr::select(medianage,code) |> 
+  mutate(code=as.character(code)) |> 
+  mutate(medianage=as.numeric(medianage))
+census <- left_join(census, age, by = c("code"="code"))
+
+#### Missing Vlaues Imputation ####
 # Dealing with missing values #
 md.pattern(census)
 aggr_plot <- aggr(census, col=c('navyblue','orange'), numbers=TRUE, sortVars=TRUE, labels=names(census), cex.axis=.7, gap=3, ylab=c("Histogram of missing data","Pattern"))
 
 sa1_census <- left_join(sa1_polys, census, by = c("SA12018_V1_00"="code"))
+sa1_census$bornOverseas <- (sa1_census$bornOverseas/sa1_census$popUsual)
 tmap_mode("plot")
-tm_shape(sa1_census) + tm_polygons(col="deprivation", lwd=0, style="kmeans")
+tm_shape(sa1_census) + tm_polygons(col="bornOverseas", lwd=0, style="kmeans")
 
 #### NN impute - impute NAs based on neighbouring values
 index <- st_touches(sa1_census, sa1_census)
@@ -131,26 +140,38 @@ sa1_imped <- sa1_imped %>%
 sa1_imped <- sa1_imped %>% 
   mutate(Degree = ifelse(is.na(Degree),
                               apply(index, 1, function(i){mean(.$Degree[i], na.rm=T)}),Degree))
+sa1_imped <- sa1_imped %>% 
+  mutate(medianage = ifelse(is.na(medianage),
+                         apply(index, 1, function(i){mean(.$medianage[i], na.rm=T)}),medianage))
 
-sa1_imped[which(is.na(sa1_imped$maoriDescent),), "maoriDescent"] <- mean(sa1_imped$maoriDescent, na.rm=T)
-sa1_imped[which(is.na(sa1_imped$PrMaoriDesc),), "PrMaoriDesc"] <- mean(sa1_imped$PrMaoriDesc, na.rm=T)
-sa1_imped[which(is.na(sa1_imped$PrEuropeanDesc),), "PrEuropeanDesc"] <- mean(sa1_imped$PrEuropeanDesc, na.rm=T)
-sa1_imped[which(is.na(sa1_imped$medianIncome),), "medianIncome"] <- mean(sa1_imped$medianIncome, na.rm=T)
-sa1_imped[which(is.na(sa1_imped$bornOverseas),), "bornOverseas"] <- mean(sa1_imped$bornOverseas, na.rm=T)
 sa1_imped[which(is.na(sa1_imped$privateTransporTtoWork),), "privateTransporTtoWork"] <- mean(sa1_imped$privateTransporTtoWork, na.rm=T)
 sa1_imped[which(is.na(sa1_imped$PTtoWork),), "PTtoWork"] <- mean(sa1_imped$PTtoWork, na.rm=T)
 sa1_imped[which(is.na(sa1_imped$cycleToWork),), "cycleToWork"] <- mean(sa1_imped$cycleToWork, na.rm=T)
 sa1_imped[which(is.na(sa1_imped$noCar),), "noCar"] <- mean(sa1_imped$noCar, na.rm=T)
 sa1_imped[which(is.na(sa1_imped$carsPerPreson),), "carsPerPreson"] <- mean(sa1_imped$carsPerPreson, na.rm=T)
 sa1_imped[which(is.na(sa1_imped$Degree),), "Degree"] <- mean(sa1_imped$Degree, na.rm=T)
+sa1_imped[which(is.na(sa1_imped$medianage),), "Degree"] <- mean(sa1_imped$medianage, na.rm=T)
 
 # calculate population density measure
-sa1_imped$area <- st_area(sa1_imped)
-sa1_imped$popdens <- as.numeric(sa1_imped$popUsual / sa1_imped$area)
+sa1_imped$area <- as.numeric(st_area(sa1_imped))
+sa1_imped$popdens <- sa1_imped$popUsual / sa1_imped$area
 sa1_imped$popdenlog <- log(sa1_imped$popdens+0.0001)
+
+# select columns for regression
+sa1_reg <- sa1_imped |> 
+  dplyr::select(SA12018_V1_00, medianIncome, bornOverseas, privateTransporTtoWork, PTtoWork, cycleToWork, noCar, carsPerPreson,
+         PrEuropeanDesc, PrMaoriDesc, Degree, deprivation, medianage, popdenlog)
 
 gdf <- left_join(sa1_imped, nongkuli, by = c("SA12018_V1_00"="SA12018_V1_00"))
 df <- st_drop_geometry(gdf)
+
+#### EDA ####
+numeric_data <- df[, sapply(df, is.numeric)]
+cor <- cor(x = numeric_data, y = numeric_data, use="complete.obs", method="pearson")
+par(mfrow = c(1, 1))
+corrplot(cor, tl.srt = 45, type = "lower", method = "ellipse",
+         order = "FPC", tl.cex = 0.8,
+         tl.col = "black", diag = T, cl.cex=0.7,cl.offset=0.3)
 
 #### KULI Visualisation ####
 ### MAP
@@ -175,12 +196,12 @@ ggplot(gdf)+
     theme(legend.position="right",
           text=element_text(size=13,  family="serif")) +
     ylab(" ") + xlab (" ")
+numeric_data <- data[, sapply(data, is.numeric)]
 
-#### Aggregation binning ####
-### SA2 ###
+#### Aggregation to SA2 ####
 sa2 = st_read('data/sa2.gpkg', quiet = T) |> 
   subset(select = c(SA22023_V1_00)) |> st_transform(27291)
-sa2agg <- st_interpolate_aw(gdf[2:19], sa2, extensive = F)
+sa2agg <- st_interpolate_aw(gdf[2:20], sa2, extensive = F)
 
 tm_shape(sa2agg) + 
   tm_polygons("kuli_MPIAgg", palette = "YlGnBu", style="kmeans",
@@ -191,63 +212,80 @@ tm_shape(sa2agg) +
 ##### OLS #####
 formula = as.formula(kuli_MPIAgg ~ medianIncome + privateTransporTtoWork +
                        PTtoWork + cycleToWork + noCar + carsPerPreson + PrEuropeanDesc +
-                       PrMaoriDesc + deprivation + Degree + popdenlog)
+                       PrMaoriDesc + deprivation + Degree + popdenlog + medianage)
 lm_sa1 = lm(formula, data = gdf)
 lm_sa2 = lm(formula, data = sa2agg)
 summary(lm_sa1)
 summary(lm_sa2)
-plot(gdf$carsPerPreson, gdf$privateTransporTtoWork)
+
 # stepwise model
 steplmsa1 = stepAIC(lm_sa1, trace = 0)
 steplmsa2 = stepAIC(lm_sa2, trace = 0)
 summary(steplmsa1)
 summary(steplmsa2)
 
-formulastep = as.formula(kuli_MPIAgg ~ medianIncome + privateTransporTtoWork +
-                       PTtoWork + cycleToWork + noCar + carsPerPreson +
-                       PrMaoriDesc + deprivation + Degree + popdenlog)
-
-##### Residuals #####
-residuals <- residuals(lm_sa1)
-gdf$residuals <- (residuals)
-
+###### Residuals ######
+residuals_sa1 <- residuals(lm_sa1)
+residuals_sa2 <- residuals(lm_sa2)
+gdf$residuals <- residuals_sa1
+sa2agg$residuals <- residuals_sa2
 # Map the residuals
-tm_shape(gdf) +
+tm_shape(sa2agg) +
   tm_fill("residuals", lwd=0, style='jenks')
 
 par(mfrow=c(2,2))
-plot(lm_sa1)
+plot(lm_sa2)
+par(mfrow=c(1,1))
 
 check_model(lm_sa1, check="all")
 
-##### Spatial Weights Matrix ####
-gdf.nb <- poly2nb(gdf, queen=T)
-gdf.lw = nb2listw(gdf.nb, style="W")
+##### Spatial Regression Model ####
+## Weights Matrices
+sa1.lw = nb2listw(poly2nb(gdf, queen=T), style="W")
+sa2.lw = nb2listw(poly2nb(sa2agg, queen=T), style="W")
 
 #plot spatially lagged mean
-gdf$lagged.means <- lag.listw(gdf.lw, gdf$kuli_MPIAgg)
-tm_shape(gdf) + 
+gdf$lagged.means <- lag.listw(sa1.lw, gdf$kuli_MPIAgg)
+sa2agg$lagged.means <- lag.listw(sa2.lw, sa2agg$kuli_MPIAgg)
+
+tm_shape(sa2agg) + 
   tm_polygons(col='lagged.means',
               palette = "YlGnBu", lwd=0, style="kmeans")
 
 # test for spatial autocorrelation in residuals
-moran.test(gdf$residuals, gdf.lw)
+moran.test(gdf$residuals, sa1.lw)
+moran.test(sa2agg$residuals, sa2.lw)
+
+## Spatial Lag Model ##
+#sp_lag_sa1 <- lagsarlm(formula, data = gdf, sa1.lw, method = "eigen")
+sp_lag_sa2 <- lagsarlm(formula, data = sa2agg, sa2.lw, method = "eigen")
+
+summary(sp_lag_sa2)
+
+library(lmtest)
+lrtest(sa2.lw, sp_lag_sa2)
+
+## Spatial Error Model ##
+#sp_err_sa1 <- errorsarlm(formula, data = gdf, sa1.lw, method = "eigen")
+sp_err_sa2 <- errorsarlm(formula, data = sa2agg, sa2.lw, method = "eigen")
+summary(sp_err_sa2)
 
 ##### Geographically Weighted Regression #####
 # convert to sp
 sa2.sp = as(sa2agg, "Spatial")
 
 # specify MGWR model
-mgwr <- gwr.multiscale(formulastep,
+mgwr <- gwr.multiscale(formula,
                          data = sa2.sp,
                          adaptive = TRUE, max.iterations = 10000,
                          criterion = "dCVR", approach = "AIC",
                          kernel = "gaussian",
-                         bws0 = rep(100, 11),
-                         verbose = FALSE, predictor.centered = rep(TRUE, 10))
+                         bws0 = rep(100, 12),
+                         verbose = FALSE, predictor.centered = rep(TRUE, 11))
   
 # Save the model
-save(mgwr, file = "outputs/models/mgwr_sa2.Rdata")
+save(mgwr, file = "outputs/models/mgwr_sa2_new.Rdata")
+#load("outputs/models/mgwr_sa2_new.Rdata")
 mbwa <- mgwr[[2]]$bws #save bandwidths for later
 
 mgwr
@@ -256,12 +294,12 @@ mgwr$GW.diagnostic
 c(mgwr$GW.diagnostic$AICc, mgwr$GW.diagnostic$R2.val)
 
 # Examine Boxplots of coef distributions
-mgwr_coef_cols <- data.frame(mgwr$SDF@data[, 1:11])
+mgwr_coef_cols <- data.frame(mgwr$SDF@data[, 1:13])
 mgwr_coef_cols$id <- 1:nrow(mgwr_coef_cols)
 mgwr_coef_cols$Model <- "MGWR"
 mgwr_long <- melt(mgwr_coef_cols, id = c("id","Model"))
 
-olssum <- data.frame(steplmsa1$coefficients)
+olssum <- data.frame(lm_sa1$coefficients)
 olssum <- cbind(variable = rownames(olssum), olssum)
 rownames(olssum) <- 1:nrow(olssum)
 colnames(olssum)[2] <- "value"
@@ -281,26 +319,14 @@ ggplot() +
         plot.title = element_text(hjust = 0.5),
         text=element_text(size=13,  family="serif")) +
   scale_color_manual(values=c("#6ECCAF","#344D67","red")) +
-  ylab('Coefficient estimate') +xlab ('')+coord_cartesian(ylim = c(-2, 4)) +
+  ylab('Coefficient estimate') +xlab ('')+#coord_cartesian(ylim = c(-2, 4)) +
   labs(title ="Boxplots of Coefficient estimates")
   
 ggplot(mgwr_long) +
   geom_boxplot(mapping = aes(x = variable, y = value), position="dodge2")
-  
-#plot distributions of coefficients
-my_plots <- lapply(names(mgwr_coef_cols), function(var_x){
-  p <- ggplot(mgwr_coef_cols) +
-    aes_string(var_x)
-  if(is.numeric(mgwr_coef_cols[[var_x]])) {
-    p <- p + geom_density()
-  } else {
-    p <- p + geom_bar()
-  } 
-})
-plot_grid(plotlist = my_plots)
 
 # Examine Boxplots of SE distributions
-mgwr_se <- mgwr_2$SDF@data[, 14:24] # select standard errors
+mgwr_se <- mgwr$SDF@data[, 17:28] # select standard errors
 mgwr_se$id <- 1:nrow(mgwr_se)
 mgwr_se$kind <- "MGWR"
 mgwr_se_long <- melt(mgwr_se, id = c("id","kind"))
@@ -311,9 +337,9 @@ ggplot(mgwr_se_long, aes(x = variable, y = value, col= kind)) +
         plot.title = element_text(hjust = 0.5),
         text=element_text(size=13,  family="serif"))
 
-##### Model Summary tables #####
+###### Model Summary tables ######
 # create a table with coefficient stats for MGWR
-coefs_msgwr = apply(mgwr$SDF@data[, 1:11], 2, summary)
+coefs_msgwr = apply(mgwr$SDF@data[, 1:13], 2, summary)
 tab.mgwr = data.frame(Bandwidth = mbwa, t(round(coefs_msgwr,3)))
 names(tab.mgwr)[c(3,6)] = c("Q1", "Q3")
 tab.mgwr
@@ -326,7 +352,7 @@ colnames(olssum)[2] <- "coef"
 summary_table <- data.frame(olssum, tab.mgwr[,c(5,1)])
 summary_table
 
-##### Mapping GW results #####
+###### Mapping GW results ######
 mgwr_sf = st_as_sf(mgwr$SDF)
 
 # simplest maps
@@ -337,7 +363,7 @@ tm_shape(mgwr_sf) +
 
 # plot diverging coefs for MGWR
 tm_shape(mgwr_sf) +
-  tm_fill(c("privateTransporTtoWork", "PTtoWork", "cycleToWork","noCar","carsPerPreson","PrMaoriDesc"),midpoint = 0, style = "kmeans") +
+  tm_fill(c("privateTransporTtoWork", "PTtoWork", "cycleToWork","noCar","carsPerPreson","PrMaoriDesc","medianage"),midpoint = 0, style = "kmeans") +
   tm_style("col_blind")+
   tm_layout(legend.position = c("right","top"), frame = F)
 
@@ -436,9 +462,10 @@ mgwr_nocar <- map_signif_coefs_diverging_func(x = mgwr_sf, "noCar", "noCar_TV", 
 mgwr_degree <- map_signif_coefs_diverging_func(x = mgwr_sf, "Degree", "Degree_TV", "% Degree", "Coefficient")
 mgwr_depriv <- map_signif_coefs_diverging_func(x = mgwr_sf, "deprivation", "deprivation_TV", "Deprivation", "Coefficient")
 mgwr_popdenslog <- map_signif_coefs_diverging_func(x = mgwr_sf, "popdenlog", "popdenlog_TV", "Log(Population Density)", "Coefficient")
+mgwr_medianage <- map_signif_coefs_diverging_func(x = mgwr_sf, "medianage", "medianage_TV", "Median Age)", "Coefficient")
 
-png(file="outputs/allmgwr.png",width=3000, height=2000)
-tmap_arrange(mgwr_income, mgwr_cars, mgwr_pt, mgwr_cycle, mgwr_privtr, mgwr_maori, mgwr_nocar, mgwr_degree, mgwr_depriv, mgwr_popdenslog,ncol=5)
+png(file="outputs/allmgwr2.png",width=3000, height=2000)
+tmap_arrange(mgwr_income, mgwr_cars, mgwr_pt, mgwr_cycle, mgwr_privtr, mgwr_maori, mgwr_nocar, mgwr_degree, mgwr_depriv, mgwr_popdenslog, mgwr_medianage,ncol=6)
 dev.off()
 
 #### Quantile - analysis ####
@@ -508,17 +535,25 @@ summary(popgdf)
 
 popgdf <- popgdf %>%
   mutate(
-    European_kuli_avg = (European * kuli_MPIAgg) / European,
-    Maori_kuli_avg = (Maori * kuli_MPIAgg) / Maori,
-    Pacific_kuli_avg = (Pacific * kuli_MPIAgg) / Pacific,
-    Asian_kuli_avg = (Asian * kuli_MPIAgg) / Asian,
-    MiddleEasternLatinAmerican_kuli_avg = (MiddleEasternLatinAmericanAfrican * kuli_MPIAgg) / MiddleEasternLatinAmericanAfrican,
-    OtherEthnicity_kuli_avg = (OtherEthnicity * kuli_MPIAgg) / OtherEthnicity,
-    PacificNum_kuli_avg = (PacificNum * kuli_MPIAgg) / PacificNum
-  )
+    European_kuli_avg = (((European * kuli_MPIAgg)/European)-1),
+    Maori_kuli_avg = (Maori * kuli_MPIAgg),
+    Pacific_kuli_avg = (Pacific * kuli_MPIAgg),
+    Asian_kuli_avg = (Asian * kuli_MPIAgg),
+    MiddleEasternLatinAmerican_kuli_avg = (MiddleEasternLatinAmericanAfrican * kuli_MPIAgg) ,
+    OtherEthnicity_kuli_avg = (OtherEthnicity * kuli_MPIAgg)
+    )
 # preview variables
 tm_shape(popgdf) +
-  tm_fill("Pacific_kuli_avg")
+  tm_fill("European_kuli_avg")
 
-# Note this file contains only the code needed to replicate the results presented in the research.
+sum(popgdf$European_kuli_avg)/sum(popgdf$European)
+sum(popgdf$Pacific_kuli_avg)/sum(popgdf$Pacific)
+sum(popgdf$Asian_kuli_avg)/sum(popgdf$Asian)
+sum(popgdf$Maori_kuli_avg)/sum(popgdf$Maori)
+sum(popgdf$MiddleEasternLatinAmerican_kuli_avg)/sum(popgdf$MiddleEasternLatinAmericanAfrican)
+sum(popgdf$OtherEthnicity_kuli_avg)/sum(popgdf$OtherEthnicity)
+
+
+
+# Note this file contains only the code needed to replicate the results of the research.
 # Additional, messier analysis that was also done is provided in the file 'additional_analysis.R'

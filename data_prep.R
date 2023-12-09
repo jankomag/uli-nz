@@ -11,7 +11,12 @@ library(tidyr)
 library(mice)
 library(VIM)
 library(stringr)
+library(readr)
 library(spatstat)
+library(GWmodel)
+library(DescTools)
+library(tidyverse)
+library(readxl)
 
 #### Data imports ####
 # geographic data
@@ -21,7 +26,7 @@ sa1_polys <- st_read("data/sa1_auckland_waiheke_urban.gpkg") |>
 sa1_base <- sa1_polys |> st_drop_geometry()
 
 #### Census ####
-census <- as.data.frame(read.csv("data/auckland_census.csv"))
+census <- as.data.frame(read_excel("data/auckland_census.xlsx"))
 census <- census |>
   subset(select = -c(maori_desc, median_income, born_overseas, PacificNum, Degree)) |> 
   mutate(code = as.character(code)) |> 
@@ -32,12 +37,10 @@ census <- census |>
   mutate(Asian = as.numeric(Asian)) |>
   mutate(MiddleEasternLatinAmericanAfrican = as.numeric(MiddleEasternLatinAmericanAfrican)) |>
   mutate(OtherEthnicity = as.numeric(OtherEthnicity)) |>
-  mutate(pop_usual = as.numeric(pop_usual)) |> 
   mutate(medianRent = as.numeric(medianRent))
 
 # Dealing with missing values #
 aggr_plot <- aggr(census, col=c('navyblue','red'), numbers=TRUE, sortVars=TRUE, labels=names(census), cex.axis=.7, gap=3, ylab=c("Histogram of missing data","Pattern"))
-
 census[which(census$pop_usual == 0,),5:10] <- 0 # assign ethnicity values to 0 in rows where no population is registered
 
 #calculate percentages ethnicity
@@ -48,7 +51,7 @@ census <- census |>
   mutate(pcAsian = Asian/pop_usual, na.rm=T) |> 
   mutate(pcMiddleEasternLatinAmericanAfrican = MiddleEasternLatinAmericanAfrican/pop_usual, na.rm=T) |> 
   mutate(pcOtherEthnicity = OtherEthnicity/pop_usual, na.rm=T)
-census[which(census$pop_usual == 0,),12:18] <- 0 # 0 in rows where no population is registered
+census[which(census$pop_usual == 0,),13:19] <- 0 # 0 in rows where no population is registered
 census[which(census$pcEuropean>1), "pcEuropean"] <- 1 # 3 rows where european pop is larger than total pop
 
 #### NN impute - impute NAs based on neighbouring values
@@ -103,13 +106,44 @@ shannon <- function(p){
   H = -sum(p*log(p))
   return (H)
 }
-census$shannon <- apply(census[,6:11], 1, shannon)
+census$shannon <- apply(census[,7:12], 1, shannon)
 sa1_all <- left_join(sa1_base, census, by = c("SA12018_V1_00"="SA12018_V1_00"))
-sa1_all <- select(sa1_all, SA12018_V1_00, no_households, pop_usual, dampness, medianRent, shannon)
+sa1_all <- dplyr::select(sa1_all, SA12018_V1_00, no_households, pop_usual, dampness, medianRent, shannon, occupiedPrivateDwellings)
+
+### Dwelling Density ###
+dwellingDensity <- left_join(sa1_polys, census, by = c("SA12018_V1_00"="SA12018_V1_00")) |> dplyr::select(SA12018_V1_00, occupiedPrivateDwellings)
+dwellingDensity$area <- as.numeric(st_area(dwellingDensity))
+dwellingDensity <- dwellingDensity |> 
+  mutate(dwelldensity = occupiedPrivateDwellings/area) |> 
+  mutate(dwelldensity_transf = Winsorize(dwelldensity, minval=0.000001))
+tm_shape(dwellingDensity)+tm_fill("dwelldensity_transf", style="jenks")
+
+# smooth  dwelling density
+dwellDens.sp = as(dwellingDensity, "Spatial")
+nb <- poly2nb(dwellDens.sp)
+num_neighbors <- sapply(nb, length)
+mean(num_neighbors)
+
+bandwidth <- 300
+gw_ss_dwdens_300 <- gwss(dwellDens.sp, vars  =  c("dwelldensity_transf"),
+                    kernel = "bisquare", adaptive = FALSE, bw = bandwidth, quantile = FALSE)
+summary(gw_ss_dwdens_300$SDF)
+sa1_dwelldnsity <- as(gw_ss_dwdens_300$SDF, "sf")
+tm_shape(sa1_dwelldnsity)+tm_fill("dwelldensity_transf_LM", style="jenks")
+
+sa1_dwelldnsity <- (sa1_dwelldnsity) |> 
+  dplyr::select(dwelldensity_transf_LM)
+
+# join by geometry equality
+sa1_dwelldnsity <- st_join(sa1_polys, sa1_dwelldnsity, join=st_equals)
+sa1_dwelldnsity_nong <- st_drop_geometry(sa1_dwelldnsity) # drop geom again...
+sa1_all <- left_join(sa1_all, sa1_dwelldnsity_nong) # ... and join to the rest of the data
+
+#### Remaining Variables ####
 ##### Crime Risk ####
 # load raw crime counts data
-crime <- as.data.frame(read.csv("data/crime_23.csv"))|> 
-  select(Area.Unit, Victimisations, Meshblock, Weapon, ANZSOC.Subdivision, ANZSOC.Group)
+crime <- as.data.frame(read.csv("data/crimes_originaldata.csv"))|> 
+  dplyr::select(Area.Unit, Victimisations, Meshblock)
 crime$Area.Unit = substr(crime$Area.Unit,1,nchar(crime$Area.Unit)-1) # clean Area unit field
 crime <- crime %>%
   group_by(Area.Unit) %>%
@@ -118,7 +152,7 @@ crime <- crime %>%
 
 # load Area Unit spatial Data
 au <- st_read("data/area-unit-2017-generalised-version.gpkg") |> 
-  select(AU2017_NAME, LAND_AREA_SQ_KM) |> 
+  dplyr::select(AU2017_NAME, LAND_AREA_SQ_KM) |> 
   st_transform(27291) #transforming to the same coordinate system
 au$area <- st_area(au)
 
@@ -126,45 +160,61 @@ au$area <- st_area(au)
 crimes <- left_join(au, crime, by = c("AU2017_NAME" = "Area.Unit")) %>%
   mutate(across("Sum_Victimisations", ~replace(., is.na(.), 0))) |> #replace areas with no crimes reported with 0
   mutate(crimerisk = as.numeric(Sum_Victimisations/area)) # calculate crimes by area measure
-sa1_crime <- st_join(sa1_polys, crimes, by = FALSE) |> st_drop_geometry() |> # spatial join with to SA1
-  select(SA12018_V1_00, crimerisk) |> 
+sa1_crime <- st_join(sa1_polys, crimes, by = FALSE) |> st_drop_geometry() |> # spatial join to SA1
+  dplyr::select(SA12018_V1_00, crimerisk) |> 
   group_by(SA12018_V1_00) |> 
-  summarize(crimerisk = mean(crimerisk))
+  dplyr::summarize(crimerisk = mean(crimerisk))
 
 # add to sa1_all
 sa1_all <- left_join(sa1_all, sa1_crime, by = "SA12018_V1_00")
 
 ##### Road Safety ####
-crash <- st_read("data/sa1_crashrisk.gpkg") |> 
-  st_transform(27291) #transforming to the same coordinate system
+sa1_crashrisk <-st_read("data/sa1_crashrisk.gpkg") |> st_transform(27291)
+sa1_crashrisk[which(is.na(sa1_crashrisk$crash_risk),), "crash_risk"] <- 0 # replace NAs with 0
+sa1_crashrisk[which(is.infinite(sa1_crashrisk$crash_risk),), "crash_risk"] <- 150000
+sa1_crashrisk[which(is.na(sa1_crashrisk$crash_per_roadlen),), "crash_per_roadlen"] <- 0 # replace NAs with 0
+tm_shape(sa1_crashrisk)+tm_fill("crash_risk", style="jenks")
 
+crash.sp = as(sa1_crashrisk, "Spatial")
+bandwidth <- 15
+gw_ss_crash_15adap <- gwss(crash.sp, vars  = c("crash_per_roadlen","crash_risk"),
+                         kernel = "bisquare", adaptive = TRUE, bw = bandwidth, quantile = FALSE)
+weightedCrash <- as(gw_ss_crash_15adap$SDF, "sf")
+summary(weightedCrash)
+tm_shape(weightedCrash)+tm_fill(c("crash_per_roadlen_LM","crash_risk_LM"), style="jenks")
+#st_write(weightedCrash, "weightedCrash.gpkg")
+weightedCrash <- weightedCrash |>
+  dplyr::select(crash_per_roadlen_LM) |> st_transform(27291)
 
-#### Remaining Variables ####
+tm_shape(sa1_polys)+tm_polygons()
+# join by geometry equality
+sa1_crashrisk <- st_join(sa1_polys, weightedCrash, join=st_equals_exact, par=1)
+sa1_crashrisk_nong <- st_drop_geometry(sa1_crashrisk) # drop geom again...
+sa1_all <- left_join(sa1_all, sa1_crashrisk_nong) # ... and join to the rest of the data
+
 ## Flood Proneness ##
 floods_sa1 <- st_read("data/sa1_floods_final.gpkg") |> st_drop_geometry() |>
-  select(SA12018_V1_00, flood_pc)
+  dplyr::select(SA12018_V1_00, flood_pc)
 floods_sa1[which(is.na(floods_sa1$flood_pc),), "flood_pc"] <- 0 # replace NAs with 0
 sa1_all <- left_join(sa1_all, floods_sa1, by = c("SA12018_V1_00"="SA12018_V1_00"))
 
 ## Alcohol Environments ##
 alco_sa1 <- st_read("data/sa1_cents_alcoenvs.gpkg") |> st_drop_geometry() |> 
-  select(SA12018_V1, alcoprohibited)
+  dplyr::select(SA12018_V1, alcoprohibited)
 
 sa1_all <- left_join(sa1_all, alco_sa1, by = c("SA12018_V1_00"="SA12018_V1"))
 sa1_all[which(is.na(sa1_all$alcoprohibited),), "alcoprohibited"] <- 0
 
 ## Street Connectivity ##
 stconnectivity_sa1 <- st_read("data/streetconnectivity_new.gpkg") |> st_drop_geometry()|>
-  select(SA12018_V1_00, streetconn)
+  dplyr::select(SA12018_V1_00, streetconn)
 sa1_all <- left_join(sa1_all, stconnectivity_sa1, by = c("SA12018_V1_00"="SA12018_V1_00"))
 
 ## Bikeability ##
-sa1_bikeability <- st_read("data/bikeability.gpkg")|> st_drop_geometry()
-sa1_all <- left_join(sa1_all, sa1_bikeability, by = c("SA12018_V1_00"="SA12018_V1_00"))
+sa1_bikeability <- st_read("data/sa1_bikeability.gpkg")|> st_drop_geometry()
+sa1_bikeability[which(is.na(sa1_bikeability$bikeability),), "bikeability"] <- 0
 
-## Dwelling Density ##
-sa1_dwelldens <- st_read("data/newdwellingdensity.gpkg")|> st_drop_geometry()
-sa1_all <- left_join(sa1_all, sa1_dwelldens, by = c("SA12018_V1_00"="SA12018_V1_00"))
+sa1_all <- left_join(sa1_all, sa1_bikeability, by = c("SA12018_V1_00"="SA12018_V1_00"))
 
 #### Distances ####
 sa1_dists <- st_read("data/sa1_out_dist_new.gpkg")|> st_drop_geometry()
