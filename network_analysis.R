@@ -26,7 +26,7 @@ edges <- st_read("data/networks/auckland_waiheke_network_walk.gpkg", layer='edge
 sa1 <- st_read("data/sa1_kuli_all.gpkg") |> 
   st_transform(4326) |> 
   subset(select = c(SA12018_V1_00))
-smoledges <- head(edges, 1000)
+
 #get network
 network <- as_sfnetwork(edges, directed = FALSE) |> 
   st_transform(4326) |> 
@@ -149,7 +149,7 @@ smolpolys$park_within_400m <- count_row_if(lt(401), smolpolys_to_bigpark_calc)
 edges <- st_read("data/networks/auckland_waiheke_network_drive.gpkg", layer='edges') |> 
   st_transform(27291) |> 
   subset(select = -c(u,v,key,osmid, lanes, name, highway, oneway, reversed, from, to,ref, service, access, bridge,
-                     width, junction, tunnel)) #area
+                     width, junction, tunnel)) |> st_transform(27291)
 #get network
 network <- as_sfnetwork(edges, directed = FALSE) |> 
   st_transform(27291) |> 
@@ -173,9 +173,10 @@ sa1_polys <- st_read("data/sa1_auckland_waiheke_urban.gpkg") |>
 census <- read.csv('data/auckland_census_3.csv') |>
   subset(select = c(censusnightpop, code)) |> 
   mutate(code = as.character(code))
+census[which(is.na(census$censusnightpop),), "censusnightpop"] <- 1
+
 sa1_polys <- left_join(sa1_polys, census, by=c("SA12018_V1_00"="code"))
 
-#option 1
 # Intersect roads with SA1 areas
 roadlens <- sf::st_intersection(edges, sa1_polys) %>% # Find the intersections, which should all be points or multilines
   dplyr::mutate(len_m = sf::st_length(geom)) %>% # Find the length of each line
@@ -185,23 +186,6 @@ roadlens <- st_drop_geometry(roadlens)
 
 sa1_roadlens <- left_join(sa1_polys, roadlens, by="SA12018_V1_00")
 tm_shape(sa1_roadlens)+tm_fill("len_m", style="jenks")
-#st_write(sa1_roadlens, "sa1_roadlens.gpkg")
-summary(sa1_roadlens)
-
-# Simple calculate road lengths
-sa1_roadsSimple <- sa1_roads %>%
-  group_by(SA12018_V1_00) %>% # group by area
-  summarize(total_road_length = sum(length))
-tm_shape(sa1_roadsSimple)+tm_fill("total_road_length", style="jenks")
-sa1_polys[which(is.na(sa1_roadsSimple$total_raod_length),), "total_raod_length"] <- 0
-
-# Buffering #
-smol <- head(edges, 500)
-l1.sf.buf <- st_buffer(smol, dist = 50)
-l1.sf.buf.dis <- l1.sf.buf %>% 
-  group_by()  %>% 
-  summarise()
-ggplot(l1.sf.buf.dis) + geom_sf() 
 
 # get crashes data
 crash <- st_read("data/auckland_CAS.gpkg") |> 
@@ -214,9 +198,12 @@ sa1_crash <- left_join(sa1_crash, roadlens, by="SA12018_V1_00")
 sa1_crash <- sa1_crash |> 
   mutate(crashesperarea = n/area) |> 
   mutate(crash_per_roadlen = n/len_m) |> 
-  mutate(crash_risk = crash_per_roadlen/(censusnightpop/area))
+  mutate(crash_risk = as.numeric(crash_per_roadlen/censusnightpop))
+sa1_crash[which(is.na(sa1_crash$crash_per_roadlen),), "crash_per_roadlen"] <- 0.01
+sa1_crash$crash_risk <- ifelse(is.na(sa1_crash$crash_risk), min(sa1_crash$crash_risk,na.rm = T), sa1_crash$crash_risk)
 
-tm_shape(sa1_crash)+tm_fill("crash_risk", style="jenks")
+tm_shape(sa1_crash)+tm_fill(c("crashesperarea","crash_per_roadlen","crash_risk"), style="jenks")
+
 sa1_crash %>%
   ggplot(aes(x = crash_risk)) +
   geom_histogram(bins = 10)

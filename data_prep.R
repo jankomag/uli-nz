@@ -17,6 +17,7 @@ library(GWmodel)
 library(DescTools)
 library(tidyverse)
 library(readxl)
+library(leaflet)
 
 #### Data imports ####
 # geographic data
@@ -110,7 +111,7 @@ census$shannon <- apply(census[,7:12], 1, shannon)
 sa1_all <- left_join(sa1_base, census, by = c("SA12018_V1_00"="SA12018_V1_00"))
 sa1_all <- dplyr::select(sa1_all, SA12018_V1_00, no_households, pop_usual, dampness, medianRent, shannon, occupiedPrivateDwellings)
 
-### Dwelling Density ###
+#### Dwelling Density #####
 dwellingDensity <- left_join(sa1_polys, census, by = c("SA12018_V1_00"="SA12018_V1_00")) |> dplyr::select(SA12018_V1_00, occupiedPrivateDwellings)
 dwellingDensity$area <- as.numeric(st_area(dwellingDensity))
 dwellingDensity <- dwellingDensity |> 
@@ -118,17 +119,16 @@ dwellingDensity <- dwellingDensity |>
   mutate(dwelldensity_transf = Winsorize(dwelldensity, minval=0.000001))
 tm_shape(dwellingDensity)+tm_fill("dwelldensity_transf", style="jenks")
 
-# smooth  dwelling density
+# smooth dwelling density
 dwellDens.sp = as(dwellingDensity, "Spatial")
 nb <- poly2nb(dwellDens.sp)
 num_neighbors <- sapply(nb, length)
 mean(num_neighbors)
 
-bandwidth <- 300
-gw_ss_dwdens_300 <- gwss(dwellDens.sp, vars  =  c("dwelldensity_transf"),
-                    kernel = "bisquare", adaptive = FALSE, bw = bandwidth, quantile = FALSE)
-summary(gw_ss_dwdens_300$SDF)
-sa1_dwelldnsity <- as(gw_ss_dwdens_300$SDF, "sf")
+bandwidth <- 10
+gw_ss_dwdens_10 <- gwss(dwellDens.sp, vars  =  c("dwelldensity_transf"),
+                    kernel = "bisquare", adaptive = TRUE, bw = bandwidth, quantile = FALSE)
+sa1_dwelldnsity <- as(gw_ss_dwdens_10$SDF, "sf")
 tm_shape(sa1_dwelldnsity)+tm_fill("dwelldensity_transf_LM", style="jenks")
 
 sa1_dwelldnsity <- (sa1_dwelldnsity) |> 
@@ -139,8 +139,7 @@ sa1_dwelldnsity <- st_join(sa1_polys, sa1_dwelldnsity, join=st_equals)
 sa1_dwelldnsity_nong <- st_drop_geometry(sa1_dwelldnsity) # drop geom again...
 sa1_all <- left_join(sa1_all, sa1_dwelldnsity_nong) # ... and join to the rest of the data
 
-#### Remaining Variables ####
-##### Crime Risk ####
+#### Crime Risk ####
 # load raw crime counts data
 crime <- as.data.frame(read.csv("data/crimes_originaldata.csv"))|> 
   dplyr::select(Area.Unit, Victimisations, Meshblock)
@@ -168,29 +167,36 @@ sa1_crime <- st_join(sa1_polys, crimes, by = FALSE) |> st_drop_geometry() |> # s
 # add to sa1_all
 sa1_all <- left_join(sa1_all, sa1_crime, by = "SA12018_V1_00")
 
-##### Road Safety ####
-sa1_crashrisk <-st_read("data/sa1_crashrisk.gpkg") |> st_transform(27291)
-sa1_crashrisk[which(is.na(sa1_crashrisk$crash_risk),), "crash_risk"] <- 0 # replace NAs with 0
-sa1_crashrisk[which(is.infinite(sa1_crashrisk$crash_risk),), "crash_risk"] <- 150000
-sa1_crashrisk[which(is.na(sa1_crashrisk$crash_per_roadlen),), "crash_per_roadlen"] <- 0 # replace NAs with 0
-tm_shape(sa1_crashrisk)+tm_fill("crash_risk", style="jenks")
+#### Road Safety ####
+minmaxNORM0_10 <- function(x) {
+  return (((x - min(x))) / (max(x) - min(x))*(10-0)+0)
+} #0-10
+sa1_crashrisk <- st_read("data/sa1_crash_risk.gpkg") |> st_drop_geometry()
+sa1_crashrisk$crash_risk <- unlist(sa1_crashrisk$crash_risk)
+sa1_crashrisk[sapply(sa1_crashrisk, is.infinite)] <- NA
+sa1_crashrisk <- sa1_crashrisk |> 
+  mutate(crash_risk = minmaxNORM0_10(crash_risk)) |> 
+  mutate(crash_per_roadlen = minmaxNORM0_10(crash_per_roadlen))
 
+# replace missing values with the indicator crashes_per_roadlen
+sa1_crashrisk[which(!is.finite(sa1_crashrisk$crash_risk),), "crash_risk"] <- sa1_crashrisk[which(!is.finite(sa1_crashrisk$crash_risk),), "crash_per_roadlen"]
+sa1_crashrisk <- left_join(sa1_polys, sa1_crashrisk, by="SA12018_V1_00")
+# smooth with geographically weighted mean
 crash.sp = as(sa1_crashrisk, "Spatial")
-bandwidth <- 15
-gw_ss_crash_15adap <- gwss(crash.sp, vars  = c("crash_per_roadlen","crash_risk"),
-                         kernel = "bisquare", adaptive = TRUE, bw = bandwidth, quantile = FALSE)
-weightedCrash <- as(gw_ss_crash_15adap$SDF, "sf")
-summary(weightedCrash)
-tm_shape(weightedCrash)+tm_fill(c("crash_per_roadlen_LM","crash_risk_LM"), style="jenks")
-#st_write(weightedCrash, "weightedCrash.gpkg")
-weightedCrash <- weightedCrash |>
-  dplyr::select(crash_per_roadlen_LM) |> st_transform(27291)
+bandwidth <- 10
+gw_ss_crash_10 <- gwss(crash.sp, vars  = c("crash_risk"),
+                         kernel = "bisquare", adaptive = FALSE, bw = bandwidth, quantile = FALSE)
+weightedCrash <- as(gw_ss_crash_10$SDF, "sf")
+tm_shape(weightedCrash)+tm_fill(c("crash_risk_LM"), style="jenks")
 
-tm_shape(sa1_polys)+tm_polygons()
+weightedCrash <- weightedCrash |>
+  dplyr::select(crash_risk_LM) |> st_transform(27291)
+
 # join by geometry equality
 sa1_crashrisk <- st_join(sa1_polys, weightedCrash, join=st_equals_exact, par=1)
 sa1_crashrisk_nong <- st_drop_geometry(sa1_crashrisk) # drop geom again...
 sa1_all <- left_join(sa1_all, sa1_crashrisk_nong) # ... and join to the rest of the data
+
 
 ## Flood Proneness ##
 floods_sa1 <- st_read("data/sa1_floods_final.gpkg") |> st_drop_geometry() |>

@@ -43,7 +43,7 @@ library(data.table)
 library(collapse)
 library(cluster)
 library(see)
-library(performance)
+library(lmtest)
 
 #### Loading data ####
 # load the kuli data
@@ -175,13 +175,17 @@ corrplot(cor, tl.srt = 45, type = "lower", method = "ellipse",
 
 #### KULI Visualisation ####
 ### MAP
+bbox_coords <- c(174.489515, -37.159816, 175.258558, -36.570920)
+bbox <- matrix(c(bbox_coords[1], bbox_coords[2], bbox_coords[3], bbox_coords[4]), ncol = 2, byrow = TRUE)
+
 bckgd <- st_read('data/land.gpkg', quiet = T) # transform to OSGB projection
 tm_shape(gdf) +tm_polygons("grey",  lwd=0) +
 tm_shape(bckgd) + tm_polygons(col="#DCDACB", lwd=0) +
 tm_shape(gdf) +
-  tm_polygons("kuli_MPIAgg", midpoint = 6, legend.hist = T, lwd=0.01, n=14,
-              style = "kmeans", title = "KULI in Auckland", title.fontfamily="serif") +
-  tm_style("col_blind") +
+  tm_polygons(col = "kuli_MPIAgg", midpoint = 6, legend.hist = T, lwd=0.01, n=14,
+              style = "kmeans", title = "KULI in Auckland", title.fontfamily="serif",
+              palette="Reds", n=6) +
+#  tm_style("col_blind") +
   tm_layout(legend.position = c("left","bottom"), frame = F, legend.outside = F,
             legend.title.fontfamily = "serif", bg.color="#CCEAE5") +
             #legend.width=1, legend.height=1, legend.text.size=1,legend.title.size=1,
@@ -189,6 +193,32 @@ tm_shape(gdf) +
             #legend.hist.height=.2, legend.hist.width=.3, legend.hist.bg.color="grey90", legend.hist.bg.alpha=.4) +
   tm_scale_bar(breaks = c(0, 100, 200), text.size = 0.6) +
   tm_compass(type = "4star", size = 2, position = c("left", "top"))
+
+tmaptools::palette_explorer()
+
+kulimap <- tm_shape(gdf) +
+  tm_polygons("grey",  lwd=0.1) +
+tm_shape(bckgd, bbox=bbox) + tm_polygons(col="#DCDACB", lwd=0) +
+tm_shape(gdf, bbox=bbox) + 
+  tm_polygons(col = "kuli_MPIAgg",
+              fill.palette = "magma",
+              #palette = c("lightyellow","orange","darkorange","red","darkred"),
+              #palette = rev(hcl.colors(7, "ag_GrnYl")),
+              title="KULI",
+              legend.hist = TRUE,
+              lwd = 0, style="jenks", n=9) +
+  tm_layout(title = "Kiwi Urban Liveability Index in Auckland", title.fontfamily = "serif",
+            frame = FALSE, leend.title.fontfamily = "serif", title.size = 1.6,
+            legend.outside = FALSE,
+            legend.text.size = 0.00001,
+            legend.hist.size = 0.7,
+            legend.hist.width = 0.5,legend.hist.height = 0.2,
+            bg.color="#CCEAE5", title.position = c('center', 'top')) +
+  tm_scale_bar(breaks = c(0, 100, 200), text.size = 0.3) +
+  tm_compass(type = "4star", size = 1, position = c("left", "top")) +
+  tm_scale_bar(position = c("right", "bottom"), text.size = 10)
+tmap_save(kulimap, filename = "outputs/kuli_map.png", width = 8, height = 8)
+
 ### Histogram
 ggplot(gdf)+
     geom_histogram(aes(kuli_MPIAgg)) +
@@ -199,7 +229,7 @@ ggplot(gdf)+
 numeric_data <- data[, sapply(data, is.numeric)]
 
 #### Aggregation to SA2 ####
-sa2 = st_read('data/sa2.gpkg', quiet = T) |> 
+sa2 <- st_read('data/sa2.gpkg', quiet = T) |> 
   subset(select = c(SA22023_V1_00)) |> st_transform(27291)
 sa2agg <- st_interpolate_aw(gdf[2:20], sa2, extensive = F)
 
@@ -224,20 +254,19 @@ steplmsa2 = stepAIC(lm_sa2, trace = 0)
 summary(steplmsa1)
 summary(steplmsa2)
 
-###### Residuals ######
+par(mfrow=c(1,1))
+plot(lm_sa2)
+check_model(lm_sa1, check="all")
+
+#### Residuals
 residuals_sa1 <- residuals(lm_sa1)
 residuals_sa2 <- residuals(lm_sa2)
 gdf$residuals <- residuals_sa1
 sa2agg$residuals <- residuals_sa2
+
 # Map the residuals
 tm_shape(sa2agg) +
   tm_fill("residuals", lwd=0, style='jenks')
-
-par(mfrow=c(2,2))
-plot(lm_sa2)
-par(mfrow=c(1,1))
-
-check_model(lm_sa1, check="all")
 
 ##### Spatial Regression Model ####
 ## Weights Matrices
@@ -253,26 +282,85 @@ tm_shape(sa2agg) +
               palette = "YlGnBu", lwd=0, style="kmeans")
 
 # test for spatial autocorrelation in residuals
-moran.test(gdf$residuals, sa1.lw)
-moran.test(sa2agg$residuals, sa2.lw)
+moran.test(sa2agg$kuli_MPIAgg, sa2.lw)
+lm.morantest(sa2agg$residuals, sa2.lw, alternative="two.sided")
+lm.morantest(gdf$residuals, sa1.lw, alternative="two.sided")
 
-## Spatial Lag Model ##
-#sp_lag_sa1 <- lagsarlm(formula, data = gdf, sa1.lw, method = "eigen")
+# test what model best to run
+lm.LMtests(lm_sa2, sa2.lw, c("LMerr","LMlag"))
+
+###### Spatial Lag Model #####
+sp_lag_sa1 <- lagsarlm(formula, data = gdf, sa1.lw, method = "eigen")
+save(sp_lag_sa1, file = "outputs/models/sp_lag_sa1.Rdata")
+#load("outputs/models/sp_lag_sa1.Rdata")
+
 sp_lag_sa2 <- lagsarlm(formula, data = sa2agg, sa2.lw, method = "eigen")
 
-summary(sp_lag_sa2)
+gdf$residuals_splag <- residuals(sp_lag_sa1)
+sa2agg$residuals_splag <- residuals(sp_lag_sa2)
 
-library(lmtest)
-lrtest(sa2.lw, sp_lag_sa2)
+summary(sp_lag_sa1)
 
-## Spatial Error Model ##
-#sp_err_sa1 <- errorsarlm(formula, data = gdf, sa1.lw, method = "eigen")
+par(mfrow=c(2,2))
+plot(sp_lag_sa2)
+
+# test significance
+lrtest(lm_sa2, sp_lag_sa2)
+
+# Plot the residuals
+dfresid_splag_sa1 <- data.frame(Fitted = sp_lag_sa1$fitted.values, Residuals = sp_lag_sa1$residuals)
+ggplot(dfresid_splag_sa1, aes(x = Fitted, y = Residuals)) +
+  geom_point() +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+  labs(title = "Residuals vs. Fitted Values", x = "Fitted Values", y = "Residuals")
+
+dfresid_splag <- data.frame(Fitted = sp_lag_sa2$fitted.values, Residuals = sp_lag_sa2$residuals)
+ggplot(dfresid_splag, aes(x = Fitted, y = Residuals)) +
+  geom_point() +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+  labs(title = "Residuals vs. Fitted Values", x = "Fitted Values", y = "Residuals")
+
+# Map residuals
+tm_shape(gdf) + tm_polygons(col='residuals_splag',lwd=0, style="jenks")
+tm_shape(sa2agg) + tm_polygons(col='residuals_splag',lwd=0, style="jenks")
+
+###### Spatial Error Model #####
+sp_err_sa1 <- errorsarlm(formula, data = gdf, sa1.lw, method = "eigen")
+save(sp_err_sa1, file = "outputs/models/sp_err_sa1.Rdata")
+#load("outputs/models/sp_err_sa1.Rdata")
+
 sp_err_sa2 <- errorsarlm(formula, data = sa2agg, sa2.lw, method = "eigen")
 summary(sp_err_sa2)
+lrtest(lm_sa2, sp_err_sa2)
+
+gdf$residuals_sperr <- residuals(sp_err_sa1)
+sa2agg$residuals_sperr <- residuals(sp_err_sa2)
+
+tm_shape(gdf) + 
+  tm_polygons(col='residuals_sperr',lwd=0, style="jenks")
+tm_shape(sa2agg) + 
+  tm_polygons(col='residuals_sperr',lwd=0, style="jenks")
+
+# Plot the residuals
+dfresid_sperr_sa1 <- data.frame(Fitted = sp_err_sa1$fitted.values, Residuals = sp_err_sa1$residuals)
+ggplot(dfresid_sperr_sa1, aes(x = Fitted, y = Residuals)) +
+  geom_point() +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+  labs(title = "Residuals vs. Fitted Values", x = "Fitted Values", y = "Residuals")
+
+dfresid_sperr_sa2 <- data.frame(Fitted = sp_err_sa2$fitted.values, Residuals = sp_err_sa2$residuals)
+ggplot(dfresid_sperr_sa2, aes(x = Fitted, y = Residuals)) +
+  geom_point() +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+  labs(title = "Residuals vs. Fitted Values", x = "Fitted Values", y = "Residuals")
+
+# compare model LM
+summary(lm.LMtests(lm_sa2, sa2.lw, test=c("LMlag","LMerr")))
 
 ##### Geographically Weighted Regression #####
 # convert to sp
 sa2.sp = as(sa2agg, "Spatial")
+sa1.sp = as(gdf, "Spatial")
 
 # specify MGWR model
 mgwr <- gwr.multiscale(formula,
@@ -282,23 +370,28 @@ mgwr <- gwr.multiscale(formula,
                          kernel = "gaussian",
                          bws0 = rep(100, 12),
                          verbose = FALSE, predictor.centered = rep(TRUE, 11))
+
+mgwrsa1 <- gwr.multiscale(formula,
+                       data = sa1.sp,
+                       adaptive = TRUE, max.iterations = 5000,
+                       criterion = "dCVR", approach = "AIC",
+                       kernel = "gaussian",
+                       bws0 = rep(100, 12),
+                       verbose = FALSE, predictor.centered = rep(TRUE, 11))
   
 # Save the model
+save(mgwrsa1, file = "outputs/models/mgwr_sa1.Rdata")
 save(mgwr, file = "outputs/models/mgwr_sa2_new.Rdata")
 #load("outputs/models/mgwr_sa2_new.Rdata")
 mbwa <- mgwr[[2]]$bws #save bandwidths for later
-
 mgwr
-mgwr$GW.diagnostic
+
 # show diagnostics
+mgwr$GW.diagnostic
 c(mgwr$GW.diagnostic$AICc, mgwr$GW.diagnostic$R2.val)
 
-# Examine Boxplots of coef distributions
-mgwr_coef_cols <- data.frame(mgwr$SDF@data[, 1:13])
-mgwr_coef_cols$id <- 1:nrow(mgwr_coef_cols)
-mgwr_coef_cols$Model <- "MGWR"
-mgwr_long <- melt(mgwr_coef_cols, id = c("id","Model"))
-
+##### Model Summary tables #####
+# Examine Boxplots of coefficients distributions
 olssum <- data.frame(lm_sa1$coefficients)
 olssum <- cbind(variable = rownames(olssum), olssum)
 rownames(olssum) <- 1:nrow(olssum)
@@ -308,24 +401,39 @@ olssum$id <- 1:nrow(olssum)
 olssum$variable[olssum$variable == '(Intercept)'] <- 'Intercept'
 olssum <- olssum[,c(4,3,1,2)]
 
-allcoefs <- rbind(mgwr_long, olssum)
+splag_coefs <- data.frame(sp_lag_sa2$coefficients)
+splag_coefs <- cbind(variable = rownames(splag_coefs), splag_coefs)
+rownames(splag_coefs) <- 1:nrow(splag_coefs)
+colnames(splag_coefs)[2] <- "value"
+splag_coefs$Model <- "Spatial Lag"
+splag_coefs$id <- 1:nrow(splag_coefs)
+splag_coefs$variable[splag_coefs$variable == '(Intercept)'] <- 'Intercept'
+splag_coefs <- splag_coefs[,c(4,3,1,2)]
 
-ggplot() +
+mgwr_coef_cols <- data.frame(mgwr$SDF@data[, 1:13])
+mgwr_coef_cols$id <- 1:nrow(mgwr_coef_cols)
+mgwr_coef_cols$Model <- "MGWR"
+mgwr_long <- melt(mgwr_coef_cols, id = c("id","Model"))
+
+allcoefs <- rbind(olssum, splag_coefs)
+allcoefs <- rbind(allcoefs, mgwr_long)
+
+boxplot_coefs <- ggplot() +
   geom_boxplot(allcoefs, mapping = aes(x = variable, y = value, col= Model), position="dodge2") +
   stat_boxplot(geom ='errorbar') +
   theme_minimal() +
   theme(legend.position="right",
         axis.text.x = element_text(angle = 45, hjust=1),
         plot.title = element_text(hjust = 0.5),
-        text=element_text(size=13,  family="serif")) +
-  scale_color_manual(values=c("#6ECCAF","#344D67","red")) +
+        text=element_text(size=16,  family="serif")) +
+  scale_color_manual(values=c("#6ECCAF","blue","red")) +
   ylab('Coefficient estimate') +xlab ('')+#coord_cartesian(ylim = c(-2, 4)) +
-  labs(title ="Boxplots of Coefficient estimates")
-  
-ggplot(mgwr_long) +
-  geom_boxplot(mapping = aes(x = variable, y = value), position="dodge2")
+  labs(title ="Boxplots of Coefficient estimates") + theme(
+    panel.background = element_rect(fill = "white"),
+    plot.background = element_rect(fill = "white"))
+ggsave("outputs/boxplot_coefs.png", plot = boxplot_coefs, dpi = 300)
 
-# Examine Boxplots of SE distributions
+# Boxplots of SE distributions
 mgwr_se <- mgwr$SDF@data[, 17:28] # select standard errors
 mgwr_se$id <- 1:nrow(mgwr_se)
 mgwr_se$kind <- "MGWR"
@@ -337,20 +445,27 @@ ggplot(mgwr_se_long, aes(x = variable, y = value, col= kind)) +
         plot.title = element_text(hjust = 0.5),
         text=element_text(size=13,  family="serif"))
 
-###### Model Summary tables ######
-# create a table with coefficient stats for MGWR
+# Summary table with models' coefficients
 coefs_msgwr = apply(mgwr$SDF@data[, 1:13], 2, summary)
 tab.mgwr = data.frame(Bandwidth = mbwa, t(round(coefs_msgwr,3)))
-names(tab.mgwr)[c(3,6)] = c("Q1", "Q3")
+names(tab.mgwr)[c(3,4,6)] = c("Q1", "MedianMGWR","Q3")
 tab.mgwr
 
-olssum <- data.frame(steplmsa1$coefficients)
+olssum <- data.frame(lm_sa1$coefficients)
 olssum <- cbind(variable = rownames(olssum), olssum)
 rownames(olssum) <- 1:nrow(olssum)
-colnames(olssum)[2] <- "coef"
+colnames(olssum)[2] <- "OLS"
+olssum <- data.frame(olssum[1], round(olssum[2],3))
 
-summary_table <- data.frame(olssum, tab.mgwr[,c(5,1)])
+splag_summ <- data.frame(sp_lag_sa2$coefficients)
+splag_summ <- cbind(variable = rownames(splag_summ), splag_summ)
+rownames(splag_summ) <- 1:nrow(splag_summ)
+colnames(splag_summ)[2] <- "SpatialLag"
+splag_summ <- data.frame(splag_summ[1], round(splag_summ[2],3))
+
+summary_table <- data.frame(olssum, splag_summ[2], tab.mgwr[,c(4,1)])
 summary_table
+stargazer(summary_table)
 
 ###### Mapping GW results ######
 mgwr_sf = st_as_sf(mgwr$SDF)

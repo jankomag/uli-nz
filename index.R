@@ -62,6 +62,10 @@ plot_grid(plotlist = my_plots)
 minmaxNORM <- function(x) {
   return (((x - min(x))) / (max(x) - min(x))*(10-1)+1)
 } #1-10
+reverseMinmaxNORM <- function(y, original_min, original_max) {
+  x <- ((y - 1) / (10 - 1)) * (original_max - original_min) + original_min
+  return(x)
+} # from 1-10 back to original distribution
 minmaxNORM0_10 <- function(x) {
   return (((x - min(x))) / (max(x) - min(x))*(10-0)+0)
 } #0-10
@@ -108,32 +112,25 @@ transform_to_normal <- function(column, small_constant = 0.000001) {
 transform_to_normal(sa1_all$dist_marae, small_constant = 0.1)
 
 # box cox transformation
-b <- boxcox(lm((crash_per_roadlen_LM) ~ 1, data=sa1_all))
+b <- boxcox(lm((crash_risk_LM+0.0000000000000001) ~ 1, data=sa1_all))
 lambda <- b$x[which.max(b$y)]
 sa1_alltest <- prekuli |> 
-  mutate(boxc = ((crash_per_roadlen_LM) ^ lambda - 1) / lambda)
+  mutate(boxc = ((crash_risk_LM) ^ lambda - 1) / lambda)
 
 # Choosing indicator prekuli
 sa1_alltest <- prekuli |> 
-  mutate(raw = bikeability) |> 
-  mutate(testvar = Winsorize(raw, maxval=10,minval=-700)) |> 
-  mutate(testvar2 = log(raw+0.00000001)) |> 
+  mutate(raw = crash_risk_LM) |> 
+  mutate(testvar = log(crash_risk_LM+0.00000001)) |> 
+  mutate(testvar2 = Winsorize(testvar, maxval=-1,minval=-10)) |> 
   mutate(newtestvar = as.numeric(testvar2))#,minval=-8,maxval=2))
 
 sa1_alltest %>%
-  pivot_longer(cols = raw) %>%
+  pivot_longer(cols = testvar2) %>%
   ggplot(aes(x = value)) +
   geom_histogram(bins = 100)
 
 tm_shape(sa1_alltest) +
-  tm_fill("raw",lwd=0, style="jenks", palette="Blues")
-
-
-
-st_write(dplyr::select(sa1_alltest,newtestvar), "testing.gpkg")
-obj <- st_read("testing.gpkg")
-tm_shape(obj) + tm_fill("newtestvar")
-
+  tm_fill(c("testvar2"),lwd=0, style="jenks", palette="Blues")
 
 # optimised lambda values for chosen variables
 lambdahealth <- 0.3434343
@@ -161,7 +158,6 @@ sa1_all_index <- sa1_all |>
   mutate(sportBC = ((dist_sport+0.1) ^ lambdasport - 1) / lambdasport) |> 
   mutate(secondaryBC = ((dist_secondary+0.1) ^ lambdasecond - 1) / lambdasecond) |> 
   mutate(emergencyBC = ((dist_emergency+0.1) ^ lambdaemergency - 1) / lambdaemergency) |> 
-  mutate(crashriskBC = ((crash_per_roadlen_LM+0.1) ^ lambdacrashrisk - 1) / lambdacrashrisk) |> 
   mutate(convstoreBC = ((dist_conveniencestore+0.000001) ^ lambdaconv - 1) / lambdaconv) |> 
   mutate(petrol1 = minmaxNORM(-Winsorize(petrolBC, minval=1, maxval = 80))) |>
   mutate(evch1 = minmaxNORM(-(evchBC))) |> 
@@ -193,8 +189,8 @@ sa1_all_index <- sa1_all |>
   
   #SAFETY
   mutate(alcohol1 = minmaxNORM(-alcoprohibited)) |> #checked
-  mutate(crime1 = minmaxNORM(-log(crimerisk+0.00001))) |> #checked
-  mutate(crashes1 = minmaxNORM(-Winsorize(crashriskBC, maxval=1,minval=-8))) |> 
+  mutate(crime1 = minmaxNORM(-Winsorize(log(crimerisk+0.00000001), maxval=10,minval=-11))) |> #checked
+  mutate(crashes1 = minmaxNORM(-Winsorize(log(crash_risk_LM+0.00000001), maxval=-1,minval=-10))) |> 
   mutate(flood1 = minmaxNORM(-Winsorize(flood_pc, minval=0, maxval=.125))) |> #checked
   mutate(emergency1 = minmaxNORM(-Winsorize(emergencyBC, minval=0, maxval=90))) |> #checked
   
@@ -253,8 +249,8 @@ for (i in seq_along(column_names)) {
   print(paste("Column Name:", column_names[i], "Index:", column_indices[i]))
 }
   # KULI aggregation - geometric average method
-sa1_all_index$kuli_geomAgg <- minmaxNORM0_1(apply(sa1_all_index[,56:92], 1, FUN = a_gmean))
-sa1_all_index$kuli_MPIAgg <- minmaxNORM0_1(ci_mpi(sa1_all_index,c(56:92),penalty="POS")$ci_mpi_est)
+sa1_all_index$kuli_geomAgg <- minmaxNORM0_1(apply(sa1_all_index[,55:91], 1, FUN = a_gmean))
+sa1_all_index$kuli_MPIAgg <- minmaxNORM0_1(ci_mpi(sa1_all_index,c(55:91),penalty="POS")$ci_mpi_est)
 #sa1_all_index$kuli_MPIAgg <- minmaxNORM0_1(Winsorize(sa1_all_index$kuli_MPIAgg, maxval = 150, minval = 86))
 hist(sa1_all_index$kuli_MPIAgg, breaks=50)
 
@@ -268,7 +264,7 @@ tm_shape(index_sa1g) +
 index_sa1g |> ggplot() + geom_histogram(aes(c(kuli_MPIAgg)),bins=100)
 
 # save the KULI
-kuli <- index_sa1g[,c(1,56:92,96)]
+kuli <- index_sa1g[,c(1,55:91,95)]
 st_write(kuli, "data/sa1_kuli.gpkg")
 # save for webmap
 kuli <- st_transform(kuli,3857)
@@ -374,7 +370,7 @@ densityplot(dist_gym, gym1, "Gym")
 densityplot(medianRent, affordability1, "Affordability")
 densityplot(dampness, damp1, "Dampness")
 
-df_indicators <- sa1_all_index[,c(56:92,96)]
+df_indicators <- sa1_all_index[,c(55:91,95)]
 colnames(df_indicators) <- c("Station","FrequentBusStop","Bikeability","CarInfrastructure",
                              "ConvenienceStore","Supermarket","StreetConnectivity","DwellingDensity",
                              "Cinema","Gym","Theatre","Library",
@@ -401,7 +397,7 @@ plot(x = df_indicators$KULI, y = df_indicators$Affordabilit)
 #### Mapping indicators ####
 border <- st_read("data/sa1_auckland_waiheke_urban.gpkg") |> st_transform(27291)
 
-indicators_sa1g <- left_join(sa1_allg, sa1_all_index, by = c("SA12018_V1_00"="SA12018_V1_00"))
+indicators_sa1g <- left_join(sa1_polys, sa1_all_index, by = c("SA12018_V1_00"="SA12018_V1_00"))
 indic_map_func = function(var_name, titl) {
   mapout = tm_shape(border) + tm_polygons(col="black", lwd=1)+
     tm_shape(indicators_sa1g) +
@@ -465,22 +461,6 @@ tmap_arrange(station,freqb,bikeab,carinf,
              bigp,beach,
              nrow=8, ncol=5)
 dev.off()
-
-#### Map of indicators 2 ####
-map_func = function(var_name, titl) {
-  mapout = tm_shape(indicators_sa1g) +
-    tm_polygons(var_name, lwd=0,style = "kmeans", title = "Indicator", title.fontfamily="serif") +
-    tm_style("col_blind") +
-    tm_layout(main.title = titl, legend.position = c("left","bottom"), frame = T, legend.outside = F,
-              legend.title.fontfamily = "serif", main.title.size = 2, main.title.position = "center",
-              legend.width=2, legend.height=2, legend.text.size=1.5,legend.title.size=2,
-              legend.bg.color="grey100", legend.bg.alpha=.7, main.title.fontfamily="serif")
-  #tm_scale_bar(breaks = c(0, 100, 200), text.size = 0.4) +
-  #tm_compass(type = "4star", size = 1, position = c("left", "top"))
-  
-  mapout
-}
-museu=map_func("museum1","Museum Indicator")
 
 #### Other ####
 # SUBINDICATORS
