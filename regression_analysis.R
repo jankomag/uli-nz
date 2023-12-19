@@ -44,6 +44,8 @@ library(collapse)
 library(cluster)
 library(see)
 library(lmtest)
+library(tidyverse)
+library(tidymodels)
 
 #### Loading data ####
 # load the kuli data
@@ -164,6 +166,7 @@ sa1_reg <- sa1_imped |>
 
 gdf <- left_join(sa1_imped, nongkuli, by = c("SA12018_V1_00"="SA12018_V1_00"))
 df <- st_drop_geometry(gdf)
+tm_shape(gdf) + tm_fill("medianage", style="jenks")
 
 #### EDA ####
 numeric_data <- df[, sapply(df, is.numeric)]
@@ -172,6 +175,8 @@ par(mfrow = c(1, 1))
 corrplot(cor, tl.srt = 45, type = "lower", method = "ellipse",
          order = "FPC", tl.cex = 0.8,
          tl.col = "black", diag = T, cl.cex=0.7,cl.offset=0.3)
+
+ggplot(gdf) + geom_histogram(aes(medianage))
 
 #### KULI Visualisation ####
 ### MAP
@@ -198,22 +203,24 @@ tmaptools::palette_explorer()
 
 kulimap <- tm_shape(gdf) +
   tm_polygons("grey",  lwd=0.1) +
-tm_shape(bckgd, bbox=bbox) + tm_polygons(col="#DCDACB", lwd=0) +
+tm_shape(bckgd, bbox=bbox) + tm_polygons(col="#FFFFDD", lwd=0) +
 tm_shape(gdf, bbox=bbox) + 
   tm_polygons(col = "kuli_MPIAgg",
-              fill.palette = "magma",
+              #fill.palette = "GnBu",
               #palette = c("lightyellow","orange","darkorange","red","darkred"),
-              #palette = rev(hcl.colors(7, "ag_GrnYl")),
+              palette = rev(hcl.colors(9, "GnBu")),
               title="KULI",
               legend.hist = TRUE,
               lwd = 0, style="jenks", n=9) +
-  tm_layout(title = "Kiwi Urban Liveability Index in Auckland", title.fontfamily = "serif",
-            frame = FALSE, leend.title.fontfamily = "serif", title.size = 1.6,
+  tm_layout(main.title = "Kiwi Urban Liveability Index in Auckland", main.title.fontfamily = "serif",
+            frame = FALSE, legend.title.fontfamily = "serif", main.title.size = 1.7,
             legend.outside = FALSE,
             legend.text.size = 0.00001,
             legend.hist.size = 0.7,
             legend.hist.width = 0.5,legend.hist.height = 0.2,
-            bg.color="#CCEAE5", title.position = c('center', 'top')) +
+            bg.color="#AEC3AE", main.title.position = c('center', 'top'),
+            legend.bg.color = "white",  # Set the background color
+            legend.bg.alpha = 0.9 ) +
   tm_scale_bar(breaks = c(0, 100, 200), text.size = 0.3) +
   tm_compass(type = "4star", size = 1, position = c("left", "top")) +
   tm_scale_bar(position = c("right", "bottom"), text.size = 10)
@@ -240,13 +247,15 @@ tm_shape(sa2agg) +
 
 #### Modelling ####
 ##### OLS #####
+# Get rid PTtoWork carsPerPreson, median age
 formula = as.formula(kuli_MPIAgg ~ medianIncome + privateTransporTtoWork +
-                       PTtoWork + cycleToWork + noCar + carsPerPreson + PrEuropeanDesc +
-                       PrMaoriDesc + deprivation + Degree + popdenlog + medianage)
+                       cycleToWork + noCar + PrEuropeanDesc +
+                       deprivation + Degree + popdenlog)
 lm_sa1 = lm(formula, data = gdf)
 lm_sa2 = lm(formula, data = sa2agg)
 summary(lm_sa1)
 summary(lm_sa2)
+vif(lm_sa1)
 
 # stepwise model
 steplmsa1 = stepAIC(lm_sa1, trace = 0)
@@ -293,16 +302,16 @@ lm.LMtests(lm_sa2, sa2.lw, c("LMerr","LMlag"))
 sp_lag_sa1 <- lagsarlm(formula, data = gdf, sa1.lw, method = "eigen")
 save(sp_lag_sa1, file = "outputs/models/sp_lag_sa1.Rdata")
 #load("outputs/models/sp_lag_sa1.Rdata")
+sp_lag_sa1$coefficients
+tidy(sp_lag_sa1)
 
 sp_lag_sa2 <- lagsarlm(formula, data = sa2agg, sa2.lw, method = "eigen")
 
 gdf$residuals_splag <- residuals(sp_lag_sa1)
 sa2agg$residuals_splag <- residuals(sp_lag_sa2)
 
-summary(sp_lag_sa1)
-
 par(mfrow=c(2,2))
-plot(sp_lag_sa2)
+plot(sp_lag_sa1)
 
 # test significance
 lrtest(lm_sa2, sp_lag_sa2)
@@ -328,9 +337,9 @@ tm_shape(sa2agg) + tm_polygons(col='residuals_splag',lwd=0, style="jenks")
 sp_err_sa1 <- errorsarlm(formula, data = gdf, sa1.lw, method = "eigen")
 save(sp_err_sa1, file = "outputs/models/sp_err_sa1.Rdata")
 #load("outputs/models/sp_err_sa1.Rdata")
-
+sp_err_sa1
 sp_err_sa2 <- errorsarlm(formula, data = sa2agg, sa2.lw, method = "eigen")
-summary(sp_err_sa2)
+
 lrtest(lm_sa2, sp_err_sa2)
 
 gdf$residuals_sperr <- residuals(sp_err_sa1)
@@ -380,8 +389,9 @@ mgwrsa1 <- gwr.multiscale(formula,
                        verbose = FALSE, predictor.centered = rep(TRUE, 11))
   
 # Save the model
-save(mgwrsa1, file = "outputs/models/mgwr_sa1.Rdata")
 save(mgwr, file = "outputs/models/mgwr_sa2_new.Rdata")
+
+save(mgwrsa1, file = "outputs/models/mgwr_sa1.Rdata")
 #load("outputs/models/mgwr_sa2_new.Rdata")
 mbwa <- mgwr[[2]]$bws #save bandwidths for later
 mgwr
@@ -401,7 +411,7 @@ olssum$id <- 1:nrow(olssum)
 olssum$variable[olssum$variable == '(Intercept)'] <- 'Intercept'
 olssum <- olssum[,c(4,3,1,2)]
 
-splag_coefs <- data.frame(sp_lag_sa2$coefficients)
+splag_coefs <- data.frame(sp_lag_sa1$coefficients)
 splag_coefs <- cbind(variable = rownames(splag_coefs), splag_coefs)
 rownames(splag_coefs) <- 1:nrow(splag_coefs)
 colnames(splag_coefs)[2] <- "value"

@@ -198,7 +198,7 @@ sa1_crash <- left_join(sa1_crash, roadlens, by="SA12018_V1_00")
 sa1_crash <- sa1_crash |> 
   mutate(crashesperarea = n/area) |> 
   mutate(crash_per_roadlen = n/len_m) |> 
-  mutate(crash_risk = as.numeric(crash_per_roadlen/censusnightpop))
+  mutate(crash_risk = as.numeric(crash_per_roadlen/censusnightpop.x))
 sa1_crash[which(is.na(sa1_crash$crash_per_roadlen),), "crash_per_roadlen"] <- 0.01
 sa1_crash$crash_risk <- ifelse(is.na(sa1_crash$crash_risk), min(sa1_crash$crash_risk,na.rm = T), sa1_crash$crash_risk)
 
