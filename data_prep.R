@@ -111,34 +111,6 @@ census$shannon <- apply(census[,7:12], 1, shannon)
 sa1_all <- left_join(sa1_base, census, by = c("SA12018_V1_00"="SA12018_V1_00"))
 sa1_all <- dplyr::select(sa1_all, SA12018_V1_00, no_households, pop_usual, dampness, medianRent, shannon, occupiedPrivateDwellings)
 
-#### Dwelling Density #####
-dwellingDensity <- left_join(sa1_polys, census, by = c("SA12018_V1_00"="SA12018_V1_00")) |> dplyr::select(SA12018_V1_00, occupiedPrivateDwellings)
-dwellingDensity$area <- as.numeric(st_area(dwellingDensity))
-dwellingDensity <- dwellingDensity |> 
-  mutate(dwelldensity = occupiedPrivateDwellings/area) |> 
-  mutate(dwelldensity_transf = Winsorize(dwelldensity, minval=0.000001))
-tm_shape(dwellingDensity)+tm_fill("dwelldensity_transf", style="jenks")
-
-# smooth dwelling density
-dwellDens.sp = as(dwellingDensity, "Spatial")
-nb <- poly2nb(dwellDens.sp)
-num_neighbors <- sapply(nb, length)
-mean(num_neighbors)
-
-bandwidth <- 10
-gw_ss_dwdens_10 <- gwss(dwellDens.sp, vars  =  c("dwelldensity_transf"),
-                    kernel = "bisquare", adaptive = TRUE, bw = bandwidth, quantile = FALSE)
-sa1_dwelldnsity <- as(gw_ss_dwdens_10$SDF, "sf")
-tm_shape(sa1_dwelldnsity)+tm_fill("dwelldensity_transf_LM", style="jenks")
-
-sa1_dwelldnsity <- (sa1_dwelldnsity) |> 
-  dplyr::select(dwelldensity_transf_LM)
-
-# join by geometry equality
-sa1_dwelldnsity <- st_join(sa1_polys, sa1_dwelldnsity, join=st_equals)
-sa1_dwelldnsity_nong <- st_drop_geometry(sa1_dwelldnsity) # drop geom again...
-sa1_all <- left_join(sa1_all, sa1_dwelldnsity_nong) # ... and join to the rest of the data
-
 #### Crime Risk ####
 # load raw crime counts data
 crime <- as.data.frame(read.csv("data/crimes_originaldata.csv"))|> 
@@ -197,13 +169,7 @@ sa1_crashrisk <- st_join(sa1_polys, weightedCrash, join=st_equals_exact, par=1)
 sa1_crashrisk_nong <- st_drop_geometry(sa1_crashrisk) # drop geom again...
 sa1_all <- left_join(sa1_all, sa1_crashrisk_nong) # ... and join to the rest of the data
 
-
-## Flood Proneness ##
-floods_sa1 <- st_read("data/sa1_floods_final.gpkg") |> st_drop_geometry() |>
-  dplyr::select(SA12018_V1_00, flood_pc)
-floods_sa1[which(is.na(floods_sa1$flood_pc),), "flood_pc"] <- 0 # replace NAs with 0
-sa1_all <- left_join(sa1_all, floods_sa1, by = c("SA12018_V1_00"="SA12018_V1_00"))
-
+#### Other indicators ####
 ## Alcohol Environments ##
 alco_sa1 <- st_read("data/sa1_cents_alcoenvs.gpkg") |> st_drop_geometry() |> 
   dplyr::select(SA12018_V1, alcoprohibited)
@@ -234,3 +200,40 @@ sa1_allg[which(is.infinite(sa1_allg$dist_hospital),), "dist_hospital"] <- 100000
 sa1_allg[which(is.infinite(sa1_allg$dist_chemist),), "dist_chemist"] <- 100000
 
 st_write(sa1_allg, "data/sa1_allvars.gpkg")
+
+
+
+#### Other indicators #### not used in the index in the end
+## Dwelling Density ##
+dwellingDensity <- left_join(sa1_polys, census, by = c("SA12018_V1_00"="SA12018_V1_00")) |> dplyr::select(SA12018_V1_00, occupiedPrivateDwellings)
+dwellingDensity$area <- as.numeric(st_area(dwellingDensity))
+dwellingDensity <- dwellingDensity |> 
+  mutate(dwelldensity = occupiedPrivateDwellings/area) |> 
+  mutate(dwelldensity_transf = Winsorize(dwelldensity, minval=0.000001))
+tm_shape(dwellingDensity)+tm_fill("dwelldensity_transf", style="jenks")
+
+# smooth dwelling density
+dwellDens.sp = as(dwellingDensity, "Spatial")
+nb <- poly2nb(dwellDens.sp)
+num_neighbors <- sapply(nb, length)
+mean(num_neighbors)
+
+bandwidth <- 10
+gw_ss_dwdens_10 <- gwss(dwellDens.sp, vars  =  c("dwelldensity_transf"),
+                        kernel = "bisquare", adaptive = TRUE, bw = bandwidth, quantile = FALSE)
+sa1_dwelldnsity <- as(gw_ss_dwdens_10$SDF, "sf")
+tm_shape(sa1_dwelldnsity)+tm_fill("dwelldensity_transf_LM", style="jenks")
+
+sa1_dwelldnsity <- (sa1_dwelldnsity) |> 
+  dplyr::select(dwelldensity_transf_LM)
+
+# join by geometry equality
+sa1_dwelldnsity <- st_join(sa1_polys, sa1_dwelldnsity, join=st_equals)
+sa1_dwelldnsity_nong <- st_drop_geometry(sa1_dwelldnsity) # drop geom again...
+sa1_all <- left_join(sa1_all, sa1_dwelldnsity_nong) # ... and join to the rest of the data
+
+## Flood Proneness ##
+floods_sa1 <- st_read("data/sa1_floods_final.gpkg") |> st_drop_geometry() |>
+  dplyr::select(SA12018_V1_00, flood_pc)
+floods_sa1[which(is.na(floods_sa1$flood_pc),), "flood_pc"] <- 0 # replace NAs with 0
+sa1_all <- left_join(sa1_all, floods_sa1, by = c("SA12018_V1_00"="SA12018_V1_00"))
