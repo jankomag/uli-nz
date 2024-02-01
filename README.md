@@ -21,8 +21,9 @@ Interactive web map of the KULI and its components, created with Mapbox GL JS, c
 -   The folder [web-map](https://github.com/jankomag/uli-nz/tree/master/web-map) contains the script for the web map
 
 ### Dataset
+
 pending.
 
-
+![AULI](res/AULI_map.png)
 
 Jan Magnuszewski, University of Leeds
