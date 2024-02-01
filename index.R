@@ -24,21 +24,22 @@ library(MASS)
 library(gstat)
 library(ltm)
 library(Compind)
-
+library(biscale)
+library(cluster)
+library(factoextra)
 
 #### Data imports ####
 # geographic data
-prekuli <- st_read("data/sa1_allvars.gpkg") |> st_transform(27291) #transforming to the same coordinate system
-summary(prekuli)
+preauli <- st_read("data/sa1_allvars.gpkg") |> st_transform(27291) #transforming to the same coordinate system
 
 #### EDA ####
-column_names <- colnames(prekuli)
-column_indices <- seq_along(prekuli)
+column_names <- colnames(preauli)
+column_indices <- seq_along(preauli)
 for (i in seq_along(column_names)) {
   print(paste("Column Name:", column_names[i], "Index:", column_indices[i]))
 }
 # drop geometry for EDA
-sa1_all <- prekuli |> st_drop_geometry()
+sa1_all <- preauli |> st_drop_geometry()
 ##### Correlations #####
 datacorr <- sa1_all[c(4:6,8:42)]
 cor <- cor(x = datacorr, y = datacorr, use="complete.obs")
@@ -54,7 +55,6 @@ my_plots <- lapply(names(datacorr), function(var_x){
     p <- p + geom_bar()
   } 
 })
-
 plot_grid(plotlist = my_plots)
 
 #### Index Construction ####
@@ -62,13 +62,6 @@ plot_grid(plotlist = my_plots)
 minmaxNORM <- function(x) {
   return (((x - min(x))) / (max(x) - min(x))*(10-1)+1)
 } #1-10
-reverseMinmaxNORM <- function(y, original_min, original_max) {
-  x <- ((y - 1) / (10 - 1)) * (original_max - original_min) + original_min
-  return(x)
-} # from 1-10 back to original distribution
-minmaxNORM0_10 <- function(x) {
-  return (((x - min(x))) / (max(x) - min(x))*(10-0)+0)
-} #0-10
 minmaxNORM0_1 <- function(x) {
   return (((x - min(x))) / (max(x) - min(x))*(1-0)+0)
 } #0-1
@@ -93,104 +86,82 @@ a_gmean <- function(x, w = NULL){
   gm
 }
 
-
-# Test box cox function
-transform_to_normal <- function(column, small_constant = 0.000001) {
-  # Add a small constant to the column
-  transformed_column <- column + small_constant
+winsorize_column <- function(data, column_name, percentage) {
+  maxval <- quantile(data[[column_name]], 1 - percentage)
   
-  # Find optimal lambda using Box-Cox transformation
-  b <- boxcox(lm((transformed_column ~ 1,data=sa1_all)))
-  print(b)
-  lambda <- b$x[which.max(b$y)]
+  data[[column_name]] <- pmin(pmax(data[[column_name]], 0), maxval)
   
-  # Apply Box-Cox transformation
-  transformed_column <- ((transformed_column) ^ lambda - 1) / lambda
-  
-  return (transformed_column)
+  return(data)
 }
-transform_to_normal(sa1_all$dist_marae, small_constant = 0.1)
+max_perc <- 0.1
 
-# box cox transformation
-b <- boxcox(lm((crash_risk_LM+0.0000000000000001) ~ 1, data=sa1_all))
-lambda <- b$x[which.max(b$y)]
-sa1_alltest <- prekuli |> 
-  mutate(boxc = ((crash_risk_LM) ^ lambda - 1) / lambda)
-
-# Choosing indicator prekuli
-sa1_alltest <- prekuli |> 
-  mutate(raw = crash_risk_LM) |> 
-  mutate(testvar = log(crash_risk_LM+0.00000001)) |> 
-  mutate(testvar2 = Winsorize(testvar, maxval=-1,minval=-10)) |> 
-  mutate(newtestvar = as.numeric(testvar2))#,minval=-8,maxval=2))
-
-sa1_alltest %>%
-  pivot_longer(cols = testvar2) %>%
-  ggplot(aes(x = value)) +
-  geom_histogram(bins = 100)
-
-tm_shape(sa1_alltest) +
-  tm_fill(c("testvar2"),lwd=0, style="jenks", palette="Blues")
-
-# optimised lambda values for chosen variables
-lambdahealth <- 0.3434343
-lambdachildcare <- 0.06060606
-lambdasport <- 0.3838384
-lambdasecond <- 0.3434343
-lambdapetrol <- 0.4242424
-lambdaev <- 0.6262626
-lambdapubs <- 0.3434343
-lambdarent <- 1.151515
-lambdaemergency <- 0.4646465
-lambdaconv <- 0.3434343
-lambdabike <- 0.4646465
-lambdacrashrisk <- -0.06060606
-
-##### Custom Transformation of each variable ##### original no box-cox
-sa1_all_index <- sa1_all |> 
-  # BoxCox prep
-  mutate(rentBC = ((medianRent+0.1) ^ lambdarent - 1) / lambdarent) |> 
-  mutate(healthcBC = ((dist_healthcentre+0.1) ^ lambdahealth - 1) / lambdahealth) |> 
-  mutate(childcareBC = ((dist_childcare+0.1) ^ lambdachildcare - 1) / lambdachildcare) |> 
-  mutate(petrolBC = ((dist_petrol+0.1) ^ lambdapetrol - 1) / lambdapetrol) |> 
-  mutate(evchBC = ((dist_ev_charge+0.1) ^ lambdaev - 1) / lambdaev) |> 
-  mutate(pubBC = ((dist_pub+0.1) ^ lambdapubs - 1) / lambdapubs) |> 
-  mutate(sportBC = ((dist_sport+0.1) ^ lambdasport - 1) / lambdasport) |> 
-  mutate(secondaryBC = ((dist_secondary+0.1) ^ lambdasecond - 1) / lambdasecond) |> 
-  mutate(emergencyBC = ((dist_emergency+0.1) ^ lambdaemergency - 1) / lambdaemergency) |> 
-  mutate(convstoreBC = ((dist_conveniencestore+0.000001) ^ lambdaconv - 1) / lambdaconv) |> 
-# mutate(petrol1 = minmaxNORM(-Winsorize(petrolBC, minval=1, maxval = 80))) |>
-  
+sa1_all_index <- sa1_all %>%
   # LEISURE
-  mutate(gym1 = minmaxNORM(-Winsorize(log(dist_gym+0.1), minval=5, maxval=10))) |> #checked
-  mutate(sport1 = minmaxNORM(-Winsorize((sportBC), minval=0, maxval=60))) |> #checked 
+  winsorize_column("dist_gym", max_perc) |> 
+  winsorize_column("dist_sport", max_perc) |> 
+  winsorize_column("dist_cinema", max_perc) |> 
+  winsorize_column("dist_theatre", max_perc) |> 
+  winsorize_column("dist_library", max_perc) |> 
+  winsorize_column("dist_museum", max_perc) |> 
+  winsorize_column("dist_gallery", max_perc) |> 
+  # TRANSPORTATION
+  winsorize_column("dist_stations", max_perc) |> 
+  winsorize_column("dist_busstopsfreq", max_perc) |> 
+  winsorize_column("dist_ev_charge", max_perc) |> 
+  winsorize_column("streetconn", max_perc) |> 
+  # ESSENTIAL AMENITIES
+  winsorize_column("dist_conveniencestore", max_perc) |> 
+  winsorize_column("dist_supermarket", max_perc) |> 
+  # HOUSING
+  winsorize_column("medianRent", max_perc) |> 
+  winsorize_column("dampness", max_perc) |> 
+  # ETHNIC DIVERSITY
+  winsorize_column("dist_marae", max_perc) |> 
+  # MEDICAL
+  winsorize_column("dist_chemist", max_perc) |> 
+  winsorize_column("dist_dentist", max_perc) |> 
+  winsorize_column("dist_healthcentre", max_perc) |> 
+  winsorize_column("dist_hospital", max_perc) |> 
+  # EDUCATION
+  winsorize_column("dist_childcare", max_perc) |> 
+  winsorize_column("dist_primary", max_perc) |> 
+  winsorize_column("dist_secondary", max_perc) |> 
+  # FOOD OUTLETS
+  winsorize_column("dist_cafe", max_perc) |> 
+  winsorize_column("dist_restaurant", max_perc) |> 
+  winsorize_column("dist_pub", max_perc) |> 
+  winsorize_column("dist_bbq", max_perc) |> 
+  # GREEN SPACE
+  winsorize_column("dist_bigpark", max_perc) |> 
+  winsorize_column("dist_beach", max_perc)
+
+##### Custom Transformation of each variable #####
+sa1_all_index <- sa1_all_index |> 
+  mutate(gym1 = minmaxNORM(dist_gym)) |>
+  mutate(sport1 = minmaxNORM(dist_sport)) |>
   
-  mutate(cinema1 = minmaxNORM(-Winsorize(log(dist_cinema), minval=6, maxval=max(log(dist_cinema))))) |> #checked
-  mutate(theatre1 = minmaxNORM(-Winsorize(dist_theatre, minval=0, maxval=11000))) |> #checked 
-  mutate(library1 = minmaxNORM(-Winsorize(log(dist_library), minval=5.3, maxval=max(log(dist_library))))) |> #checked 
-  mutate(museum1 = minmaxNORM(-Winsorize(dist_museum, minval=0, maxval=18000))) |> #checked 
-  mutate(gallery1 = minmaxNORM(-Winsorize(log(dist_gallery), minval=6, maxval=max(log(dist_gallery))))) |> #checked
-  
-  mutate(leisureart1 = minmaxNORM(cinema1+theatre1+library1+museum1+gallery1/5)) |>
-  mutate(leisuresport1 = minmaxNORM(gym1+sport1/2)) |>
+  mutate(cinema1 = minmaxNORM(dist_cinema)) |>
+  mutate(theatre1 = minmaxNORM(dist_theatre)) |> #checked 
+  mutate(library1 = minmaxNORM(dist_library)) |> #checked 
+  mutate(museum1 = minmaxNORM(dist_museum)) |> #checked 
+  mutate(gallery1 = minmaxNORM(dist_gallery)) |> #checked
+  # LEISURE
+  mutate(leisuresport1 = minmaxNORM(-(gym1+sport1))) |> #checked
+  mutate(leisureart1 = minmaxNORM(Winsorize(minmaxNORM(-(cinema1+theatre1+library1+museum1+gallery1)),minval=3, maxval=10))) |> #checked
   
   # TRANSPORTATION
-  mutate(station1 = minmaxNORM(-Winsorize(log(dist_stations), minval=5, maxval=11))) |> #checked
-  mutate(freqbusstop1 = minmaxNORM(-Winsorize(dist_busstopsfreq, minval=0, maxval= 2000))) |> #checked
-  mutate(bikeability1 = minmaxNORM(Winsorize(bikeability,maxval=0.04))) |> #checked
-  mutate(strconnectivity1 = minmaxNORM(Winsorize(streetconn, minval=0, maxval=15))) |> #checked
-  #mutate(carInfrastructure1 = minmaxNORM((evch1 + petrol1)/18)) |> #checked
-  mutate(evch1 = minmaxNORM(-(evchBC))) |>
+  mutate(station1 = minmaxNORM(-dist_stations)) |> #checked
+  mutate(freqbusstop1 = minmaxNORM(-dist_busstopsfreq)) |> #checked
+  mutate(bikeability1 = minmaxNORM(bikeability)) |> #checked
+  mutate(strconnectivity1 = minmaxNORM(streetconn)) |> #checked
+  mutate(evch1 = minmaxNORM(-dist_ev_charge)) |> 
   
   # ESSENTIAL AMENITIES
-  mutate(convstor1 = minmaxNORM(-Winsorize(convstoreBC, maxval=45,minval=-1))) |>
-  mutate(supermarket1 = minmaxNORM(-Winsorize(log(dist_supermarket+0.1), minval=4.5, maxval=10))) |> #checked 
-  #mutate(dwelldensity1 = minmaxNORM(dwelldensity_transf_LM)) |> #checked
-  
+  mutate(convstor1 = minmaxNORM(-dist_conveniencestore)) |>
+  mutate(supermarket1 = minmaxNORM(-dist_supermarket)) |> 
   # HOUSING
-  mutate(affordability1 = minmaxNORM(-Winsorize(rentBC, minval=0, maxval=2500))) |> #checked
-  mutate(damp1 = minmaxNORM(-Winsorize(dampness, maxval = 0.4, minval = 0))) |> #checked
-  
+  mutate(affordability1 = minmaxNORM(-medianRent)) |> #checked
+  mutate(damp1 = minmaxNORM(-dampness)) |> #checked
   # SAFETY
   mutate(alcohol1 = minmaxNORM(-alcoprohibited)) |> #checked
   mutate(crime1 = minmaxNORM(-Winsorize(log(crimerisk+0.00000001), maxval=10,minval=-11))) |> #checked
@@ -200,28 +171,28 @@ sa1_all_index <- sa1_all |>
   
   # ETHNIC DIVERSITY
   mutate(diversity1 = minmaxNORM(shannon)) |> #checked
-  mutate(marae1 = minmaxNORM(-Winsorize(dist_marae, minval=0, maxval=10000))) |> #checked
+  mutate(marae1 = minmaxNORM(-dist_marae)) |>
   
   # MEDICAL
-  mutate(chemist1 = minmaxNORM(-Winsorize(log(dist_chemist), minval=6.2, maxval=10))) |> #checked
-  mutate(dentist1 = minmaxNORM(-Winsorize(log(dist_dentist), minval=4.8, maxval=9))) |> #checked 
-  mutate(healthcr1 = minmaxNORM(-Winsorize(healthcBC, minval=0, maxval = 58))) |> #checked 
-  mutate(hospital1 = minmaxNORM(-Winsorize(dist_hospital,minval=0, maxval=11000))) |> #checked 
+  mutate(chemist1 = minmaxNORM(-dist_chemist)) |> 
+  mutate(dentist1 = minmaxNORM(-dist_dentist)) |> 
+  mutate(healthcr1 = minmaxNORM(-dist_healthcentre)) |> 
+  mutate(hospital1 = minmaxNORM(-dist_hospital)) |>
   
   # EDUCATION
-  mutate(childcare1 = minmaxNORM(-Winsorize(childcareBC, minval=4.5, maxval = 12))) |> #checked 
-  mutate(primary1 = minmaxNORM(-Winsorize((dist_primary), minval=200, maxval=2000))) |> #checked
-  mutate(secondary1 = minmaxNORM(-secondaryBC)) |> #checked 
+  mutate(childcare1 = minmaxNORM(-dist_childcare)) |> 
+  mutate(primary1 = minmaxNORM(-dist_primary)) |>
+  mutate(secondary1 = minmaxNORM(-dist_secondary)) |> 
   
   # FOOD OUTLETS
-  mutate(cafe1 = minmaxNORM(-Winsorize(dist_cafe, minval=0, maxval=3000))) |> #checked
-  mutate(restaurant1 = minmaxNORM(-Winsorize(dist_restaurant, minval=0, maxval=4000))) |> #checked
-  mutate(pub1 = minmaxNORM(-pubBC)) |> #checked
-  mutate(bbq1 = minmaxNORM(-Winsorize(log(dist_bbq+0.1), minval=5.5, maxval=10))) |> #checked
+  mutate(cafe1 = minmaxNORM(-dist_cafe)) |> 
+  mutate(restaurant1 = minmaxNORM(-dist_restaurant)) |> 
+  mutate(pub1 = minmaxNORM(-dist_pub)) |> 
+  mutate(bbq1 = minmaxNORM(-dist_bbq)) |>
   
   # GREEN SPACE
-  mutate(park1 = minmaxNORM(-Winsorize(dist_bigpark, minval=0, maxval=1500))) |> #checked
-  mutate(beach1 = minmaxNORM(-Winsorize(dist_beach, minval=0, maxval=10000))) #checked
+  mutate(park1 = minmaxNORM(-dist_bigpark)) |>
+  mutate(beach1 = minmaxNORM(-dist_beach))
 
 ##### Final Index Construction ####
 # show column index
@@ -232,50 +203,100 @@ for (i in seq_along(column_names)) {
 }
 
 # KULI aggregation
-sa1_all_index$kuli_geomAgg <- minmaxNORM0_1(apply(sa1_all_index[,60:88], 1, FUN = a_gmean))
-sa1_all_index$kuli_MPIAgg <- minmaxNORM0_1(ci_mpi(sa1_all_index[,60:88],penalty="POS")$ci_mpi_est)
+sa1_all_index$auli_geomAgg <- minmaxNORM(apply(sa1_all_index[,50:78], 1, FUN = a_gmean))
+sa1_all_index$auli_MPIAgg <- minmaxNORM(ci_mpi(sa1_all_index[,50:78],penalty="POS")$ci_mpi_est)
+#sa1_all_index$auli_MPIAgg <- Winsorize(sa1_all_index$kuli_MPIAgg, minval=0.1, maxval=max(sa1_all_index$kuli_MPIAgg))
+#sa1_all_index |> ggplot() + geom_histogram(aes(c(kuli_MPIAgg)),bins=100)
 
 # rejoin with geometry
 sa1_boundry <- st_read("data/sa1_auckland_waiheke_urban.gpkg") |> st_transform(27291) #transforming to the same coordinate system
 index_sa1g <- left_join(sa1_boundry, sa1_all_index, by = c("SA12018_V1_00"="SA12018_V1_00"))
 #preview kuli
 tm_shape(index_sa1g) +
-  tm_polygons(col = c("kuli_MPIAgg","kuli_geomAgg"),
-              palette = "-RdBu", style = "jenks", lwd=0,n =8)
-index_sa1g |> ggplot() + geom_histogram(aes(c(kuli_MPIAgg)),bins=100)
+  tm_polygons(col = c("auli_MPIAgg","auli_geomAgg"),
+              palette = "Reds", style = "jenks", lwd=0,n=7)
 
 # save the KULI
-kuli <- index_sa1g[,c(1,60:88,90)]
-st_write(kuli, "data/sa1_kuli.gpkg")
+auli <- index_sa1g[,c(1,50:78,80)]
+st_write(auli, "data/sa1_auli.gpkg")
+
 # save for webmap
-kuli <- st_transform(kuli,3857)
-st_write(kuli, "web-map/sa1_kuli.geojson")
+auli_web <- st_transform(auli,4326) |> 
+  dplyr::select(-c(SA12018_V1_00))
+colnames(auli_web) <- c("LeisureSport","LeisureArt","TrainStation","BusStop",
+                             "Bikeability","StreetConnectivity","EVcharger",
+                             "ConvenienceStore","Supermarket","Affordability",
+                             "Dampness","AlcoholEnvs","Crime","RoadSafety",
+                             "Diversity","Marae",
+                             "Chemist","Dentist","HealthCentre","Hospital",
+                             "Childcare","PrimarySchool","SecondarySchool","Cafe",
+                             "Restaurant","Pub","BBQ","Park","Beach","AULI","geom")
+auli_web <- st_simplify(auli_web, preserveTopology = FALSE, dTolerance = 10)
+st_write(auli_web, "web-map/sa1_auli.geojson")
 
-# Interpolate to SA2 for web-map
-sa2 = st_read('data/geographic/sa2.gpkg', quiet = T) |>
-  st_transform(27291) |> select(SA22023_V1_00)
-sa2agg <- st_interpolate_aw(kuli, sa2, extensive = F)
-summary(sa2agg)
-tm_shape(sa2agg) + 
-  tm_polygons("kuli_geomAgg", palette = "YlGnBu", style="kmeans",
-              lwd=.1) + tm_layout(frame = F)
-sa2agg <- st_transform(sa2agg, 4326)
-st_write(sa2agg, "data/geographic/sa2agg.geojson")
+#### AULI Visualisation ####
+### MAP
+bckgd <- st_read('data/land_auck.gpkg', quiet = T) # transform to OSGB projection
+aulimap <- tm_shape(auli) +
+  tm_polygons("grey",  lwd=0.05) +
+  tm_shape(bckgd) + tm_polygons(col="#e2e2e2", lwd=0.1) +
+  tm_shape(auli, bbox=bbox) + 
+  tm_polygons(col = "auli_MPIAgg",
+              palette = rev(hcl.colors(7, "YlGnBu")),
+              title="AULI",
+              legend.hist = TRUE,
+              lwd = 0, style="jenks", n=7) +
+  tm_layout(
+    #main.title = "Auckland Urban Liveability Index", main.title.fontfamily = "serif",
+    frame = FALSE, legend.title.fontfamily = "serif", main.title.size = 1.7,
+    legend.outside = FALSE,
+    legend.text.size = 0.00001,
+    legend.hist.size = 0.6,
+    legend.hist.width = 0.6,legend.hist.height = 0.2,
+    bg.color="#edfbff", main.title.position = c('center', 'top')) +
+  tm_compass(type = "4star", size = 1, position = c("left", "top"))
+tmap_save(aulimap, filename = "outputs/auli_map.png", width = 8, height = 8)
 
- #### EDA2 ####
+tm_shape(auli) + 
+  tm_polygons(col = "auli_MPIAgg",
+              palette = rev(hcl.colors(8, "YlGnBu")),
+              legend.hist = TRUE,
+              lwd = 0, style="jenks", n=7) +
+  tm_layout(bg.color="#edfbff", legend.text.size = 0.00001)
+#### Clustering ####
+auli_features <- st_drop_geometry(auli[, 2:30])
+k_values <- 1:5
+wss <- numeric(length(k_values))
+
+for (i in k_values) {
+  kmeans_result <- kmeans(auli_features, centers = i, nstart = 10)
+  wss[i] <- kmeans_result$tot.withinss
+}
+
+# Plot the elbow plot
+plot(k_values, wss, type = "b", pch = 19, frame = FALSE, 
+     xlab = "Number of Clusters (k)", ylab = "Within-cluster Sum of Squares (WSS)",
+     main = "Elbow Plot for Optimal k")
+
+kmeans_result <- kmeans(auli_features, centers = 2, nstart = 10)
+auli$cluster <- kmeans_result$cluster
+tm_shape(auli) +
+  tm_polygons(col = "cluster", lwd=0, palette="Set2")
+
+#### Indicator details for Appendix ####
 # Evaluate the transformation method of each indicator
 densityplot = function(xpre, xpost, varN) {
   xpre <- deparse(substitute(xpre))
   xpost <- deparse(substitute(xpost))
   varN <- toString(varN)
   Data <- c("Raw","Transformed")
-  Skewness <- c(round(skewness(sa1_all_index[[xpre]]),3), round(skewness(sa1_all_index[[xpost]]),3))
-  Kurtosis <- c(round(kurtosis(sa1_all_index[[xpre]]),3), round(kurtosis(sa1_all_index[[xpost]]),3))
+  Skewness <- c(round(skewness(sa1_all[[xpre]]),3), round(skewness(sa1_all_index[[xpost]]),3))
+  Kurtosis <- c(round(kurtosis(sa1_all[[xpre]]),3), round(kurtosis(sa1_all_index[[xpost]]),3))
   df <- data.frame(Data, Skewness, Kurtosis)
   print(df)
   
   pre_out = ggplot() +
-    geom_histogram(aes(sa1_all_index[[xpre]]), bins=70) + theme_publish() +
+    geom_histogram(aes(sa1_all[[xpre]]), bins=70) + theme_publish() +
     ggtitle("Raw") +
     theme(plot.title = element_text(hjust = 0.5),
           axis.title.x=element_blank(),
@@ -303,6 +324,7 @@ densityplot = function(xpre, xpost, varN) {
   dev.off()
   grid.arrange(pre_out, post_out, ncol=2)
 }
+
 # TRANSPORTATION
 densityplot(dist_stations, station1, "Train Station")
 densityplot(dist_busstopsfreq,freqbusstop1, "Frequent Buses")
@@ -348,8 +370,6 @@ densityplot(dist_bbq, bbq1, "BBQ")
 densityplot(dist_bigpark, bigpark1, "Big Park")
 densityplot(dist_beach, beach1, "Beach")
 
-
-
 #densityplot(dist_cinema,cinema1, "Cinema")
 #densityplot(dist_galleries, gallery1,"Gallery")
 #densityplot(dist_libraries,library1, "Library")
@@ -358,14 +378,14 @@ densityplot(dist_beach, beach1, "Beach")
 #densityplot(dist_sport, sport1, "Sport Facilities")
 #densityplot(dist_gym, gym1, "Gym")
 
-df_indicators <- st_drop_geometry(kuli[,2:31])
-colnames(df_indicators) <- c("LeisureArt","LeisureSport","TrainStation","Bus Stop",
+df_indicators <- st_drop_geometry(auli[,2:31])
+colnames(df_indicators) <- c("LeisureArt","LeisureSport","TrainStation","BusStop",
                              "Bikeability","StreetConnectivity","EVcharger",
                              "ConvenienceStore","Supermarket","Affordability",
                              "Dampness","AlcoholEnvs","Crime","RoadSafety",
                              "Diversity","Marae",
                              "Chemist","Dentist","HealthCentre","Hospital",
-                             "Childcare","Primary","Secondary","Cafe",
+                             "Childcare","PrimarySchool","SecondarySchool","Cafe",
                              "Restaurant","Pub","BBQ","Park","Beach","KULI")
 # Cronbach Alpha #
 cronbach.alpha(df_indicators)
@@ -373,20 +393,17 @@ cronbach.alpha(df_indicators)
 # Correlations #
 cor <- cor(x = df_indicators, y = df_indicators, use="complete.obs", method="pearson")
 stargazer(cor, type = "text")
-corrplot(cor, tl.srt = 45, type = "lower", method = "ellipse",
+corrplot(cor, tl.srt = 60, type = "lower", method = "ellipse",
          order = "FPC", tl.cex = 0.8,
         tl.col = "black", diag = T, cl.cex=0.7,cl.offset=0.3)
 
-round(cor(x = df_indicators$KULI, y = df_indicators$Affordability),3)
-plot(x = df_indicators$KULI, y = df_indicators$Affordabilit)
-
-#### Mapping indicators ####
+##### Mapping all indicators #####
 border <- st_read("data/sa1_auckland_waiheke_urban.gpkg") |> st_transform(27291)
 
 indicators_sa1g <- left_join(sa1_polys, sa1_all_index, by = c("SA12018_V1_00"="SA12018_V1_00"))
 indic_map_func = function(var_name, titl) {
   mapout = tm_shape(border) + tm_polygons(col="black", lwd=1)+
-    tm_shape(indicators_sa1g) +
+    tm_shape(auli) +
     tm_polygons(var_name, lwd=0,style = "kmeans", title = "Indicator",
                 title.fontfamily="serif", palette="Greys", legend.show = FALSE) +
     tm_style("col_blind") +
@@ -406,7 +423,6 @@ stcon = indic_map_func("strconnectivity1", "Street Connectivity")
 # LEISURE
 lart <- indic_map_func("leisureart1", "Leisure Art")
 lsport <- indic_map_func("leisuresport1", "Leisure Sport")
-
 
 # ESSENTIAL AMENITIES
 convs = indic_map_func("convstor1", "Convenience Store")
@@ -446,136 +462,15 @@ bbq <- indic_map_func("bbq1", "BBQ")
 bigp <- indic_map_func("park1", "Big Park")
 beach <- indic_map_func("beach1", "Beach")
 
-# emer <- indic_map_func("emergency1", "Emergency Service")
-# cinem=indic_map_func("cinema1", "Cinema")
-# gall = indic_map_func("gallery1","Gallery")
-# libr = indic_map_func("library1", "Library")
-# museum = indic_map_func("museum1", "Museum")
-# theat = indic_map_func("theatre1", "Theatre")
-
-png(file="outputs/mapsindics_full.png",width=4000, height=6400)
+png(file="outputs/mapsindics_full.png",width=4000, height=5000)
 
 tmap_arrange(station,freqb,bikeab,evch,stcon,
              convs,superm,afford,damp,
              lart, lsport,
-             afford,damp,
              alco,crime,crash,
              marae,divers,
              chemi,denti,health,hospi,childc,prim,secon,
              cafe, resta, pub, bbq,
              bigp,beach,
-             nrow=7, ncol=5)
+             nrow=6, ncol=5)
 dev.off()
-
-#### Other #### 
-# Other aggergation methods
-sa1_all_index <- sa1_all_index |> 
-  # KULI aggregation - without subindicators
-  mutate(kuli_addAgg = convstor1 + supermarket1 + strconnectivity1 + dwelldensity1 +
-           chemist1 + dentist1 + healthcr1 + hospital1 +
-           secondary1 + primary1 + childcare1 +
-           crime1 + crashes1 + flood1 + alcohol1 + emergency1 +
-           station1 +freqbusstop1 +carInfrastructure1 + bikeability1 + #bustop1
-           diversity1+marae1 +
-           cinema1 + gallery1 + library1 + museum1 + theatre1 + sport1 + gym1 +
-           cafe1 + restaurant1 +  pub1 + bbq1 +
-           bigpark1 + beach1 +
-           affordability1 + damp1) |> 
-  # KULI aggregation - arithmetic average method
-  mutate(kuli_arithAgg = minmaxNORM0_1(kuli_addAgg/37)) |>
-  # KULI aggregation - additive method
-  mutate(kuli_addAgg = minmaxNORM0_1(kuli_addAgg))
-
-
-# SUBINDICATORS
-# second level aggregation - geometric average method
-sa1_all_index$carInfra2_geom <- minmaxNORM(apply(sa1_all_index[,65:66], 1, FUN = a_gmean))
-sa1_all_index$transport2_geom <- minmaxNORM(apply(sa1_all_index[,c(75:77,106)], 1, FUN = a_gmean))
-sa1_all_index$walkability2_geom <- minmaxNORM(apply(sa1_all_index[,c(65:66,88:89,92)], 1, FUN = a_gmean))
-sa1_all_index$medical2_geom <- minmaxNORM(apply(sa1_all_index[,82:85], 1, FUN = a_gmean))
-sa1_all_index$education2_geom <- minmaxNORM(apply(sa1_all_index[,c(86,90:91)], 1, FUN = a_gmean))
-sa1_all_index$safety2_geom <- minmaxNORM(apply(sa1_all_index[,69:72], 1, FUN = a_gmean))
-sa1_all_index$culture2_geom <- minmaxNORM(apply(sa1_all_index[,c(68,76)], 1, FUN = a_gmean))
-sa1_all_index$sport2_geom <- minmaxNORM(apply(sa1_all_index[,c(87,100)], 1, FUN = a_gmean))
-sa1_all_index$leisure2_geom <- minmaxNORM(apply(sa1_all_index[,77:81], 1, FUN = a_gmean))
-sa1_all_index$food2_geom <- minmaxNORM(apply(sa1_all_index[,95:98], 1, FUN = a_gmean))
-sa1_all_index$greenspace2_geom <- minmaxNORM(apply(sa1_all_index[,c(93,94)], 1, FUN = a_gmean))
-sa1_all_index$housing2_geom <- minmaxNORM(apply(sa1_all_index[,c(67,102)], 1, FUN = a_gmean))
-
-sa1_all_index_2level <- sa1_all_index |> 
-  # second level aggregation - additive method
-  mutate(walkability2_add = minmaxNORM(housedens1+convstor1 + supermarket1 + strconnectivity1)) |> 
-  mutate(medical2_add = minmaxNORM(chemist1 + dentist1 + healthcr1 + hospital1)) |> 
-  mutate(education2_add = minmaxNORM(secondary1 + primary1 + childcare1)) |> 
-  mutate(safety2_add = minmaxNORM(crime1 + crashes1 + flood1 + alcohol1 + emergency1)) |> 
-  mutate(transport2_add = minmaxNORM(station1 + bustop1 +freqbusstop1)) |> 
-  mutate(culture2_add = minmaxNORM(diversity1+marae1)) |> 
-  mutate(sport2_add = minmaxNORM(sport1 + gym1)) |> 
-  mutate(leisure2_add = minmaxNORM(cinema1 + gallery1 +  library1 + museum1 + theatre1)) |> 
-  mutate(food2_add = minmaxNORM(cafe1 + restaurant1 +  pub1 + bbq1)) |> 
-  mutate(greenspace2_add = minmaxNORM(bigpark1 + smallpark1 + beach1)) |> 
-  mutate(housing2_add = minmaxNORM(affordability1 + damp1)) |> 
-  mutate(carInfrastructure2_add = minmaxNORM(evch1 + petrol1)) |> 
-  # second level aggregation - arithmetic average method
-  mutate(walkability2_mean = (popdens1 + housedens1 +convstor1 + supermarket1 + strconnectivity1)/45) |> 
-  mutate(medical2_mean = (chemist1 + dentist1 + healthcr1 + hospital1)/36) |> 
-  mutate(education2_mean = (secondary1 + primary1 + childcare1)/27) |> 
-  mutate(safety2_mean = (crime1 + crashes1 + flood1 + alcohol1 + emergency1)/45) |> 
-  mutate(transport2_mean = (station1 + bustop1 +freqbusstop1 + carInfra2_geom)/36) |> 
-  mutate(culture2_mean = (diversity1+marae1)/18) |> 
-  mutate(sport2_mean = (sport1 + gym1)/18) |> 
-  mutate(leisure2_mean = (cinema1 + gallery1 +  library1 + museum1 + theatre1)/45) |> 
-  mutate(food2_mean = (cafe1 + restaurant1 +  pub1 + bbq1)/20) |> 
-  mutate(greenspace2_mean = (bigpark1 + smallpark1 + beach1)/27) |> 
-  mutate(housing2_mean = (affordability1 + damp1)/18) |> 
-  mutate(carInfrastructure2_mean = (evch1 + petrol1)/18) |> 
-  # KULI aggregation - with 2nd level agg - additive method
-  mutate(kuli_add2s_addAgg = minmaxNORM01(carInfrastructure2_add+bikeability1+walkability2_add+
-                                            medical2_add+education2_add+safety2_add +
-                                            transport2_add+culture2_add +sport2_add+
-                                            leisure2_add+ food2_add + greenspace2_add + housing2_add))
-# KULI aggregation - with 2nd level agg(geom) - geometric average method
-#sa1_all_index$kuli_geom2s_geomAgg <- minmaxNORM01(apply(sa1_all_index[,103:114], 1, FUN = a_gmean))
-# KULI aggregation - with 2nd level agg(add) - geometric average method
-#sa1_all_index$kuli_add2s_geomAgg <- minmaxNORM01(apply(sa1_all_index[,c(115:126)], 1, FUN = a_gmean))
-# KULI aggregation - with 2nd level agg(arith) - geometric average method
-#sa1_all_index$kuli_arith2s_geomAgg <- minmaxNORM01(apply(sa1_all_index[,c(127:138)], 1, FUN = a_gmean))
-
-# KULI aggregation -  MPI aggregation method
-kuli_MPI <- ci_mpi(sa1_all_index,c(67:105,117),penalty="POS")
-sa1_all_index$kuli_no2s_MPIAgg <- minmaxNORM01(kuli_MPI$ci_mpi_est)
-#Common maximum value for tranformations
-commonMaxval = 5000
-sa1_all_index_commonmax <- sa1_all |> 
-  mutate(popdens1 = minmaxNORM(Winsorize(log10(popdens), maxval = -2, minval = -2.7))) |>
-  mutate(housedens1 = minmaxNORM(Winsorize(log10(no_households/area), maxval = -2, minval = -4))) |> 
-  mutate(damp1 = minmaxNORM(-dampness)) |>
-  mutate(diversity1 = minmaxNORM(shannon)) |>
-  mutate(crime1 = minmaxNORM(-Winsorize((crime_perarea), maxval = 0.0030, minval = 0))) |> 
-  mutate(crashes1 = minmaxNORM(-Winsorize(crashesperarea, minval=0, maxval = 0.001))) |> 
-  mutate(flood1 = minmaxNORM(-Winsorize(floodprone_prc, minval=0, maxval = 0.5))) |> 
-  mutate(alcohol1 = alcoprohibited) |> 
-  mutate(station1 = minmaxNORM(-Winsorize(dist_stations, maxval = commonMaxval))) |> 
-  mutate(bustop1 = minmaxNORM(-Winsorize(dist_busstops, maxval = commonMaxval))) |> 
-  mutate(freqbusstop1 = minmaxNORM(-Winsorize(dist_busstopsfreq, maxval= commonMaxval))) |> 
-  mutate(marae1 = minmaxNORM(-Winsorize(dist_marae, maxval=commonMaxval))) |> 
-  mutate(cinema1 = minmaxNORM(-Winsorize(dist_cinema, maxval = commonMaxval))) |> 
-  mutate(gallery1 = minmaxNORM(-Winsorize(dist_galleries, maxval = commonMaxval))) |> 
-  mutate(library1 = minmaxNORM(-Winsorize(dist_libraries, maxval = commonMaxval))) |> 
-  mutate(museum1 = minmaxNORM(-Winsorize(dist_museums, maxval = commonMaxval))) |> 
-  mutate(theatre1 = minmaxNORM(-Winsorize(dist_theatre, maxval = commonMaxval))) |> 
-  mutate(chemist1 = minmaxNORM(-Winsorize(dist_chemist, maxval = commonMaxval))) |> 
-  mutate(dentist1 = minmaxNORM(-Winsorize(dist_dentist, maxval = commonMaxval))) |> 
-  mutate(healthcr1 = minmaxNORM(-Winsorize(dist_healthcentre, maxval = commonMaxval))) |> 
-  mutate(hospital1 = minmaxNORM(-Winsorize(dist_hospital, maxval = commonMaxval))) |>
-  mutate(childcare1 = minmaxNORM(-Winsorize(dist_childcare, maxval = commonMaxval))) |> 
-  mutate(sport1 = minmaxNORM(-Winsorize(dist_sport, maxval = commonMaxval))) |>
-  mutate(convstor1 = minmaxNORM(-Winsorize(dist_conveniencestore, maxval = commonMaxval))) |>
-  mutate(supermarket1 = minmaxNORM(-Winsorize(dist_supermarket, maxval = commonMaxval))) |>
-  mutate(secondary1 = minmaxNORM(-Winsorize(dist_secondary, maxval = commonMaxval))) |>
-  mutate(primary1 = minmaxNORM(-Winsorize(dist_primary, maxval = commonMaxval))) |>
-  mutate(petrol1 = minmaxNORM(-Winsorize(dist_petrol, maxval = commonMaxval))) |>
-  mutate(evch1 = minmaxNORM(-Winsorize(dist_evs, maxval = commonMaxval))) |> 
-  mutate(strconnectivity1 = minmaxNORM(Winsorize(str_connectivity, maxval = 0.0003))) |> 
-  mutate(bigpark1 = minmaxNORM(-Winsorize(dist_bigpark, minval=50, maxval = commonMaxval))) |> 
-  mutate(smallpark1 = minmaxNORM(-Winsorize(dist_smallpark, minval=50, maxval = commonMaxval)))

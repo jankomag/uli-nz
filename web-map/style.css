@@ -1,135 +1,194 @@
-html, body {
-    margin: 0;
-    padding: 0;
-    height: 100%;
-    width: 100%;
-}  
-  #map {
-    position: absolute; top: 0; bottom: 0; width: 100%;
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  width: 100%;
 }
-  #sidebar {
-    position: absolute;
-    background: #fff;
-    padding: 20px;
-    margin: 20px;
-    font-family: 'Open Sans', sans-serif;
-    max-width: 280px;
-    border-radius: 3px;
-    border: 1px solid rgba(0, 0, 0, 0.4);
+
+#map {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 100%;
+}
+#sidebar {
+  position: absolute;
+  background: #fff;
+  padding: 20px;
+  margin: 20px;
+  font-family: "Open Sans", sans-serif;
+  max-width: 280px;
+  border-radius: 3px;
+  border: 1px solid rgba(0, 0, 0, 0.4);
 }
 h1 {
-    margin-top: 0px;
-    margin-bottom: 10px;
-    font-family: 'Lato', sans-serif;
+  margin-top: 0px;
+  margin-bottom: 10px;
+  font-family: "Lato", sans-serif;
 }
-p{
-    font-family: 'Lato', sans-serif;
+p {
+  font-family: "Lato", sans-serif;
 }
 #menu {
-    background: #fff;
-    position:relative;
-    align-content: center;
-    /* z-index: 1;
+  background: #fff;
+  position: relative;
+  align-content: center;
+  /* z-index: 1;
     top: 10px;
     right: 20px;
     left: 20px; */
-    border-radius: 3px;
-    width: 240px;
-    border: 0px solid rgba(0, 0, 0, 0.4);
-    font-family: 'Lato', serif;
-    overflow: scroll;
-    max-height: 60vh;
-  }
-
-  #menu a {
-    font-size: 13px;
-    color: #404040;
-    display: block;
-    margin: 0;
-    padding: 0;
-    padding: 10px;
-    text-decoration: none;
-    border-bottom: 0px solid rgba(0, 0, 0, 0.25);
-    text-align: left;
-  }
-  #menu .menu-category h3{
-    text-transform:capitalize;
-    padding-left:0px;
-    font-size:20px;
-    font-family: 'Lato', serif;
-    font-weight:500;
-    padding-top:0px;
-    margin-top:5px;
-    margin-bottom:5px;
-   }   
-/* add a border to the bottom of the last item */
-  #menu a:last-child {
-    border: none;
+  border-radius: 3px;
+  width: 240px;
+  border: 0px solid rgba(0, 0, 0, 0.4);
+  font-family: "Lato", sans-serif;
+  overflow: scroll;
+  max-height: 60vh;
 }
 
-  #menu a:hover {
-    background-color: #f8f8f8;
-    color: #404040;
+#menu a {
+  font-size: 13px;
+  color: #404040;
+  display: block;
+  margin: 0;
+  padding: 0;
+  padding: 10px;
+  text-decoration: none;
+  border-bottom: 0px solid rgba(0, 0, 0, 0.25);
+  text-align: left;
+}
+#menu .menu-category h3 {
+  text-transform: capitalize;
+  padding-left: 0px;
+  font-size: 20px;
+  font-weight: 500;
+  padding-top: 0px;
+  margin-top: 5px;
+  margin-bottom: 5px;
+}
+
+#menu a:last-child {
+  border: none;
+}
+
+#menu a:hover {
+  background-color: #f8f8f8;
+  color: #404040;
 }
 
 #menu a.active {
-    background-color: #3887be;
-    color: #ffffff;
+  background-color: #3887be;
+  color: #ffffff;
 }
 
 #menu a.active:hover {
-    background: #3074a4;
+  background: #3074a4;
+}
+
+#legend {
+  font-family: Arial, sans-serif;
+  background-color: #fff;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 5px;
+}
+
+.legend-color {
+  width: 20px;
+  height: 20px;
+  margin-right: 5px;
+  border-radius: 50%;
+}
+
+.legend-title {
+  font-weight: bold;
+  margin-bottom: 5px;
 }
 
 .mapboxgl-popup {
-    max-width: 400px;
-    font: 12px/20px 'Helvetica Neue', Arial, Helvetica, sans-serif;
-}
+  max-width: 400px;
+  font: 12px/20px "Helvetica Neue", Arial, Helvetica, sans-serif;
 
-.menu-category.transport .title-container {
-  background-color: #ffd6cc; /* light orange */
-  padding: 5px;
-}
+  #legend {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background-color: #fff;
+    padding: 10px;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+    z-index: 1;
+  }
 
-.menu-category.walkability .title-container {
-  background-color: #d6e9c6; /* light green */
-  padding: 5px;
-}
+  #legend h2 {
+    margin-top: 0;
+    margin-bottom: 10px;
+  }
 
-.menu-category.medical .title-container {
-  background-color: #c9daf8; /* light blue */
-  padding: 5px;
-}
+  .legend-item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 5px;
+  }
 
-.menu-category.KULI .title-container {
-  background-color: #e8ffbd; /* light blue */
-  padding: 5px;
-}
-.menu-category.greeninfrastructure .title-container {
-  background-color: #9dfb98; /* light blue */
-  padding: 5px;
-}
+  .color-box {
+    width: 20px;
+    height: 20px;
+    margin-right: 10px;
+  }
 
-.menu-category.leisure .title-container {
-  background-color: #f8c9df; /* light blue */
-  padding: 5px;
-}
+  .legend-label {
+    font-size: 14px;
+  }
 
-.menu-category.housing .title-container {
-  background-color: #b2bccd; /* light blue */
-}
+  .menu-category.transport .title-container {
+    background-color: #ffd6cc; /* light orange */
+  }
 
-.menu-category.safety .title-container {
-  background-color: #aea9ec; /* light blue */
-}
+  .menu-category.walkability .title-container {
+    background-color: #d6e9c6; /* light green */
+  }
 
-.menu-category.culture .title-container {
-  background-color: #eed6ac; /* light blue */
-}
-.menu-category.education .title-container {
-  background-color: #daf2ac; /* light blue */
-}
-.menu-category.food .title-container {
-  background-color: #f2bba1; /* light blue */
-}
+  .menu-category.medical .title-container {
+    background-color: #c9daf8; /* light blue */
+  }
 
+  .menu-category.KULI .title-container {
+    background-color: #e8ffbd; /* light blue */
+  }
+  .menu-category.greeninfrastructure .title-container {
+    background-color: #9dfb98; /* light blue */
+  }
+
+  .menu-category.leisure .title-container {
+    background-color: #f8c9df; /* light blue */
+  }
+
+  .menu-category.housing .title-container {
+    background-color: #b2bccd; /* light blue */
+  }
+
+  .menu-category.safety .title-container {
+    background-color: #aea9ec; /* light blue */
+  }
+
+  .menu-category.culture .title-container {
+    background-color: #eed6ac; /* light blue */
+  }
+  .menu-category.education .title-container {
+    background-color: #daf2ac; /* light blue */
+  }
+  .menu-category.food .title-container {
+    background-color: #f2bba1; /* light blue */
+  }
+}

@@ -129,39 +129,23 @@ tm_shape(sa1) +
   tm_fill("dist_cinema", title = "Distance") +
   tm_layout(legend.position = c("left", "bottom"))
 
-smolpolys <- head(sa1_polys,10)
-# Testing Density based measure
-osmdata <- opq(bbox = bbox) %>%
-  add_osm_feature(key = "highway", value = c("primary", "secondary", "tertiary", "residential", 
-                                             "path", "footway", "unclassified", "living_street", "pedestrian")) %>%
-  # And then pipe this into our osmdata_sf object
-  osmdata_sf()
-walkingosm_edges <- osmdata$osm_lines[, c("osm_id", "name", "highway", "maxspeed", 
-                                           "oneway")]
-graph <- weight_streetnet(walkingosm_edges, wt_profile = "foot", type_col="highway")
-smolpolys_to_bigpark_calc <- dodgr_distances(graph, from = st_coordinates(smolpolys), to = st_coordinates(bigpark), 
-                                  shortest = TRUE, pairwise = FALSE, quiet = FALSE)
-
-smolpolys$park_within_400m <- count_row_if(lt(401), smolpolys_to_bigpark_calc)
-
-
 #### Driving distance calculations ####
 edges <- st_read("data/networks/auckland_waiheke_network_drive.gpkg", layer='edges') |> 
-  st_transform(27291) |> 
+  st_transform(4326) |> 
   subset(select = -c(u,v,key,osmid, lanes, name, highway, oneway, reversed, from, to,ref, service, access, bridge,
-                     width, junction, tunnel)) |> st_transform(27291)
+                     width, junction, tunnel)) |> st_transform(4326)
 #get network
 network <- as_sfnetwork(edges, directed = FALSE) |> 
-  st_transform(27291) |> 
+  st_transform(4326) |> 
   activate("edges")
 
-emergency <- st_read("data/emergencies_auck.gpkg") |> st_transform(4326)
 ev_charge <- st_read("data/EV_NZ_charging_stations.geojson") |> st_transform(4326)
 #crash <- st_read("uli-nz/data/Crash_Analysis_System_(CAS)_data.geojson") |> st_transform(4326)
+#emergency <- st_read("data/emergencies_auck.gpkg") |> st_transform(4326)
 
-sa1 <- get_distance(emergency)
+#sa1 <- get_distance(emergency)
 sa1 <- get_distance(ev_charge)
-sa1 <- get_distance(petrol)
+#sa1 <- get_distance(petrol)
 
 #### Road Crash Risk ####
 # get polygon data
@@ -244,3 +228,13 @@ tm_shape(sa1_bikeability)+tm_fill("bikeability", style="jenks")
 sa1 <- left_join(sa1, sa1_bikeability, by="SA12018_V1_00")
 
 st_write(sa1_bikeability, "data/sa1_bikeability.gpkg")
+
+
+#CBD distance
+#coords <- data.frame(lon = 174.76465799244477, lat = -36.85051024769627)
+#cbd_point <- st_as_sf(coords, coords = c("lon", "lat"), crs = 4326) |> 
+#  st_transform(4326)
+#sa1 <- get_distance(cbd_point)
+#sa1[which(is.infinite(sa1$dist_cbd_point.2),), "dist_cbd_point.2"] <- 36000
+#summary(sa1)
+#st_write(sa1, "data/sa1_cbddist.gpkg")

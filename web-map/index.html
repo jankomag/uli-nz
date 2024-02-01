@@ -15,12 +15,43 @@
     <script src="https://api.mapbox.com/mapbox-gl-js/v2.13.0/mapbox-gl.js"></script>
   </head>
   <body>
+
     <div id="map"></div>
+    <!-- <div id="legend" class="map-overlay"></div> -->
+
     <div id="sidebar">
-      <h1>Kiwi Urban Liveability Index</h1>
+      <h1>Auckland Urban Liveability Index</h1>
       <p>Select indicator to view:</p>
       <nav id="menu"></nav>
     </div>
-    <script src="mapbox.js"></script>
+    <div id="legend">
+    <div class="legend-title">Legend</div>
+    <div class="legend-item">
+        <div class="legend-color" style="background-color: #fff5eb;"></div>
+        <div>1 - 2.9 </div>
+    </div>
+    <div class="legend-item">
+        <div class="legend-color" style="background-color: #fee6ce;"></div>
+        <div>2.9 - 4.5 </div>
+    </div>
+    <div class="legend-item">
+        <div class="legend-color" style="background-color: #fdd0a2;"></div>
+        <div>4.5 - 6.5 </div>
+    </div>
+    <div class="legend-item">
+        <div class="legend-color" style="background-color: #f16913;"></div>
+        <div>6.5 - 7.2 </div>
+    </div>
+    <div class="legend-item">
+        <div class="legend-color" style="background-color: #d94801;"></div>
+        <div>7.2 - 8.5 </div>
+    </div>
+    <div class="legend-item">
+        <div class="legend-color" style="background-color: #8c2d04;"></div>
+        <div>8.5 - 10 </div>
+    </div>
+</div>
+
+    <script src="auli_mapbox.js"></script>
   </body>
 </html>
