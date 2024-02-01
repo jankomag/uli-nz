@@ -1,5 +1,4 @@
-# The Auckland Urban Liveability Index (AULI) 
-### 🏙 🏡 🚃 🇳🇿
+# The Auckland Urban Liveability Index (AULI) 🏙 🏡 🚃 🇳🇿
 
 ## Analysing intra-urban patterns of urban liveability in Auckland with a spatial composite indicator
 
