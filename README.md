@@ -10,7 +10,7 @@ Interactive web map of the KULI and its components, created with Mapbox GL JS, c
 
 -   [network_generation.ipynb](https://github.com/jankomag/uli-nz/blob/master/network_generation.ipynb) : python notebook to generate walking, biking and driving networks for the study area using the OSMnx package; getting bus freqency data from GTFS for Auckland transport
 
--   [network-analysis.R](https://github.com/jankomag/uli-nz/blob/master/network-analysis.R): R script for calculating walking or driving distances to nearest of each of the amenities
+-   [network_analysis.R](https://github.com/jankomag/uli-nz/blob/master/network-analysis.R): R script for calculating walking or driving distances to nearest of each of the amenities
 
 -   [data_prep.R](https://github.com/jankomag/uli-nz/blob/master/data_prep.R): gathering data for the index construction; dealing with missing values and cleaning the data
 
@@ -21,7 +21,8 @@ Interactive web map of the KULI and its components, created with Mapbox GL JS, c
 -   The folder [web-map](https://github.com/jankomag/uli-nz/tree/master/web-map) contains the script for the web map
 
 ### Dataset
-The AULI dataset will be available for download from...
+pending.
+
 
 
 Jan Magnuszewski, University of Leeds
