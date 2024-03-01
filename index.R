@@ -62,9 +62,6 @@ plot_grid(plotlist = my_plots)
 minmaxNORM <- function(x) {
   return (((x - min(x))) / (max(x) - min(x))*(10-1)+1)
 } #1-10
-minmaxNORM0_1 <- function(x) {
-  return (((x - min(x))) / (max(x) - min(x))*(1-0)+0)
-} #0-1
 #Geometric Mean
 a_gmean <- function(x, w = NULL){
   if(is.null(w)){
@@ -95,6 +92,9 @@ winsorize_column <- function(data, column_name, percentage) {
 }
 max_perc <- 0.1
 
+# adjust street connectivity
+sa1_all$streetconn[sa1_all$streetconn == 0] <- min(unique(sa1_all$streetconn)[unique(sa1_all$streetconn) != min(unique(sa1_all$streetconn))])
+
 sa1_all_index <- sa1_all %>%
   # LEISURE
   winsorize_column("dist_gym", max_perc) |> 
@@ -108,7 +108,6 @@ sa1_all_index <- sa1_all %>%
   winsorize_column("dist_stations", max_perc) |> 
   winsorize_column("dist_busstopsfreq", max_perc) |> 
   winsorize_column("dist_ev_charge", max_perc) |> 
-  winsorize_column("streetconn", max_perc) |> 
   # ESSENTIAL AMENITIES
   winsorize_column("dist_conveniencestore", max_perc) |> 
   winsorize_column("dist_supermarket", max_perc) |> 
@@ -152,8 +151,8 @@ sa1_all_index <- sa1_all_index |>
   # TRANSPORTATION
   mutate(station1 = minmaxNORM(-dist_stations)) |> #checked
   mutate(freqbusstop1 = minmaxNORM(-dist_busstopsfreq)) |> #checked
-  mutate(bikeability1 = minmaxNORM(bikeability)) |> #checked
-  mutate(strconnectivity1 = minmaxNORM(streetconn)) |> #checked
+  mutate(bikeability1 = minmaxNORM(log(bikeability+0.001))) |> #checked
+  mutate(strconnectivity1 = minmaxNORM(log(streetconn))) |> #checked
   mutate(evch1 = minmaxNORM(-dist_ev_charge)) |> 
   
   # ESSENTIAL AMENITIES
@@ -257,12 +256,6 @@ aulimap <- tm_shape(auli) +
   tm_compass(type = "4star", size = 1, position = c("left", "top"))
 tmap_save(aulimap, filename = "outputs/auli_map.png", width = 8, height = 8)
 
-tm_shape(auli) + 
-  tm_polygons(col = "auli_MPIAgg",
-              palette = rev(hcl.colors(8, "YlGnBu")),
-              legend.hist = TRUE,
-              lwd = 0, style="jenks", n=7) +
-  tm_layout(bg.color="#edfbff", legend.text.size = 0.00001)
 #### Clustering ####
 auli_features <- st_drop_geometry(auli[, 2:30])
 k_values <- 1:5
@@ -296,7 +289,7 @@ densityplot = function(xpre, xpost, varN) {
   print(df)
   
   pre_out = ggplot() +
-    geom_histogram(aes(sa1_all[[xpre]]), bins=70) + theme_publish() +
+    geom_histogram(aes(sa1_all[[xpre]]), bins=20) + theme_publish() +
     ggtitle("Raw") +
     theme(plot.title = element_text(hjust = 0.5),
           axis.title.x=element_blank(),
@@ -306,7 +299,7 @@ densityplot = function(xpre, xpost, varN) {
           axis.text.y=element_blank(),
           axis.ticks.y=element_blank()) #ylab("Density") + xlab(varN) + xlab(varN)
   post_out = ggplot() +
-    geom_histogram(aes(sa1_all_index[[xpost]]), bins=70) + theme_publish() +
+    geom_histogram(aes(sa1_all_index[[xpost]]), bins=20) + theme_publish() +
     ggtitle("Transformed") +
     theme(plot.title = element_text(hjust = 0.5),
           axis.title.x=element_blank(),
@@ -328,9 +321,9 @@ densityplot = function(xpre, xpost, varN) {
 # TRANSPORTATION
 densityplot(dist_stations, station1, "Train Station")
 densityplot(dist_busstopsfreq,freqbusstop1, "Frequent Buses")
-densityplot(bikeperarea, bikeability1, "Bikeability")
+densityplot(bikeability, bikeability1, "Bikeability")
 densityplot(streetconn, strconnectivity1, "Street Connectivity")
-densityplot(evch1, dist_ev, "EV Chargers")
+densityplot(dist_ev_charge, evch1, "EV Chargers")
 
 # ESSENTIAL AMENITIES
 densityplot(dist_conveniencestore, convstor1, "Convenience Store")
@@ -340,9 +333,17 @@ densityplot(dist_supermarket, supermarket1, "Supermarket")
 densityplot(medianRent, affordability1, "Affordability")
 densityplot(dampness, damp1, "Dampness")
 
+# GREEN SPACE
+densityplot(dist_bigpark, park1, "Big Park")
+densityplot(dist_beach, beach1, "Beach")
+
+# LEISURE
+densityplot(leisureart1,leisureart1, "Marae")
+densityplot(leisuresport1,leisuresport1, "Marae")
+
 # SAFETY
-densityplot(crime_perarea, crime1, "Crime")
-densityplot(dist_crash, crashes1, "Crashes")
+densityplot(crimerisk, crime1, "Crime")
+densityplot(crash_risk_LM, crashes1, "Crashes")
 densityplot(alcoprohibited,alcohol1, "Alcohol Prohibited")
 
 # ETHNIC DIVERSITY
@@ -362,13 +363,9 @@ densityplot(dist_primary, primary1 , "Primary")
 
 # FOOD OUTLETS
 densityplot(dist_cafe, cafe1, "Cafe")
-densityplot(dist_restaurants, restaurant1, "Restaurant")
-densityplot(dist_pubs, pub1, "Pub")
+densityplot(dist_restaurant, restaurant1, "Restaurant")
+densityplot(dist_pub, pub1, "Pub")
 densityplot(dist_bbq, bbq1, "BBQ")
-
-# GREEN SPACE
-densityplot(dist_bigpark, bigpark1, "Big Park")
-densityplot(dist_beach, beach1, "Beach")
 
 #densityplot(dist_cinema,cinema1, "Cinema")
 #densityplot(dist_galleries, gallery1,"Gallery")
@@ -399,7 +396,6 @@ corrplot(cor, tl.srt = 60, type = "lower", method = "ellipse",
 
 ##### Mapping all indicators #####
 border <- st_read("data/sa1_auckland_waiheke_urban.gpkg") |> st_transform(27291)
-
 indicators_sa1g <- left_join(sa1_polys, sa1_all_index, by = c("SA12018_V1_00"="SA12018_V1_00"))
 indic_map_func = function(var_name, titl) {
   mapout = tm_shape(border) + tm_polygons(col="black", lwd=1)+

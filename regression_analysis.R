@@ -276,7 +276,7 @@ lm.LMtests(lm_sa2, sa2.lw, c("LMerr","LMlag"), zero.policy=TRUE)
 sp_lag_sa1 <- lagsarlm(formula, data = gdf, sa1.lw, method = "eigen")
 save(sp_lag_sa1, file = "outputs/models/sp_lag_sa1.Rdata")
 #load("outputs/models/sp_lag_sa1.Rdata")
-summary(sp_lag_sa1)
+tidy(sp_lag_sa1)
 
 W <- as(sa1.lw, "CsparseMatrix")
 #creates a vector of traces of powers of the spatial weights matrix 
@@ -335,10 +335,10 @@ mgwrsa1 <- gwr.multiscale(formula,
                        verbose = FALSE)
   
 # Save the model
-save(mgwr, file = "outputs/models/mgwr_sa2.Rdata")
+save(mgwr, file = "outputs/models/mgwr_sa2_newest2.Rdata")
 
 #save(mgwrsa1, file = "outputs/models/mgwr_sa1.Rdata")
-#load("outputs/models/mgwr_sa2_new.Rdata")
+load("outputs/models/mgwr_sa2_newest.Rdata")
 mbwa <- mgwr[[2]]$bws #save bandwidths for later
 mgwr
 
@@ -459,6 +459,36 @@ map_signif_coefs_diverging_func = function(x, var_name, var_name_TV, method, var
   p_out
 }
 
+map_signif_coefs_diverging_func = function(x, var_name, var_name_TV, method, varN) {
+  # determine which are significant
+  tval = x %>% dplyr::select(all_of(var_name_TV)) %>% st_drop_geometry()
+  signif = tval < -1.96 | tval > 1.96
+  # map the sa1s
+  p_out = tm_shape(x) +
+    tm_polygons(var_name, midpoint = 0, legend.hist = F, legend.show=T, lwd=0.04,
+                style = "fixed", breaks=breaks, title = varN, title.fontfamily="serif",
+                n=8, palette = "seq")
+  
+  # Check if any values are significant before adding tvalues layer
+  if (any(signif)) {
+    p_out <- p_out +
+      # add the tvalues layer only if there are significant values
+      tm_shape(x[signif,]) + tm_borders(lwd = 0.3, col="black")
+  }
+  
+  p_out <- p_out +
+    tm_layout(main.title = method, legend.position = c("left","bottom"),
+              frame = T, legend.outside = F,
+              legend.format = list(fun = function(x) formatC(x, digits = 2, format = "f")),
+              legend.title.fontfamily = "serif", main.title.size = 4, main.title.position = "center",
+              legend.width=2, legend.height=2, legend.text.size=2,legend.title.size=3,
+              legend.bg.color="grey100", legend.bg.alpha=.7, main.title.fontfamily="serif",
+              aes.palette = list(seq = "-RdBu"))
+  
+  p_out
+}
+
+
 # MGWR coefficients
 mgwr_cycle <- map_signif_coefs_diverging_func(x = mgwr_sf, "cycleToWork", "cycleToWork_TV", "% Cycle to Work", "Coefficient")
 mgwr_eur <- map_signif_coefs_diverging_func(x = mgwr_sf, "PrEuropeanDesc", "PrEuropeanDesc_TV", "% European", "Coefficient")
@@ -495,7 +525,6 @@ popdf[which(is.na(popdf$Asian),), "Asian"] <- 0
 popdf[which(is.na(popdf$MiddleEasternLatinAmericanAfrican),), "MiddleEasternLatinAmericanAfrican"] <- 0
 popdf[which(is.na(popdf$OtherEthnicity),), "OtherEthnicity"] <- 0
 popdf[which(is.na(popdf$PacificNum),), "PacificNum"] <- 0
-
 income <- dplyr::select(census, c(medianIncome, code))
 popdf <- left_join(popdf, income, by = c("SA12018_V1_00"="code"))
 popdf[which(is.na(popdf$medianIncome),), "medianIncome"] <- 35400
@@ -514,20 +543,26 @@ popdf2 <- popdf1 |>
   mutate(csum_other = cumsum(OtherEthnicity_1)/sum(popdf1$OtherEthnicity)) |> 
   mutate(csum_eur = cumsum(European_1)/sum(popdf1$European))
   #mutate(csum_medianincome = cumsum(medianIncome_1)/sum(popdf1$medianIncome))
+hist(popdf$Pacific)
 
 # Plot the ECDF
 colors <- c("Pakeha" = "blue", "Pasifika" = "red", "Asian" = "black", "Maori"="purple") #, "MedianIncome"="darkgreen")
-ggplot(popdf2) +
+ecdf <- ggplot(popdf2) +
   geom_step(aes(quartile, csum_eur, color = "Pakeha")) +
   geom_step(aes(quartile, csum_pacific, color="Pasifika")) +
   geom_step(aes(quartile, csum_asian, color="Asian")) +
   geom_step(aes(quartile, csum_maori, color="Maori")) +
   theme_minimal() +
-  ylab('Share of Population') +xlab ('KULI Percentile') +
+  ylab('Share of Population') +xlab ('AULI Percentile') +
   #labs(title="Percentage of Population at Liveability Percentiles") +
   scale_color_manual(values = colors) +
   labs(color = "Legend") +
   theme(text=element_text(family="serif", size=12))
+
+
+png(file="outputs/ecdf.png",width=1800, height=1000, res=250)
+ecdf
+dev.off()
 
 # The KS test to test the statistical significance of these results
 ks.test(popdf2$csum_popusual, popdf2$csum_maori)
@@ -538,6 +573,13 @@ ks.test(popdf2$csum_popusual, popdf2$csum_asian)
 ks.test(popdf2$csum_popusual, popdf2$csum_melaa)
 ks.test(popdf2$csum_popusual, popdf2$csum_eur)
 
+columns_to_scale <- names(popdf)[3:10]
+zpopdf <- popdf
+zpopdf[columns_to_scale] <- scale(popdf[columns_to_scale])
+ks.test(zpopdf$popUsual, zpopdf$Pacific)
+ks.test(zpopdf$popUsual, zpopdf$European)
+ks.test(zpopdf$popUsual, zpopdf$Maori)
+ks.test(zpopdf$popUsual, zpopdf$Asian)
 
 #### Bivariate Map ####
 data <- bi_class(gdf, x = auli_MPIAgg, y = deprivation, style = "quantile", dim = 3)
@@ -601,7 +643,3 @@ plot(conditional_effects(odel, effects = "pop_density"))
 
 spatial_pred <- marginal_effects(model, effects = "pop_density")
 plot(spatial_pred, points = TRUE)
-
-
-# Note this file contains only the code needed to replicate the results of the research.
-# Additional, messier analysis that was also done is provided in the file 'additional_analysis.R'

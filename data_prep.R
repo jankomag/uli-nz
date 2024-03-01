@@ -189,7 +189,7 @@ sa1_bikeability[which(is.na(sa1_bikeability$bikeability),), "bikeability"] <- 0
 sa1_all <- left_join(sa1_all, sa1_bikeability, by = c("SA12018_V1_00"="SA12018_V1_00"))
 
 #### Distances ####
-sa1_dists <- st_read("data/sa1_out_dist_new.gpkg")|> st_drop_geometry()
+sa1_dists <- st_read("data/sa1_out_dist.gpkg")|> st_drop_geometry()
 sa1_all <- left_join(sa1_all, sa1_dists, by = c("SA12018_V1_00"="SA12018_V1_00"))
 
 #join with spatial
@@ -200,7 +200,6 @@ sa1_allg[which(is.infinite(sa1_allg$dist_hospital),), "dist_hospital"] <- 100000
 sa1_allg[which(is.infinite(sa1_allg$dist_chemist),), "dist_chemist"] <- 100000
 
 st_write(sa1_allg, "data/sa1_allvars.gpkg")
-
 
 
 #### Other indicators #### not used in the index in the end
