@@ -383,7 +383,7 @@ colnames(df_indicators) <- c("LeisureArt","LeisureSport","TrainStation","BusStop
                              "Diversity","Marae",
                              "Chemist","Dentist","HealthCentre","Hospital",
                              "Childcare","PrimarySchool","SecondarySchool","Cafe",
-                             "Restaurant","Pub","BBQ","Park","Beach","KULI")
+                             "Restaurant","Pub","BBQ","Park","Beach","AULI")
 # Cronbach Alpha #
 cronbach.alpha(df_indicators)
 
