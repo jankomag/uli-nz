@@ -21,13 +21,13 @@ library(leaflet)
 
 #### Data imports ####
 # geographic data
-sa1_polys <- st_read("data/sa1_auckland_waiheke_urban.gpkg") |>
+sa1_polys <- st_read("data/upload/sa1_auckland_waiheke_urban.gpkg") |>
   subset(select = c(SA12018_V1_00)) |> 
   st_transform(27291) #transforming to the same coordinate system
 sa1_base <- sa1_polys |> st_drop_geometry()
 
 #### Census ####
-census <- as.data.frame(read_excel("data/auckland_census.xlsx"))
+census <- as.data.frame(read_excel("data/upload/auckland_census.xlsx"))
 census <- census |>
   subset(select = -c(maori_desc, median_income, born_overseas, PacificNum, Degree)) |> 
   mutate(code = as.character(code)) |> 
@@ -81,8 +81,8 @@ sa1_imped <- sa1_imped %>%
                              pcPacific))
 sa1_imped <- sa1_imped %>% 
   mutate(pcAsian = ifelse(is.na(pcAsian),
-                             apply(index, 1, function(i){mean(.$pcAsian[i], na.rm=T)}),
-                             pcAsian))
+                          apply(index, 1, function(i){mean(.$pcAsian[i], na.rm=T)}),
+                          pcAsian))
 sa1_imped <- sa1_imped %>% 
   mutate(pcMiddleEasternLatinAmericanAfrican = ifelse(is.na(pcMiddleEasternLatinAmericanAfrican),
                              apply(index, 1, function(i){mean(.$pcMiddleEasternLatinAmericanAfrican[i], na.rm=T)}),
@@ -91,6 +91,7 @@ sa1_imped <- sa1_imped %>%
   mutate(pcOtherEthnicity = ifelse(is.na(pcOtherEthnicity),
                              apply(index, 1, function(i){mean(.$pcOtherEthnicity[i], na.rm=T)}),
                              pcOtherEthnicity))
+
 # any remaining missing values replaced with global mean
 sa1_imped[which(is.na(sa1_imped$medianRent),), "medianRent"] <- mean(sa1_imped$medianRent, na.rm=T)
 census <- st_drop_geometry(sa1_imped) |> 
@@ -113,7 +114,7 @@ sa1_all <- dplyr::select(sa1_all, SA12018_V1_00, no_households, pop_usual, dampn
 
 #### Crime Risk ####
 # load raw crime counts data
-crime <- as.data.frame(read.csv("data/crimes_originaldata.csv"))|> 
+crime <- as.data.frame(read.csv("data/upload/crimes_originaldata.csv"))|> 
   dplyr::select(Area.Unit, Victimisations, Meshblock)
 crime$Area.Unit = substr(crime$Area.Unit,1,nchar(crime$Area.Unit)-1) # clean Area unit field
 crime <- crime %>%
@@ -122,7 +123,7 @@ crime <- crime %>%
   as.data.frame()
 
 # load Area Unit spatial Data
-au <- st_read("data/area-unit-2017-generalised-version.gpkg") |> 
+au <- st_read("data/upload/area-unit-2017-generalised-version.gpkg") |> 
   dplyr::select(AU2017_NAME, LAND_AREA_SQ_KM) |> 
   st_transform(27291) #transforming to the same coordinate system
 au$area <- st_area(au)
@@ -143,15 +144,17 @@ sa1_all <- left_join(sa1_all, sa1_crime, by = "SA12018_V1_00")
 minmaxNORM0_10 <- function(x) {
   return (((x - min(x))) / (max(x) - min(x))*(10-0)+0)
 } #0-10
-sa1_crashrisk <- st_read("data/sa1_crash_risk.gpkg") |> st_drop_geometry()
+
+sa1_crashrisk <- st_read("data/sa1_crash_risk.gpkg")
 sa1_crashrisk$crash_risk <- unlist(sa1_crashrisk$crash_risk)
-sa1_crashrisk[sapply(sa1_crashrisk, is.infinite)] <- NA
+sa1_crashrisk$crash_risk[is.infinite(sa1_crashrisk$crash_risk)] <- NA
 sa1_crashrisk <- sa1_crashrisk |> 
   mutate(crash_risk = minmaxNORM0_10(crash_risk)) |> 
   mutate(crash_per_roadlen = minmaxNORM0_10(crash_per_roadlen))
 
 # replace missing values with the indicator crashes_per_roadlen
 sa1_crashrisk[which(!is.finite(sa1_crashrisk$crash_risk),), "crash_risk"] <- sa1_crashrisk[which(!is.finite(sa1_crashrisk$crash_risk),), "crash_per_roadlen"]
+sa1_crashrisk <- st_drop_geometry(sa1_crashrisk)
 sa1_crashrisk <- left_join(sa1_polys, sa1_crashrisk, by="SA12018_V1_00")
 # smooth with geographically weighted mean
 crash.sp = as(sa1_crashrisk, "Spatial")
@@ -171,22 +174,16 @@ sa1_all <- left_join(sa1_all, sa1_crashrisk_nong) # ... and join to the rest of 
 
 #### Other indicators ####
 ## Alcohol Environments ##
-alco_sa1 <- st_read("data/sa1_cents_alcoenvs.gpkg") |> st_drop_geometry() |> 
+alco_sa1 <- st_read("data/upload/sa1_cents_alcoenvs.gpkg") |> st_drop_geometry() |> 
   dplyr::select(SA12018_V1, alcoprohibited)
 
 sa1_all <- left_join(sa1_all, alco_sa1, by = c("SA12018_V1_00"="SA12018_V1"))
 sa1_all[which(is.na(sa1_all$alcoprohibited),), "alcoprohibited"] <- 0
 
 ## Street Connectivity ##
-stconnectivity_sa1 <- st_read("data/streetconnectivity_new.gpkg") |> st_drop_geometry()|>
+stconnectivity_sa1 <- st_read("data/upload/streetconnectivity_new.gpkg") |> st_drop_geometry()|>
   dplyr::select(SA12018_V1_00, streetconn)
 sa1_all <- left_join(sa1_all, stconnectivity_sa1, by = c("SA12018_V1_00"="SA12018_V1_00"))
-
-## Bikeability ##
-sa1_bikeability <- st_read("data/sa1_bikeability.gpkg")|> st_drop_geometry()
-sa1_bikeability[which(is.na(sa1_bikeability$bikeability),), "bikeability"] <- 0
-
-sa1_all <- left_join(sa1_all, sa1_bikeability, by = c("SA12018_V1_00"="SA12018_V1_00"))
 
 #### Distances ####
 sa1_dists <- st_read("data/sa1_out_dist.gpkg")|> st_drop_geometry()
@@ -198,8 +195,10 @@ sa1_allg <- left_join(sa1_polys, sa1_all, by=c("SA12018_V1_00"="SA12018_V1_00"))
 sa1_allg[which(is.infinite(sa1_allg$dist_stations),), "dist_stations"] <- 100000
 sa1_allg[which(is.infinite(sa1_allg$dist_hospital),), "dist_hospital"] <- 100000
 sa1_allg[which(is.infinite(sa1_allg$dist_chemist),), "dist_chemist"] <- 100000
+sa1_allg$bikeability[is.na(sa1_allg$bikeability)] <- 0
 
 st_write(sa1_allg, "data/sa1_allvars.gpkg")
+### end of code for paper ###
 
 
 #### Other indicators #### not used in the index in the end
@@ -208,7 +207,7 @@ dwellingDensity <- left_join(sa1_polys, census, by = c("SA12018_V1_00"="SA12018_
 dwellingDensity$area <- as.numeric(st_area(dwellingDensity))
 dwellingDensity <- dwellingDensity |> 
   mutate(dwelldensity = occupiedPrivateDwellings/area) |> 
-  mutate(dwelldensity_transf = Winsorize(dwelldensity, minval=0.000001))
+  #mutate(dwelldensity_transf = Winsorize(dwelldensity, minval=0.000001))
 tm_shape(dwellingDensity)+tm_fill("dwelldensity_transf", style="jenks")
 
 # smooth dwelling density

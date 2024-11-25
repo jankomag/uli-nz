@@ -24,11 +24,11 @@ library(DescTools)
 library(dplyr)
 library(MuMIn)
 library(VIM)
-library(spdep)
-library(rgdal)
+#library(rgdal)
+library(AICcmodavg)
 library(stargazer)
 library(spatialreg)
-library(rgeoda)
+#library(rgeoda)
 library(geosphere)
 library(raster)
 library(rgbif)
@@ -36,7 +36,6 @@ library(viridis)
 library(gridExtra)
 library(rasterVis)
 library(ggspatial)
-library(spdep)
 library(gstat)
 library(geodaData)
 library(data.table)
@@ -47,11 +46,12 @@ library(lmtest)
 library(tidyverse)
 library(tidymodels)
 library(spatialreg)
+library(RColorBrewer)
 
 #### Loading data ####
 # load the auli data
 auli <- st_read('data/sa1_auli.gpkg', quiet = T)
-sa1_polys <- st_read("data/sa1_auckland_waiheke_urban.gpkg") |>
+sa1_polys <- st_read("data/upload/sa1_auckland_waiheke_urban.gpkg") |>
   subset(select = c(SA12018_V1_00)) |> 
   st_transform(27291)
 nongauli <- st_drop_geometry(auli) |> 
@@ -61,7 +61,7 @@ only_auli_sp <- st_read('data/sa1_auli.gpkg', quiet = T) |>
   dplyr::select(SA12018_V1_00, auli_MPIAgg)
 
 #load additional data
-census <- read.csv('data/auckland_census_2.csv')
+census <- read.csv('data/upload/auckland_census_2.csv')
 census <- census |>
   subset(select = -c(European, Maori, Pacific, Asian, MiddleEasternLatinAmericanAfrican, numberdriveToWork, OtherEthnicity, PacificNum, medianRent)) |> 
   mutate(code = as.character(code)) |> 
@@ -158,8 +158,10 @@ df <- st_drop_geometry(gdf)
 #### Data preparation ####
 gdf_x <- dplyr::select(gdf, -c(auli_MPIAgg,popdens, area))
 gdf_y <- dplyr::select(gdf, c(SA12018_V1_00, auli_MPIAgg))
+
 # Z-score standardisation on the independent variables before all modelling
 columns_to_exclude <- names(gdf)[c(1,18:19)]
+columns_to_exclude
 columns_to_scale <- setdiff(names(gdf), columns_to_exclude)
 gdf[columns_to_scale] <- scale(st_drop_geometry(gdf[columns_to_scale]))
 
@@ -172,7 +174,7 @@ corrplot(cor, tl.srt = 45, type = "lower", method = "ellipse",
          tl.col = "black", diag = T, cl.cex=0.7,cl.offset=0.3)
 
 #### Aggregation to SA2 #### 
-sa2 <- st_read('data/sa2.gpkg', quiet = T) |> 
+sa2 <- st_read('data/upload/sa2.gpkg', quiet = T) |> 
   subset(select = c(SA22023_V1_00)) |> st_transform(27291)
 sa2agg <- st_interpolate_aw(gdf[2:18], sa2, extensive = F)
 
@@ -184,41 +186,94 @@ sa2agg[columns_to_scale] <- scale(st_drop_geometry(sa2agg[columns_to_scale]))
 #st_write(sa2agg, "data/sa2_auli_agg.gpkg")
 
 #### LISA ####
-sa1.lw = nb2listw(poly2nb(gdf, queen=T), style="W")
-moran.test(x = gdf$auli_MPIAgg, listw = sa1.lw) 
+# Create consistent weight matrices
+sa1.lw <- nb2listw(poly2nb(gdf, queen=T), style="W")
+queen_wts <- sa1.lw  # Use the same weights for both maps
 
-# Local Statistic #
-gdf$li <- localmoran(gdf$auli_MPIAgg, sa1.lw)[, 1]
-gdf$localmoranpval <- localmoran(gdf$auli_MPIAgg, sa1.lw)[, 5]
-index = gdf$localmoranpval <= 0.05
+moran.test(gdf$auli_MPIAgg, sa1.lw)
 
-map1 <- tm_shape(gdf) +
-  tm_fill(col = "li", style = "quantile",title="Local Moran's I Statistic") +
-  tm_shape(gdf[index,]) + tm_borders(lwd=0.15, col="black") +
-  tm_layout(legend.position = c("left","bottom"), frame = T, legend.outside = F,
-            legend.title.fontfamily = "serif", main.title.position = "center",
-            legend.width=1, legend.height=1, legend.text.size=0.8, legend.title.size = 1.2,
-            legend.bg.color="grey100", legend.bg.alpha=.7, title.fontfamily="serif", legend.text.fontfamily = "serif")
+# Calculate Local Moran's I once and reuse
+local_moran_results <- localmoran(gdf$auli_MPIAgg, sa1.lw)
+gdf$li <- local_moran_results[, 1]
+gdf$localmoranpval <- local_moran_results[, 5]
+index <- gdf$localmoranpval <= 0.05
 
-# Local Moran Cluster Map #
-queen_wts <- queen_weights(gdf)
-moran <- local_moran(queen_wts, gdf["auli_MPIAgg"])
-moran_lbls <- lisa_labels(moran)[1:5]
-moran_colors <- setNames(lisa_colors(moran)[1:5], moran_lbls)
+# Second Map - using the same Local Moran's I results
+gdf$std_var <- scale(gdf$auli_MPIAgg) %>% as.vector()
+gdf$lag_var <- lag.listw(sa1.lw, gdf$std_var)  # Use sa1.lw for consistency
 
-gdf_lmm <- gdf |>
-  mutate(cluster_num = lisa_clusters(moran) + 1,
-         cluster = factor(moran_lbls[cluster_num], levels = moran_lbls))
+gdf$cluster <- NA
+# High-High quadrant
+gdf$cluster[(gdf$std_var >= 0 & 
+               gdf$lag_var >= 0) & 
+              (gdf$localmoranpval <= 0.05)] <- "High-High"
+# Low-Low quadrant
+gdf$cluster[(gdf$std_var <= 0 & 
+               gdf$lag_var <= 0) & 
+              (gdf$localmoranpval <= 0.05)] <- "Low-Low"
+# High-Low quadrant
+gdf$cluster[(gdf$std_var >= 0 & 
+               gdf$lag_var <= 0) & 
+              (gdf$localmoranpval <= 0.05)] <- "High-Low"
+# Low-High quadrant
+gdf$cluster[(gdf$std_var <= 0 & 
+               gdf$lag_var >= 0) & 
+              (gdf$localmoranpval <= 0.05)] <- "Low-High"
+# Non-significant observations
+gdf$cluster[gdf$localmoranpval > 0.05] <- "Not Significant"
 
-map2 <- tm_shape(gdf_lmm) +
-  tm_polygons("cluster", lwd=0, title="Moran Clusters",
+gdf$cluster <- factor(gdf$cluster, 
+                      levels = c("High-High", "Low-Low", "Low-High", "High-Low", "Not Significant"))
+
+moran_colors <- c("#FF0000", "#0000FF", "#FF9999", "#9999FF", "#EEEEEE")
+names(moran_colors) <- c("High-High", "Low-Low", "Low-High", "High-Low", "Not Significant")
+
+gdf_wgs84 <- st_transform(gdf, 4326)
+
+# First Map
+bckgd <- st_read('data/land_auck.gpkg', quiet = T) # transform to OSGB projection
+map1 <- tm_shape(gdf_wgs84) + tm_polygons("grey",  lwd=0.05) + 
+  tm_shape(bckgd) + tm_polygons(col="#e2e2e2", lwd=0.1) +
+  tm_shape(gdf_wgs84) +
+  tm_fill(col = "li", 
+          style = "quantile", 
+          title = "Local Moran's I Statistic") +
+  tm_layout(legend.position = c("left","bottom"), 
+            frame = T, 
+            legend.outside = F,
+            legend.title.fontfamily = "serif", 
+            main.title.position = "center",
+            legend.width=1, 
+            legend.height=1, 
+            legend.text.size=0.8, 
+            legend.title.size = 1.2,
+            legend.bg.color="grey100", 
+            legend.bg.alpha=.7, 
+            title.fontfamily="serif", 
+            legend.text.fontfamily = "serif")
+
+map2 <- tm_shape(gdf_wgs84) + tm_polygons("grey",  lwd=0.05) + 
+  tm_shape(bckgd) + tm_polygons(col="#e2e2e2", lwd=0.1) +
+  tm_shape(gdf_wgs84) +
+  tm_polygons("cluster", 
+              lwd=0, 
+              title="Moran Clusters",
               palette = moran_colors) +
-  tm_layout(legend.position = c("left","bottom"), frame = T, legend.outside = F,
-            legend.title.fontfamily = "serif", main.title.position = "center",
-            legend.width=0.7, legend.height=1, legend.text.size=0.8, legend.title.size = 1.2,
-            legend.bg.color="grey100", legend.bg.alpha=.7, title.fontfamily="serif", legend.text.fontfamily = "serif")
+  tm_layout(legend.position = c("left","bottom"), 
+            frame = T, 
+            legend.outside = F,
+            legend.title.fontfamily = "serif", 
+            main.title.position = "center",
+            legend.width=1, 
+            legend.height=1, 
+            legend.text.size=0.8, 
+            legend.title.size = 1.2,
+            legend.bg.color="grey100", 
+            legend.bg.alpha=.7, 
+            title.fontfamily="serif", 
+            legend.text.fontfamily = "serif")
 
-tmap_arrange(map1, map2,ncol = 2)
+tmap_arrange(map1, map2, ncol = 2)
 
 #### Modelling ####
 ##### OLS #####
@@ -246,6 +301,7 @@ tidy(lm_sa1)
 summary(lm_sa1)
 par(mfrow=c(1,1))
 plot(lm_sa2)
+AICc(lm_sa1)
 
 #### Residuals
 gdf$residuals <- residuals(lm_sa1)
@@ -273,10 +329,10 @@ lm.morantest(lm_sa1, sa1.lw, alternative="two.sided")
 lm.LMtests(lm_sa2, sa2.lw, c("LMerr","LMlag"), zero.policy=TRUE)
 
 ###### Spatial Lag Model #####
-sp_lag_sa1 <- lagsarlm(formula, data = gdf, sa1.lw, method = "eigen")
-save(sp_lag_sa1, file = "outputs/models/sp_lag_sa1.Rdata")
+#sp_lag_sa1 <- lagsarlm(formula, data = gdf, sa1.lw, method = "eigen")
+#save(sp_lag_sa1, file = "outputs/models/sp_lag_sa1.Rdata")
 #load("outputs/models/sp_lag_sa1.Rdata")
-tidy(sp_lag_sa1)
+summary(sp_lag_sa1)
 
 W <- as(sa1.lw, "CsparseMatrix")
 #creates a vector of traces of powers of the spatial weights matrix 
@@ -335,12 +391,12 @@ mgwrsa1 <- gwr.multiscale(formula,
                        verbose = FALSE)
   
 # Save the model
-save(mgwr, file = "outputs/models/mgwr_sa2_newest2.Rdata")
-
+#save(mgwr, file = "outputs/models/mgwr_sa2_newest2.Rdata")
 #save(mgwrsa1, file = "outputs/models/mgwr_sa1.Rdata")
-load("outputs/models/mgwr_sa2_newest.Rdata")
+load("outputs/models/mgwr_sa2_newest2.Rdata")
+
 mbwa <- mgwr[[2]]$bws #save bandwidths for later
-mgwr
+mgwrsa1
 
 # show diagnostics
 mgwr$GW.diagnostic
@@ -422,7 +478,6 @@ splag_summ <- data.frame(splag_summ[1], round(splag_summ[2],3))
 
 summary_table <- data.frame(olssum, splag_summ[2], tab.mgwr[,c(4,1)])
 summary_table
-#stargazer(summary_table)
 
 ###### Mapping GW results ######
 mgwr_sf = st_as_sf(mgwr$SDF)
@@ -437,7 +492,7 @@ tm_shape(mgwr_sf) +
   tm_layout(legend.position = c("right","top"), frame = F)
 
 # all plotting functions
-map_signif_coefs_diverging_func = function(x, var_name, var_name_TV, method, varN) {
+somemap_signif_coefs_diverging_func = function(x, var_name, var_name_TV, method, varN) {
   # determine which are significant
   tval = x %>% dplyr::select(all_of(var_name_TV)) %>% st_drop_geometry()
   signif = tval < -1.96 | tval > 1.96
@@ -448,6 +503,25 @@ map_signif_coefs_diverging_func = function(x, var_name, var_name_TV, method, var
                 n=8, palette = "seq") +
     # now add the tvalues layer
     tm_shape(x[signif,]) + tm_borders(lwd = 0.3, col="black") +
+    tm_layout(main.title = method, legend.position = c("left","bottom"),
+              frame = T, legend.outside = F,
+              legend.format = list(fun = function(x) formatC(x, digits = 2, format = "f")),
+              legend.title.fontfamily = "serif", main.title.size = 4, main.title.position = "center",
+              legend.width=2, legend.height=2, legend.text.size=2,legend.title.size=3,
+              legend.bg.color="grey100", legend.bg.alpha=.7, main.title.fontfamily="serif",
+              aes.palette = list(seq = "-RdBu"))
+  
+  p_out
+}
+
+map_nonsignif_coefs_diverging_func = function(x, var_name, var_name_TV, method, varN) {
+  # map the sa1s
+  p_out = tm_shape(x) +
+    tm_polygons(var_name, midpoint = 0, legend.hist = F, legend.show=T, lwd=0.04,
+                style = "fixed", breaks=breaks, title = varN, title.fontfamily="serif",
+                n=8, palette = "seq")
+  
+  p_out <- p_out +
     tm_layout(main.title = method, legend.position = c("left","bottom"),
               frame = T, legend.outside = F,
               legend.format = list(fun = function(x) formatC(x, digits = 2, format = "f")),
@@ -488,22 +562,21 @@ map_signif_coefs_diverging_func = function(x, var_name, var_name_TV, method, var
   p_out
 }
 
-
 # MGWR coefficients
-mgwr_cycle <- map_signif_coefs_diverging_func(x = mgwr_sf, "cycleToWork", "cycleToWork_TV", "% Cycle to Work", "Coefficient")
-mgwr_eur <- map_signif_coefs_diverging_func(x = mgwr_sf, "PrEuropeanDesc", "PrEuropeanDesc_TV", "% European", "Coefficient")
-mgwr_privtr <- map_signif_coefs_diverging_func(x = mgwr_sf, "privateTransporTtoWork", "privateTransporTtoWork_TV", "% Private Transport to Work", "Coefficient")
-mgwr_nocar <- map_signif_coefs_diverging_func(x = mgwr_sf, "noCar", "noCar_TV", "% No Car", "Coefficient")
-mgwr_degree <- map_signif_coefs_diverging_func(x = mgwr_sf, "Degree", "Degree_TV", "% Degree", "Coefficient")
-mgwr_depriv <- map_signif_coefs_diverging_func(x = mgwr_sf, "deprivation", "deprivation_TV", "Deprivation", "Coefficient")
-mgwr_popdenslog <- map_signif_coefs_diverging_func(x = mgwr_sf, "popdenlog", "popdenlog_TV", "Log(Population Density)", "Coefficient")
+mgwr_cycle <- map_nonsignif_coefs_diverging_func(x = mgwr_sf, "cycleToWork", "cycleToWork_TV", "% Cycle to Work", "Coefficient")
+mgwr_eur <- map_nonsignif_coefs_diverging_func(x = mgwr_sf, "PrEuropeanDesc", "PrEuropeanDesc_TV", "% European", "Coefficient")
+mgwr_privtr <- map_nonsignif_coefs_diverging_func(x = mgwr_sf, "privateTransporTtoWork", "privateTransporTtoWork_TV", "% Private Transport to Work", "Coefficient")
+mgwr_nocar <- map_nonsignif_coefs_diverging_func(x = mgwr_sf, "noCar", "noCar_TV", "% No Car", "Coefficient")
+mgwr_degree <- map_nonsignif_coefs_diverging_func(x = mgwr_sf, "Degree", "Degree_TV", "% Degree", "Coefficient")
+mgwr_depriv <- map_nonsignif_coefs_diverging_func(x = mgwr_sf, "deprivation", "deprivation_TV", "Deprivation", "Coefficient")
+mgwr_popdenslog <- map_nonsignif_coefs_diverging_func(x = mgwr_sf, "popdenlog", "popdenlog_TV", "Log(Population Density)", "Coefficient")
 
 png(file="outputs/allmgwr2.png",width=3000, height=2000)
 tmap_arrange(mgwr_eur, mgwr_cycle, mgwr_privtr, mgwr_nocar, mgwr_degree, mgwr_depriv, mgwr_popdenslog,ncol=4)
 dev.off()
 
 #### Quantile - analysis ####
-population <- read.csv('data/auckland_census_2.csv')
+population <- read.csv('data/upload/auckland_census_2.csv')
 population <- population |>
   subset(select = c(code, European, Maori, Pacific, Asian, MiddleEasternLatinAmericanAfrican, OtherEthnicity, PacificNum, popUsual)) |> 
   mutate(code = as.character(code)) |> 
@@ -516,7 +589,7 @@ population <- population |>
   mutate(popUsual = as.numeric(popUsual)) |> 
   mutate(PacificNum = as.numeric(PacificNum))
 
-popdf <- left_join(nongkuli, population, by = c("SA12018_V1_00"="code"))
+popdf <- left_join(nongauli, population, by = c("SA12018_V1_00"="code"))
 #imputation
 popdf[which(is.na(popdf$European),), "European"] <- 0
 popdf[which(is.na(popdf$Maori),), "Maori"] <- 0
@@ -530,7 +603,7 @@ popdf <- left_join(popdf, income, by = c("SA12018_V1_00"="code"))
 popdf[which(is.na(popdf$medianIncome),), "medianIncome"] <- 35400
 
 # Calculate percentage of ethnicities at each KULI percentile
-popdf1 <- within(popdf, quartile <- as.integer(cut(kuli_MPIAgg, quantile(kuli_MPIAgg, seq(0,1,.01)), include.lowest=T)))
+popdf1 <- within(popdf, quartile <- as.integer(cut(auli_MPIAgg, quantile(auli_MPIAgg, seq(0,1,.01)), include.lowest=T)))
 popdf2 <- popdf1 |>
   subset(select = -c(SA12018_V1_00)) |> 
   dplyr::group_by(quartile) |>

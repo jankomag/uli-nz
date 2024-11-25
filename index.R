@@ -1,9 +1,9 @@
 # load packages
 library(sf)
 library(sp)
-library(tmap)
 library(dplyr)
 library(ggplot2)
+library(tmap)
 library(RColorBrewer)
 library(geosphere)
 library(spdep)
@@ -31,6 +31,7 @@ library(factoextra)
 #### Data imports ####
 # geographic data
 preauli <- st_read("data/sa1_allvars.gpkg") |> st_transform(27291) #transforming to the same coordinate system
+preauli <- preauli %>% dplyr::select(c(-occupiedPrivateDwellings, -crash_per_roadlen, -crash_risk))
 
 #### EDA ####
 column_names <- colnames(preauli)
@@ -40,8 +41,9 @@ for (i in seq_along(column_names)) {
 }
 # drop geometry for EDA
 sa1_all <- preauli |> st_drop_geometry()
+summary(sa1_all)
 ##### Correlations #####
-datacorr <- sa1_all[c(4:6,8:42)]
+datacorr <- sa1_all[c(4:37)]
 cor <- cor(x = datacorr, y = datacorr, use="complete.obs")
 corrplot(cor, tl.srt = 25)
 corr <- rcorr(as.matrix(datacorr))
@@ -146,7 +148,7 @@ sa1_all_index <- sa1_all_index |>
   mutate(gallery1 = minmaxNORM(dist_gallery)) |> #checked
   # LEISURE
   mutate(leisuresport1 = minmaxNORM(-(gym1+sport1))) |> #checked
-  mutate(leisureart1 = minmaxNORM(Winsorize(minmaxNORM(-(cinema1+theatre1+library1+museum1+gallery1)),minval=3, maxval=10))) |> #checked
+  mutate(leisureart1 = minmaxNORM(DescTools::Winsorize(minmaxNORM(-(cinema1+theatre1+library1+museum1+gallery1)), val=c(3,10)))) |> #checked
   
   # TRANSPORTATION
   mutate(station1 = minmaxNORM(-dist_stations)) |> #checked
@@ -163,8 +165,8 @@ sa1_all_index <- sa1_all_index |>
   mutate(damp1 = minmaxNORM(-dampness)) |> #checked
   # SAFETY
   mutate(alcohol1 = minmaxNORM(-alcoprohibited)) |> #checked
-  mutate(crime1 = minmaxNORM(-Winsorize(log(crimerisk+0.00000001), maxval=10,minval=-11))) |> #checked
-  mutate(crashes1 = minmaxNORM(-Winsorize(log(crash_risk_LM+0.00000001), maxval=-1,minval=-10))) |> 
+  mutate(crime1 = minmaxNORM(-DescTools::Winsorize(log(crimerisk+0.00000001), val=c(-11,10)))) |> #checked
+  mutate(crashes1 = minmaxNORM(-DescTools::Winsorize(log(crash_risk_LM+0.00000001), val=c(-10,-1)))) |> 
   # mutate(flood1 = minmaxNORM(-Winsorize(flood_pc, minval=0, maxval=.125))) |> #checked
   # mutate(emergency1 = minmaxNORM(-Winsorize(emergencyBC, minval=0, maxval=90))) |> #checked
   
@@ -201,14 +203,14 @@ for (i in seq_along(column_names)) {
   print(paste("Column Name:", column_names[i], "Index:", column_indices[i]))
 }
 
-# KULI aggregation
-sa1_all_index$auli_geomAgg <- minmaxNORM(apply(sa1_all_index[,50:78], 1, FUN = a_gmean))
-sa1_all_index$auli_MPIAgg <- minmaxNORM(ci_mpi(sa1_all_index[,50:78],penalty="POS")$ci_mpi_est)
+# AULI aggregation
+sa1_all_index$auli_geomAgg <- minmaxNORM(apply(sa1_all_index[,45:73], 1, FUN = a_gmean))
+sa1_all_index$auli_MPIAgg <- minmaxNORM(ci_mpi(sa1_all_index[,45:73],penalty="POS")$ci_mpi_est)
 #sa1_all_index$auli_MPIAgg <- Winsorize(sa1_all_index$kuli_MPIAgg, minval=0.1, maxval=max(sa1_all_index$kuli_MPIAgg))
 #sa1_all_index |> ggplot() + geom_histogram(aes(c(kuli_MPIAgg)),bins=100)
 
 # rejoin with geometry
-sa1_boundry <- st_read("data/sa1_auckland_waiheke_urban.gpkg") |> st_transform(27291) #transforming to the same coordinate system
+sa1_boundry <- st_read("data/upload/sa1_auckland_waiheke_urban.gpkg") |> st_transform(27291) #transforming to the same coordinate system
 index_sa1g <- left_join(sa1_boundry, sa1_all_index, by = c("SA12018_V1_00"="SA12018_V1_00"))
 #preview kuli
 tm_shape(index_sa1g) +
@@ -216,8 +218,12 @@ tm_shape(index_sa1g) +
               palette = "Reds", style = "jenks", lwd=0,n=7)
 
 # save the KULI
-auli <- index_sa1g[,c(1,50:78,80)]
-st_write(auli, "data/sa1_auli.gpkg")
+column_names <- colnames(index_sa1g)
+column_indices <- seq_along(index_sa1g)
+for (i in seq_along(column_names)) {
+  print(paste("Column Name:", column_names[i], "Index:", column_indices[i]))
+}
+auli <- index_sa1g[,c(1,45:73,75,76)]
 
 # save for webmap
 auli_web <- st_transform(auli,4326) |> 
@@ -232,6 +238,14 @@ colnames(auli_web) <- c("LeisureSport","LeisureArt","TrainStation","BusStop",
                              "Restaurant","Pub","BBQ","Park","Beach","AULI","geom")
 auli_web <- st_simplify(auli_web, preserveTopology = FALSE, dTolerance = 10)
 st_write(auli_web, "web-map/sa1_auli.geojson")
+
+
+numeric_data <- auli_web[, sapply(auli_web, is.numeric)]
+cor <- cor(x = numeric_data, y = numeric_data, use="complete.obs", method="pearson")
+par(mfrow = c(1, 1))
+corrplot(cor, tl.srt = 45, type = "lower", method = "ellipse",
+         order = "FPC", tl.cex = 0.8,
+         tl.col = "black", diag = T, cl.cex=0.7,cl.offset=0.3)
 
 #### AULI Visualisation ####
 ### MAP
@@ -389,13 +403,12 @@ cronbach.alpha(df_indicators)
 
 # Correlations #
 cor <- cor(x = df_indicators, y = df_indicators, use="complete.obs", method="pearson")
-stargazer(cor, type = "text")
 corrplot(cor, tl.srt = 60, type = "lower", method = "ellipse",
          order = "FPC", tl.cex = 0.8,
         tl.col = "black", diag = T, cl.cex=0.7,cl.offset=0.3)
 
 ##### Mapping all indicators #####
-border <- st_read("data/sa1_auckland_waiheke_urban.gpkg") |> st_transform(27291)
+border <- st_read("data/upload/sa1_auckland_waiheke_urban.gpkg") |> st_transform(27291)
 indicators_sa1g <- left_join(sa1_polys, sa1_all_index, by = c("SA12018_V1_00"="SA12018_V1_00"))
 indic_map_func = function(var_name, titl) {
   mapout = tm_shape(border) + tm_polygons(col="black", lwd=1)+
