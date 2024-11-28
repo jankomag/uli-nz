@@ -396,7 +396,7 @@ mgwrsa1 <- gwr.multiscale(formula,
 load("outputs/models/mgwr_sa2_newest2.Rdata")
 
 mbwa <- mgwr[[2]]$bws #save bandwidths for later
-mgwrsa1
+mgwr
 
 # show diagnostics
 mgwr$GW.diagnostic
@@ -516,7 +516,10 @@ somemap_signif_coefs_diverging_func = function(x, var_name, var_name_TV, method,
 
 map_nonsignif_coefs_diverging_func = function(x, var_name, var_name_TV, method, varN) {
   # map the sa1s
-  p_out = tm_shape(x) +
+    
+  p_out = tm_shape(x) + tm_polygons("grey",  lwd=0.05) +
+    tm_shape(bckgd) + tm_polygons(col="#e2e2e2", lwd=0.1) +
+    tm_shape(x) +
     tm_polygons(var_name, midpoint = 0, legend.hist = F, legend.show=T, lwd=0.04,
                 style = "fixed", breaks=breaks, title = varN, title.fontfamily="serif",
                 n=8, palette = "seq")
@@ -563,6 +566,7 @@ map_signif_coefs_diverging_func = function(x, var_name, var_name_TV, method, var
 }
 
 # MGWR coefficients
+bckgd <- st_read('data/land_auck.gpkg', quiet = T) # transform to OSGB projection
 mgwr_cycle <- map_nonsignif_coefs_diverging_func(x = mgwr_sf, "cycleToWork", "cycleToWork_TV", "% Cycle to Work", "Coefficient")
 mgwr_eur <- map_nonsignif_coefs_diverging_func(x = mgwr_sf, "PrEuropeanDesc", "PrEuropeanDesc_TV", "% European", "Coefficient")
 mgwr_privtr <- map_nonsignif_coefs_diverging_func(x = mgwr_sf, "privateTransporTtoWork", "privateTransporTtoWork_TV", "% Private Transport to Work", "Coefficient")

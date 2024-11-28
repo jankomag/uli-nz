@@ -2,7 +2,6 @@
 data/
 cache/
 .ipynb_checkpoints/
-reading/
 .RData
 .Rhistory
 SA1sNZ.qgz
@@ -23,5 +22,6 @@ zones.RData
 coinR6.R
 web-map/indextest.html
 web-map/sa1_auli.geojson
+web-map/testwebmap/*
 regression-analysis.ipynb
 data_prep.ipynb

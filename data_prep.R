@@ -197,7 +197,7 @@ sa1_allg[which(is.infinite(sa1_allg$dist_hospital),), "dist_hospital"] <- 100000
 sa1_allg[which(is.infinite(sa1_allg$dist_chemist),), "dist_chemist"] <- 100000
 sa1_allg$bikeability[is.na(sa1_allg$bikeability)] <- 0
 
-st_write(sa1_allg, "data/sa1_allvars.gpkg")
+st_write(sa1_allg, "data/sa1_allvars.gpkg", append=FALSE)
 ### end of code for paper ###
 
 

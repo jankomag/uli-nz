@@ -236,16 +236,28 @@ colnames(auli_web) <- c("LeisureSport","LeisureArt","TrainStation","BusStop",
                              "Chemist","Dentist","HealthCentre","Hospital",
                              "Childcare","PrimarySchool","SecondarySchool","Cafe",
                              "Restaurant","Pub","BBQ","Park","Beach","AULI","geom")
-auli_web <- st_simplify(auli_web, preserveTopology = FALSE, dTolerance = 10)
-st_write(auli_web, "web-map/sa1_auli.geojson")
+auli_web <- st_simplify(auli_web, preserveTopology = FALSE, dTolerance = 6)
+st_write(auli_web, "web-map/sa1_auli.geojson", append=F)
 
-
-numeric_data <- auli_web[, sapply(auli_web, is.numeric)]
+numeric_data <- auli_web[, sapply(auli_web, is.numeric)] %>% st_drop_geometry()
 cor <- cor(x = numeric_data, y = numeric_data, use="complete.obs", method="pearson")
 par(mfrow = c(1, 1))
 corrplot(cor, tl.srt = 45, type = "lower", method = "ellipse",
          order = "FPC", tl.cex = 0.8,
          tl.col = "black", diag = T, cl.cex=0.7,cl.offset=0.3)
+
+# Set up the plotting device
+png(filename = "outputs/correlation_plot.png", 
+    width = 8, height = 8, units = "in", res = 300)
+
+# Create the plot
+par(mfrow = c(1, 1))
+corrplot(cor, tl.srt = 45, type = "lower", method = "ellipse",
+         order = "FPC", tl.cex = 0.8,
+         tl.col = "black", diag = T, cl.cex=0.7, cl.offset=0.3)
+
+# Close the plotting device
+dev.off()
 
 #### AULI Visualisation ####
 ### MAP

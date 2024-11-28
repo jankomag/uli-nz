@@ -1,57 +1,27 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <meta charset="utf-8" />
-    <title>Testing KULI interactive map</title>
-    <meta
-      name="viewport"
-      content="initial-scale=1,maximum-scale=1,user-scalable=no"
-    />
-    <link
-      href="https://api.mapbox.com/mapbox-gl-js/v2.13.0/mapbox-gl.css"
-      rel="stylesheet"
-    />
-    <link href="style.css" rel="stylesheet" />
-    <script src="https://api.mapbox.com/mapbox-gl-js/v2.13.0/mapbox-gl.js"></script>
-  </head>
-  <body>
-
+<head>
+    <meta charset="utf-8">
+    <title>Auckland Urban Liveability Index</title>
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.css" rel="stylesheet">
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600&family=Lato:wght@400;700&display=swap" rel="stylesheet">
+    <link href="style.css" rel="stylesheet">
+</head>
+<body>
     <div id="map"></div>
-    <!-- <div id="legend" class="map-overlay"></div> -->
-
+    
     <div id="sidebar">
-      <h1>Auckland Urban Liveability Index</h1>
-      <p>Select indicator to view:</p>
-      <nav id="menu"></nav>
+        <h1>Auckland Urban Liveability Index</h1>
+        <p>Select indicator to view:</p>
+        <div id="menu"></div>
     </div>
+    
     <div id="legend">
-    <div class="legend-title">Legend</div>
-    <div class="legend-item">
-        <div class="legend-color" style="background-color: #fff5eb;"></div>
-        <div>1 - 2.9 </div>
+        <div class="legend-title">Legend</div>        
     </div>
-    <div class="legend-item">
-        <div class="legend-color" style="background-color: #fee6ce;"></div>
-        <div>2.9 - 4.5 </div>
-    </div>
-    <div class="legend-item">
-        <div class="legend-color" style="background-color: #fdd0a2;"></div>
-        <div>4.5 - 6.5 </div>
-    </div>
-    <div class="legend-item">
-        <div class="legend-color" style="background-color: #f16913;"></div>
-        <div>6.5 - 7.2 </div>
-    </div>
-    <div class="legend-item">
-        <div class="legend-color" style="background-color: #d94801;"></div>
-        <div>7.2 - 8.5 </div>
-    </div>
-    <div class="legend-item">
-        <div class="legend-color" style="background-color: #8c2d04;"></div>
-        <div>8.5 - 10 </div>
-    </div>
-</div>
 
-    <script src="auli_mapbox.js"></script>
-  </body>
+    <script src="wp_auli_mapbox.js"></script>
+</body>
 </html>

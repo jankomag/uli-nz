@@ -4,6 +4,7 @@ body {
   padding: 0;
   height: 100%;
   width: 100%;
+  overflow: hidden;
 }
 
 #map {
@@ -11,7 +12,10 @@ body {
   top: 0;
   bottom: 0;
   width: 100%;
+  height: 100%;
+  min-height: 750px;
 }
+
 #sidebar {
   position: absolute;
   background: #fff;
@@ -21,29 +25,30 @@ body {
   max-width: 280px;
   border-radius: 3px;
   border: 1px solid rgba(0, 0, 0, 0.4);
+  max-height: calc(100vh - 40px); /* Account for margins */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
+
 h1 {
-  margin-top: 0px;
+  margin-top: 0;
   margin-bottom: 10px;
   font-family: "Lato", sans-serif;
+  font-size: 24px; /* Slightly smaller heading */
 }
+
 p {
   font-family: "Lato", sans-serif;
+  margin: 8px 0;
 }
+
 #menu {
-  background: #fff;
-  position: relative;
-  align-content: center;
-  /* z-index: 1;
-    top: 10px;
-    right: 20px;
-    left: 20px; */
-  border-radius: 3px;
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 10px; /* Space for scrollbar */
+  margin-right: -10px; /* Offset padding */
   width: 240px;
-  border: 0px solid rgba(0, 0, 0, 0.4);
-  font-family: "Lato", sans-serif;
-  overflow: scroll;
-  max-height: 60vh;
 }
 
 #menu a {
@@ -51,20 +56,18 @@ p {
   color: #404040;
   display: block;
   margin: 0;
-  padding: 0;
-  padding: 10px;
+  padding: 8px 10px;
   text-decoration: none;
   border-bottom: 0px solid rgba(0, 0, 0, 0.25);
   text-align: left;
 }
+
 #menu .menu-category h3 {
   text-transform: capitalize;
   padding-left: 0px;
-  font-size: 20px;
+  font-size: 18px; /* Slightly smaller category headers */
   font-weight: 500;
-  padding-top: 0px;
-  margin-top: 5px;
-  margin-bottom: 5px;
+  margin: 5px 0;
 }
 
 #menu a:last-child {
@@ -85,34 +88,65 @@ p {
   background: #3074a4;
 }
 
+/* Custom scrollbar styling */
+#menu::-webkit-scrollbar {
+  width: 6px;
+}
+
+#menu::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+#menu::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 3px;
+}
+
+#menu::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+
+
 #legend {
-  font-family: Arial, sans-serif;
-  background-color: #fff;
+  background: #fff;
   padding: 10px;
-  border: 1px solid #ccc;
-  border-radius: 5px;
+  margin: 10px;
+  border-radius: 3px;
   position: absolute;
   top: 10px;
   right: 10px;
   z-index: 1;
+  font-family: "Open Sans", sans-serif;
+  min-width: 160px;
+  overflow-y: auto; /* Enable vertical scrolling if needed */
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+.legend-title {
+  font-weight: bold;
+  margin-bottom: 8px;
+  font-size: 13px;
+  position: sticky; /* Keep title visible while scrolling */
+  top: 0;
+  background: #fff;
+  padding: 2px 0;
 }
 
 .legend-item {
   display: flex;
   align-items: center;
-  margin-bottom: 5px;
+  margin-bottom: 4px; /* Reduced spacing between items */
+  font-size: 11px; /* Slightly smaller font */
+  line-height: 1.2; /* Tighter line height */
 }
 
 .legend-color {
-  width: 20px;
-  height: 20px;
-  margin-right: 5px;
-  border-radius: 50%;
-}
-
-.legend-title {
-  font-weight: bold;
-  margin-bottom: 5px;
+  width: 16px; /* Slightly smaller color boxes */
+  height: 16px;
+  margin-right: 6px;
+  flex-shrink: 0; /* Prevent color box from shrinking */
 }
 
 .mapboxgl-popup {
@@ -191,4 +225,37 @@ p {
   .menu-category.food .title-container {
     background-color: #f2bba1; /* light blue */
   }
+}
+
+#legend {
+  background: #fff;
+  padding: 10px;
+  margin: 10px;
+  border-radius: 3px;
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1;
+  font-family: "Open Sans", sans-serif;
+  min-width: 160px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+.legend-title {
+  font-weight: bold;
+  margin-bottom: 10px;
+  font-size: 14px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 5px;
+  font-size: 12px;
+}
+
+.legend-color {
+  width: 20px;
+  height: 20px;
+  margin-right: 8px;
 }

@@ -149,7 +149,7 @@ marae <- st_read("data/upload/auckland_marae_final.gpkg") |> st_transform(4326)
 primary <- st_read("data/upload/primary_schools.gpkg") |> st_transform(4326)
 secondary <- st_read("data/upload/secondary_schools.gpkg") |> st_transform(4326)
 sport <- st_read("data/upload/sport_facilities.gpkg") |> st_transform(4326)
-bigpark <- st_read("data/upload/parks.gpkg") |> st_transform(4326)
+bigpark <- st_read("data/auckland_parks_access_points.gpkg") |> st_transform(4326)
 
 #### Walking distance calculations ####
 sa1 <- get_distance(cafe, sa1, network)
@@ -292,7 +292,8 @@ tm_shape(sa1_crash)+tm_fill(c("crashesperarea","crash_per_roadlen","crash_risk")
 sa1_crash <- sa1_crash |> 
   dplyr::select(SA12018_V1_00, crash_risk, crash_per_roadlen)
 
-st_write(sa1_crash, "data/sa1_crash_risk.gpkg")
+st_write(sa1_crash, "data/sa1_crash_risk.gpkg", append=F, driver="GPKG")
+
 # finally join to the rest of the data
 sa1_crash <- st_drop_geometry(sa1_crash)
 sa1 <- left_join(sa1, sa1_crash, by="SA12018_V1_00")
@@ -322,4 +323,4 @@ sa1_bikeability <- st_drop_geometry(sa1_bikeability)
 
 # finally join to the rest of the data
 sa1 <- left_join(sa1, sa1_bikeability, by="SA12018_V1_00")
-st_write(sa1, "data/sa1_out_dist.gpkg")
+st_write(sa1, "data/sa1_out_dist.gpkg", append=F)
