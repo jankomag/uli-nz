@@ -224,6 +224,7 @@ for (i in seq_along(column_names)) {
   print(paste("Column Name:", column_names[i], "Index:", column_indices[i]))
 }
 auli <- index_sa1g[,c(1,45:73,75,76)]
+st_write(auli, "data/sa1_auli.gpkg", append=F)
 
 # save for webmap
 auli_web <- st_transform(auli,4326) |> 
@@ -269,18 +270,17 @@ aulimap <- tm_shape(auli) +
   tm_polygons(col = "auli_MPIAgg",
               palette = rev(hcl.colors(7, "YlGnBu")),
               title="AULI",
-              legend.hist = TRUE,
-              lwd = 0, style="jenks", n=7) +
-  tm_layout(
+              legend.hist = FALSE,
+              lwd = 0, style="jenks", n=7)+
+  tm_layout(legend.show = TRUE,frame = FALSE,
     #main.title = "Auckland Urban Liveability Index", main.title.fontfamily = "serif",
-    frame = FALSE, legend.title.fontfamily = "serif", main.title.size = 1.7,
-    legend.outside = FALSE,
-    legend.text.size = 0.00001,
-    legend.hist.size = 0.6,
-    legend.hist.width = 0.6,legend.hist.height = 0.2,
+    legend.title.fontfamily = "serif", main.title.size = 1.7,
+    #legend.outside = FALSE,
+    #legend.text.size = 0.00001)
+    #legend.hist.size = 0.6,
     bg.color="#edfbff", main.title.position = c('center', 'top')) +
   tm_compass(type = "4star", size = 1, position = c("left", "top"))
-tmap_save(aulimap, filename = "outputs/auli_map.png", width = 8, height = 8)
+tmap_save(aulimap, filename = "outputs/auli_map.png", width = 8, height = 8, dpi=300)
 
 #### Clustering ####
 auli_features <- st_drop_geometry(auli[, 2:30])

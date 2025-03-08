@@ -48,10 +48,16 @@ library(tidymodels)
 library(spatialreg)
 library(RColorBrewer)
 
+# min-max normalise function 
+minmaxNORM <- function(x) {
+  return (((x - min(x))) / (max(x) - min(x))*(10-1)+1)
+} #1-10
+
+
 #### Loading data ####
 # load the auli data
 auli <- st_read('data/sa1_auli.gpkg', quiet = T)
-sa1_polys <- st_read("data/upload/sa1_auckland_waiheke_urban.gpkg") |>
+sa1_polys <- st_read("data/sa1_auckland_waiheke_urban.gpkg") |>
   subset(select = c(SA12018_V1_00)) |> 
   st_transform(27291)
 nongauli <- st_drop_geometry(auli) |> 
@@ -329,8 +335,8 @@ lm.morantest(lm_sa1, sa1.lw, alternative="two.sided")
 lm.LMtests(lm_sa2, sa2.lw, c("LMerr","LMlag"), zero.policy=TRUE)
 
 ###### Spatial Lag Model #####
-#sp_lag_sa1 <- lagsarlm(formula, data = gdf, sa1.lw, method = "eigen")
-#save(sp_lag_sa1, file = "outputs/models/sp_lag_sa1.Rdata")
+sp_lag_sa1 <- lagsarlm(formula, data = gdf, sa1.lw, method = "eigen")
+save(sp_lag_sa1, file = "outputs/models/sp_lag_sa1.Rdata")
 #load("outputs/models/sp_lag_sa1.Rdata")
 summary(sp_lag_sa1)
 
@@ -391,7 +397,7 @@ mgwrsa1 <- gwr.multiscale(formula,
                        verbose = FALSE)
   
 # Save the model
-#save(mgwr, file = "outputs/models/mgwr_sa2_newest2.Rdata")
+save(mgwr, file = "outputs/models/mgwr_sa2_3-12-2024.Rdata")
 #save(mgwrsa1, file = "outputs/models/mgwr_sa1.Rdata")
 load("outputs/models/mgwr_sa2_newest2.Rdata")
 
