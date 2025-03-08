@@ -22,7 +22,7 @@ An interactive web map of the AULI and its components, created with Mapbox GL JS
 
 ### Dataset
 
-The final dataset of AULI and its components for Statistical Area 1 (2018) is available for download from this repository (AULI_SA1-2018.gpkg).
+The final dataset of AULI and its components for Statistical Area 1 (2018) is available for download [here](https://doi.org/10.6084/m9.figshare.28558343.v1).
 
 <p align="center">
   <img src="res/AULI_auckland.png" alt="AULI" width="800"/>
@@ -37,6 +37,7 @@ This work has been published in Applied Spatial Analysis and Policy:
 > *Applied Spatial Analysis and Policy*, Volume 18, Article 43 (2025)  
 > Published: 01 March 2025  
 > Open Access: [https://doi.org/10.1007/s12061-025-09456-8](https://doi.org/10.1007/s12061-025-09456-8)
+
 
 If you use this code or data in your research, please cite our paper:
 
